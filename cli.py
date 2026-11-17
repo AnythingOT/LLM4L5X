@@ -38,14 +38,15 @@ def _read_text(arg: str) -> str:
 def cmd_compile(a) -> int:
     project = read_l5x(Path(a.project)) if a.project else None
     known = project.tag_types(a.program) if project else None
+    revision = a.revision or (project.software_revision if project else None) or "32.04"
     comp = Compiler(known_tags=known, prefix=a.prefix, display_operands=a.display,
-                    comments=not a.no_comments,
+                    comments=not a.no_comments, revision=revision,
                     catalog=project.catalog() if project else None)
     res = comp.compile(parse_spec(_read_text(a.spec)))
     all_types = dict(known or {})
     all_types.update({t.name: t.datatype for t in res.tags.values()})
     issues = validate(res.rungs, all_types if project else None,
-                      catalog=project.catalog() if project else None)
+                      catalog=project.catalog() if project else None, revision=revision)
     for s in res.statements:
         print("#", describe_statement(s), file=sys.stderr)
     for r in res.rungs:
@@ -59,7 +60,7 @@ def cmd_compile(a) -> int:
         return 2
     if a.output:
         kw = dict(controller=a.controller, program=a.program or "MainProgram",
-                  revision=a.revision, scope=a.scope)
+                  revision=revision, scope=a.scope)
         xml = (write_routine(res.rungs, res.tags.values(), routine=a.routine, **kw)
                if a.routine else write_rungs(res.rungs, res.tags.values(), **kw))
         Path(a.output).write_text(xml, "utf-8")
@@ -137,7 +138,7 @@ def cmd_validate(a) -> int:
                 bad += 1
             else:
                 rungs.append(x.rung)
-        for i in validate(rungs, p.tag_types(rt.program), catalog=cat):
+        for i in validate(rungs, p.tag_types(rt.program), catalog=cat, revision=p.software_revision):
             print(f"{rt.program}/{rt.name} {i}")
             bad += i.level == "error"
     return 1 if bad else 0
@@ -166,7 +167,8 @@ def main(argv: list[str] | None = None) -> int:
     c.add_argument("--project", help="existing L5X export: known tags, AOIs, type checks")
     c.add_argument("--program", help="program whose tags are visible (default: controller tags only)")
     c.add_argument("--controller", default="LLM4L5X")
-    c.add_argument("--revision", default="32.04", help="SoftwareRevision attribute")
+    c.add_argument("--revision", help="target version, e.g. 36.00: picks GT/MOVE (v36+) or GRT/MOV "
+                   "(older); default: the --project's version, else 32.04")
     c.add_argument("--scope", choices=["controller", "program"], default="controller")
     c.add_argument("--prefix", default="L4X", help="prefix for compiler-made tags")
     c.add_argument("--display", choices=["placeholder", "values"], default="placeholder",

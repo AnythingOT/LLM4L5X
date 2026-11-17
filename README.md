@@ -44,7 +44,7 @@ The server listens on `127.0.0.1` only, so nothing leaves your PC.
 | `IF TRUE THEN action;` | unconditional |
 | `A` / `NOT A` | `XIC(A)` / `XIO(A)` |
 | `a AND b` / `a OR b` | series / branch |
-| `N = 5` `<>` `>` `<` `>=` `<=` | `EQU NEQ GRT LES GEQ LEQ` |
+| `N = 5` `<>` `>` `<` `>=` `<=` | `EQU NEQ GRT LES GEQ LEQ`, or `EQ NE GT LT GE LE` for v36+ |
 | `RISE(expr)` | `ONS` with an auto storage bit |
 | `DELAY(expr, 5s [, Timer])` | helper rung `expr TON(T,?,?)`, then `XIC(T.DN)` (`OFFDELAY` → `TOF`) |
 
@@ -54,6 +54,7 @@ Rules:
 - **AND and OR can't be mixed without parentheses**, so precedence mistakes are impossible.
 - `:=` at statement level is a coil; inside `IF … THEN` it's a move or math.
 - Tag types are inferred from use. Attach your project so existing tags are reused instead of created.
+- **Instruction names follow your Logix Designer version.** v36 renamed `GRT`→`GT`, `EQU`→`EQ`, `MOV`→`MOVE` and others. Set ⚙️ *Logix Designer version*; attaching a project sets it automatically.
 
 Full reference and design: [docs/DESIGN.md](docs/DESIGN.md).
 
@@ -81,7 +82,7 @@ l5x/                reader.py, writer.py, xref.py
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             front ends that produce LogicSpec: gbnf.py now; Excel C&E and LLM later
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (119 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (122 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

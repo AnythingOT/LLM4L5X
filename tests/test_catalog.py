@@ -9,10 +9,17 @@ def test_core_set_present():
         assert name in cat, name
 
 
-def test_old_repo_mnemonics_are_not_valid():
+def test_v36_renamed_mnemonics():
+    """Rockwell renamed these in Logix Designer v36 (IEC 61131-3 / PLCopen names)."""
     cat = default_catalog()
-    for bad in ("EQ", "NE", "GT", "LT", "GE", "LE"):
-        assert bad not in cat
+    pairs = {"EQU": "EQ", "NEQ": "NE", "GRT": "GT", "LES": "LT", "GEQ": "GE", "LEQ": "LE",
+             "LIM": "LIMIT", "MOV": "MOVE"}
+    for old, new in pairs.items():
+        o, n = cat.get(old), cat.get(new)
+        assert o.max_version == 35 and o.renamed_to == new, old
+        assert n.min_version == 36 and len(n.operands) == len(o.operands), new
+        assert o.available_in(35) and not o.available_in(36)
+        assert n.available_in(36) and not n.available_in(35)
 
 
 def test_lookup_case_insensitive_and_kinds():

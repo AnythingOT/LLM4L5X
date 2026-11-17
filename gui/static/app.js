@@ -209,6 +209,10 @@ const render = {
 
     project(d) {
         setProject(d.filename, d.programs);
+        if (d.revision_major) {
+            settings.revision = `${d.revision_major}.00`;
+            store.set('llm4l5x.settings', settings);
+        }
         const unparsed = d.routines.reduce((a, r) => a + r.unparsed, 0);
         const parts = [
             el('div', { cls: 'status-line ok', text: `✔ Attached ${d.filename}` }),
@@ -218,7 +222,8 @@ const render = {
                 d.routines.map((r) => [r.program, r.name, r.type, String(r.rungs), r.unparsed ? String(r.unparsed) : ''])),
         ];
         if (unparsed) parts.push(el('div', { cls: 'warn', text: `⚠ ${unparsed} rung(s) could not be parsed — run 'validate' to see them.` }));
-        parts.push(el('div', { cls: 'rung-comment', text: 'New LogicSpec is now checked against this project\'s tags and AOIs.' }));
+        const v36 = (d.revision_major ?? 0) >= 36;
+        parts.push(el('div', { cls: 'rung-comment', text: `New LogicSpec is now checked against this project's tags and AOIs, and written with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
         const row = el('div', { cls: 'btn-row' });
         row.appendChild(button('Decompile all rungs', () => send('decompile')));
         row.appendChild(button('Validate', () => send('validate')));

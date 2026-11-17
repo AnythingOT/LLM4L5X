@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from core.catalog import Catalog, default_catalog
+from core.catalog import Catalog, default_catalog, major_version
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_placeholder, walk
 
 import re
@@ -53,10 +53,12 @@ def validate(
     rungs: list[Rung],
     tag_types: dict[str, str] | None = None,
     catalog: Catalog | None = None,
+    revision: str | None = None,
 ) -> list[Issue]:
     """tag_types: {tag: datatype} for the project plus any new tags. Unknown tags are
     reported only when tag_types is given."""
     cat = catalog or default_catalog()
+    major = major_version(revision)
     types = {k: v.upper() for k, v in (tag_types or {}).items()}
     issues: list[Issue] = []
     ons_bits: dict[str, int] = {}
@@ -72,6 +74,13 @@ def validate(
             if spec is None:
                 issues.append(Issue("error", n, f"unknown instruction {ins.name}"))
                 continue
+            if not spec.available_in(major):
+                if spec.min_version and major < spec.min_version:
+                    old = next((i.name for i in cat.instructions.values() if i.renamed_to == spec.name), None)
+                    hint = f"; use {old}" if old else ""
+                    issues.append(Issue("error", n, f"{ins.name} needs v{spec.min_version}+, target is v{major}{hint}"))
+                else:
+                    issues.append(Issue("warning", n, f"{ins.name} was renamed {spec.renamed_to} in v{spec.max_version + 1}; target is v{major}"))
             if not spec.arity_ok(len(ins.args)):
                 want = f"at least {len(spec.operands)}" if spec.variadic else str(len(spec.operands))
                 issues.append(Issue("error", n, f"{ins.name} takes {want} operands, got {len(ins.args)}"))

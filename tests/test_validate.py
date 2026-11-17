@@ -11,8 +11,8 @@ def test_clean():
 
 
 def test_unknown_instruction_and_arity():
-    m = " ".join(msgs("EQ(a,b)OTE(c);", "XIC(a,b)OTE(c);"))
-    assert "unknown instruction EQ" in m and "XIC takes 1 operands, got 2" in m
+    m = " ".join(msgs("FOO(a,b)OTE(c);", "XIC(a,b)OTE(c);"))
+    assert "unknown instruction FOO" in m and "XIC takes 1 operands, got 2" in m
 
 
 def test_must_end_in_output():
@@ -48,3 +48,14 @@ def test_levels():
 
 def test_writing_timer_status_bit_warned():
     assert any("status bit" in m for m in msgs("XIC(a)OTE(T1.DN);"))
+
+
+def test_mnemonics_checked_against_target_version():
+    v35 = [str(i) for i in validate([parse_rung("GT(a,1)MOVE(1,b);")], revision="35.01")]
+    assert any("GT needs v36+, target is v35; use GRT" in m for m in v35)
+    assert any("MOVE needs v36+" in m and "use MOV" in m for m in v35)
+    v36 = validate([parse_rung("GRT(a,1)MOV(1,b);")], revision="v36.00")
+    assert [i.level for i in v36] == ["warning", "warning"]
+    assert "GRT was renamed GT in v36" in v36[0].message
+    assert validate([parse_rung("GT(a,1)MOVE(1,b);")], revision="36.00") == []
+    assert validate([parse_rung("GRT(a,1)MOV(1,b);")]) == []  # unknown target: both accepted

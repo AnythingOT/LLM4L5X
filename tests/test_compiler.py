@@ -172,3 +172,20 @@ def test_counter_semantics():
 def test_comments_are_read_back():
     res = compile_spec("Pump := Start OR Pump;")
     assert res.rungs[0].comment.startswith("Pump is on while either Start is on OR Pump is on")
+
+
+def test_v36_mnemonics():
+    spec = "X := A = 1 AND B <> 2 AND C > 3 AND D < 4 AND E >= 5 AND F <= 6; IF G THEN N := 3;"
+    assert texts(spec, revision="36.00") == [
+        "EQ(A,1)NE(B,2)GT(C,3)LT(D,4)GE(E,5)LE(F,6)OTE(X);", "XIC(G)MOVE(3,N);"]
+    assert texts(spec, revision="35.01")[0].startswith("EQU(A,1)NEQ(B,2)GRT(C,3)")
+    assert texts(spec)[1] == "XIC(G)MOV(3,N);"  # unknown version: pre-v36 names
+
+
+def test_v36_rungs_simulate_and_decompile():
+    from explain.decompiler import decompile_rung
+    from core.logicspec import format_spec
+    res = compile_spec("X := N > 5 AND NOT (M = 2);", comments=False, revision="36")
+    assert res.texts == ["GT(N,5)NE(M,2)OTE(X);"]
+    assert Simulator(res.rungs, {"N": 6, "M": 1}).scan()["X"] is True
+    assert format_spec(decompile_rung(res.rungs[0])) == "X := N > 5 AND M <> 2;"

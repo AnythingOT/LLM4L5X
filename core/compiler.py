@@ -10,7 +10,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from core.catalog import Catalog, default_catalog
+from core.catalog import Catalog, default_catalog, major_version
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_plain_tag, walk
 from core.logicspec import (
     And, Assign, Clear, Cmp, CMP_COMPLEMENT, Count, Delay, Expr, IfThen, Math, Not, Or,
@@ -73,9 +73,12 @@ class Compiler:
         display_operands: str = "placeholder",
         comments: bool = True,
         catalog: Catalog | None = None,
+        revision: str | None = None,
     ):
         """
         known_tags: existing project tags {name: datatype}; not re-created, checked for type.
+        revision: target Logix Designer version ("36.00"). v36+ uses the IEC mnemonics
+            (EQ, GT, MOVE ...); earlier or unknown versions use EQU, GRT, MOV ...
         display_operands: "placeholder" writes TON(T,?,?); "values" writes TON(T,5000,0).
             Real exports always use "?" (docs/DESIGN.md section 9); "values" is a fallback.
         """
@@ -86,6 +89,7 @@ class Compiler:
         self.display = display_operands
         self.comments = comments
         self.cat = catalog or default_catalog()
+        self.major = major_version(revision)
         self._counter: dict[str, int] = {}
         self.tags: dict[str, TagDef] = {}
         self.warnings: list[str] = []
@@ -237,6 +241,8 @@ class Compiler:
                 rungs += self.statement(s)
             except CompileError as e:
                 raise CompileError(f"{format_statement(s)}\n  -> {e}") from None
+        if self.major is not None and self.major >= 36:
+            rungs = [Rung(_rename(r.body, self.cat), r.comment) for r in rungs]
         self._type_tags(rungs)
         return CompileResult(rungs, self.tags, stmts, self.warnings)
 
@@ -292,6 +298,18 @@ class Compiler:
         for b in sorted(member_refs):
             if b not in self.tags and b not in self.known:
                 self.warnings.append(f"{b} is used with a member, bit or index; it must already exist in the project")
+
+
+def _rename(node, cat: Catalog):
+    """Rewrite v35 mnemonics to their v36+ names (GRT -> GT, MOV -> MOVE, ...)."""
+    if isinstance(node, Instr):
+        spec = cat.get(node.name)
+        return Instr(spec.renamed_to, node.args) if spec and spec.renamed_to else node
+    if isinstance(node, Series):
+        return Series(tuple(_rename(i, cat) for i in node.items))
+    if isinstance(node, Branch):
+        return Branch(tuple(_rename(l, cat) for l in node.legs))
+    raise TypeError(node)
 
 
 def _is_float(s: str) -> bool:

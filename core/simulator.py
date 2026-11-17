@@ -14,6 +14,10 @@ import re
 from core.rung import Branch, Instr, Rung, Series, is_literal
 
 
+_V36 = {"EQ": "EQU", "NE": "NEQ", "GT": "GRT", "LT": "LES", "GE": "GEQ", "LE": "LEQ",
+        "LIMIT": "LIM", "MOVE": "MOV"}
+
+
 class SimError(RuntimeError):
     pass
 
@@ -77,6 +81,7 @@ class Simulator:
 
     def instr(self, i: Instr, p: bool) -> bool:
         n, a = i.name.upper(), i.args
+        n = _V36.get(n, n)  # v36+ mnemonics behave like the old ones
         if n == "XIC":
             return p and self.bit(a[0])
         if n == "XIO":

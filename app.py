@@ -14,6 +14,7 @@ import time
 
 from flask import Flask, jsonify, render_template, request
 
+from core.catalog import major_version
 from core.compiler import CompileError, Compiler
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import RungSyntaxError, format_rung, parse_rung
@@ -119,12 +120,12 @@ def _compile(stmts, s: dict) -> dict:
     catalog = proj.catalog() if proj else None
     try:
         res = Compiler(known_tags=known, prefix=s["prefix"], display_operands=s["display"],
-                       comments=s["comments"], catalog=catalog).compile(stmts)
+                       comments=s["comments"], catalog=catalog, revision=s["revision"]).compile(stmts)
     except CompileError as e:
         return {"kind": "error", "message": str(e)}
     types = dict(known or {})
     types.update({t.name: t.datatype for t in res.tags.values()})
-    issues = validate(res.rungs, types if proj else None, catalog=catalog)
+    issues = validate(res.rungs, types if proj else None, catalog=catalog, revision=s["revision"])
     out = {
         "kind": "compiled",
         "readback": [describe_statement(st) for st in res.statements],
@@ -169,7 +170,7 @@ def _try_rungs(text: str) -> dict | None:
         })
     catalog = proj.catalog() if proj else None
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None
-    issues = validate(parsed, all_tags, catalog=catalog)
+    issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None)
     return {"kind": "rungs", "rungs": rungs, "issues": _issues_json(issues)}
 
 
@@ -195,6 +196,7 @@ def _summary(p: Project) -> dict:
         "aois": sorted(p.aois),
         "programs": programs,
         "routines": routines,
+        "revision_major": major_version(p.software_revision),
     }
 
 
@@ -253,7 +255,7 @@ def _project_action(action: str) -> dict:
                              "message": f"parse error: {x.parse_error}"})
             else:
                 good.append(x.rung)
-        for i in validate(good, p.tag_types(rt.program), catalog=cat):
+        for i in validate(good, p.tag_types(rt.program), catalog=cat, revision=p.software_revision):
             rows.append({"where": f"{rt.program}/{rt.name} rung {i.rung}", "level": i.level, "message": i.message})
     return {"kind": "validated", "rows": rows}
 

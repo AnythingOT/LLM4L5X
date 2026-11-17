@@ -15,9 +15,10 @@ from core.logicspec import (
     SetBit, StartTimer, Statement, Var,
 )
 
-INSTR_CMP = {"EQU": "=", "NEQ": "<>", "GRT": ">", "LES": "<", "GEQ": ">=", "LEQ": "<="}
+INSTR_CMP = {"EQU": "=", "NEQ": "<>", "GRT": ">", "LES": "<", "GEQ": ">=", "LEQ": "<=",
+             "EQ": "=", "NE": "<>", "GT": ">", "LT": "<", "GE": ">=", "LE": "<="}  # v35 and v36+ names
 INSTR_MATH = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV": "/"}
-_OUTPUTS = {"OTE", "OTL", "OTU", "CLR", "RES", "MOV", "ADD", "SUB", "MUL", "DIV",
+_OUTPUTS = {"OTE", "OTL", "OTU", "CLR", "RES", "MOV", "MOVE", "ADD", "SUB", "MUL", "DIV",
             "TON", "TOF", "CTU", "CTD"}
 
 
@@ -82,7 +83,7 @@ def _action(i: Instr, presets: dict[str, int]):
         return Clear(a[0])
     if n == "RES":
         return ResetAcc(a[0])
-    if n == "MOV":
+    if n in ("MOV", "MOVE"):
         return Math(a[1], a[0])
     if n in INSTR_MATH:
         return Math(a[2], a[0], INSTR_MATH[n], a[1])

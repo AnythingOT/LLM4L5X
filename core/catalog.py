@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -28,6 +29,16 @@ class Instruction:
     description: str = ""
     variadic: bool = False
     source: str = "builtin"  # builtin | aoi
+    min_version: int | None = None  # first Logix Designer major version with this mnemonic
+    max_version: int | None = None  # last major version with this mnemonic
+    renamed_to: str | None = None  # mnemonic used from the next version on
+
+    def available_in(self, major: int | None) -> bool:
+        if major is None:
+            return True
+        return (self.min_version is None or major >= self.min_version) and (
+            self.max_version is None or major <= self.max_version
+        )
 
     @property
     def is_input(self) -> bool:
@@ -78,7 +89,16 @@ def _validate_entry(name: str, raw: dict) -> Instruction:
         operands=tuple(ops),
         description=raw.get("description", ""),
         variadic=bool(raw.get("variadic", False)),
+        min_version=raw.get("min_version"),
+        max_version=raw.get("max_version"),
+        renamed_to=raw.get("renamed_to"),
     )
+
+
+def major_version(revision: str | None) -> int | None:
+    """'36.00' / 'v35.01' / '32' -> 36 / 35 / 32; None if unknown."""
+    m = re.match(r"\s*v?(\d+)", revision or "")
+    return int(m.group(1)) if m else None
 
 
 def load_catalog(text: str | None = None) -> Catalog:

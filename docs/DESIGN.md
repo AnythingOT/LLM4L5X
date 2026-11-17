@@ -42,8 +42,10 @@ testable software and is useful on its own.
   goes here.
 - `AnythingOT/LLM4L5XGen` — archived prototype (system prompt + keyword validator + f-string
   XML). Reference only. Do not port its code. Its known faults, so they are not repeated:
-  - Invalid comparison mnemonics (`EQ, NE, GT, LT, GE, LE`). Logix uses
-    `EQU, NEQ, GRT, LES, GEQ, LEQ`.
+  - Comparison mnemonics (`EQ, NE, GT, LT, GE, LE`) are only valid in Logix Designer v36+;
+    v35 and earlier use `EQU, NEQ, GRT, LES, GEQ, LEQ`. The old code did not know which version
+    it targeted. (Corrected 2026-11-17: an earlier draft of this document wrongly called the
+    v36 names invalid. Rockwell renamed them in v36; see section 9.)
   - The prompt's timer-done section says `XIC(A.DN)` but its examples output `OTE(A.DN)`.
   - `ONS` treated as acting on the input tag; it needs its own storage bit per instance.
   - No branches. Every rung written with `Number="0"`.
@@ -136,7 +138,8 @@ terminal is restricted to retrieved candidate tags plus an explicit new-tag form
   nodes; do not otherwise minimise. The rung should mirror what was asked.
 - `tag` → `XIC(tag)`. `NOT tag` → `XIO(tag)`.
 - NOT on a group → push down with De Morgan until it reaches atoms.
-- Comparisons → `EQU NEQ GRT LES GEQ LEQ`. NOT flips to the complement.
+- Comparisons → `EQU NEQ GRT LES GEQ LEQ` (target v35 or unknown) or `EQ NE GT LT GE LE`
+  (target v36+); `MOV` likewise becomes `MOVE`. NOT flips to the complement.
 - `RISE(e)` → compile `e`, then `ONS(bit)` with an auto-allocated, unique BOOL storage tag.
   `NOT RISE(...)` is rejected with a clear error.
 - `DELAY(e, d)` → emit a separate earlier rung `e TON(T)` with an auto-allocated TIMER tag whose
@@ -231,6 +234,16 @@ Confirmed:
 - Module I/O (`Local:3:I`, `FIT_2038:I1`) and system tags (`S:FS`) are not `<Tag>` elements.
 - `MOVE`, `CONCAT`, `RTOS`, `OSR`, `CMP`, `PID`, `FLL`, `MVM`, `MOD`, `GSV`, `SSV` and `EVENT`
   occur in real code and are now in the catalog with the operand counts seen.
+- **Mnemonics depend on the version.** Rockwell renamed several instructions in v36 to the
+  IEC 61131-3 / PLCopen names: EQU→EQ, NEQ→NE, GRT→GT, LES→LT, GEQ→GE, LEQ→LE, LIM→LIMIT,
+  MOV→MOVE, SQR→SQRT, TRN→TRUNC, XPY→EXPT, ACS/ASN/ATN→ACOS/ASIN/ATAN, TOD→TO_BCD,
+  FRD→BCD_TO (Rockwell help page "Updated instruction mnemonics"). In the corpus, `GT` and
+  `MOVE` occur only in v36.00 exports. The catalog records `max_version`/`renamed_to` and
+  `min_version`; the compiler picks names from the target version; the validator errors on a
+  v36 name for a v35 target and warns on an old name for a v36 target. The math/trig renames
+  are not in the catalog yet.
+- Unknown: whether v36+ still accepts the old names in an imported L5X. Until tested, the
+  compiler always writes the names of the target version.
 
 Still unverified (needs a real import into Studio 5000):
 - Whether a **Rung-target** L5X written by `l5x/writer.py` imports without errors. The element

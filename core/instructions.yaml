@@ -16,6 +16,11 @@
 #             | display (shown on the instruction, really a tag member;
 #               exported as "?" -- confirmed, see docs/DESIGN.md section 9)
 #   member  - for display operands: the member of the struct operand it shows
+# version fields (Logix Designer major version):
+#   max_version / renamed_to - mnemonic replaced in v36 (Rockwell "Updated
+#     instruction mnemonics": EQU->EQ, NEQ->NE, GRT->GT, LES->LT, GEQ->GE,
+#     LEQ->LE, LIM->LIMIT, MOV->MOVE, SQR->SQRT, ...)
+#   min_version - mnemonic introduced in that version
 
 XIC:
   kind: input
@@ -101,6 +106,8 @@ RES:
 
 EQU:
   kind: input
+  max_version: 35
+  renamed_to: EQ
   description: Equal. True when A = B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -108,6 +115,8 @@ EQU:
 
 NEQ:
   kind: input
+  max_version: 35
+  renamed_to: NE
   description: Not equal. True when A <> B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -115,6 +124,8 @@ NEQ:
 
 GRT:
   kind: input
+  max_version: 35
+  renamed_to: GT
   description: Greater than. True when A > B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -122,6 +133,8 @@ GRT:
 
 LES:
   kind: input
+  max_version: 35
+  renamed_to: LT
   description: Less than. True when A < B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -129,6 +142,8 @@ LES:
 
 GEQ:
   kind: input
+  max_version: 35
+  renamed_to: GE
   description: Greater than or equal. True when A >= B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -136,6 +151,8 @@ GEQ:
 
 LEQ:
   kind: input
+  max_version: 35
+  renamed_to: LE
   description: Less than or equal. True when A <= B.
   operands:
     - {name: source_a, type: NUMERIC, role: read}
@@ -143,6 +160,8 @@ LEQ:
 
 LIM:
   kind: input
+  max_version: 35
+  renamed_to: LIMIT
   description: Limit test. True when Test is between Low and High.
   operands:
     - {name: low_limit, type: NUMERIC, role: read}
@@ -151,6 +170,8 @@ LIM:
 
 MOV:
   kind: output
+  max_version: 35
+  renamed_to: MOVE
   description: Move. Dest = Source.
   operands:
     - {name: source, type: NUMERIC, role: read}
@@ -243,7 +264,8 @@ OSF:
 
 MOVE:
   kind: output
-  description: Move (appears in Rockwell's own sample exports; treated like MOV).
+  min_version: 36
+  description: Move (v36+ name of MOV; also moves strings). Seen in Rockwell's v36 sample exports.
   operands:
     - {name: source, type: ANY, role: read}
     - {name: dest, type: ANY, role: write}
@@ -342,3 +364,62 @@ PID:
     - {name: feedforward, type: ANY, role: read}
     - {name: alarm_disable, type: ANY, role: read}
     - {name: hold, type: ANY, role: read}
+
+# ---- v36+ mnemonics (IEC 61131-3 / PLCopen names) ----
+
+EQ:
+  min_version: 36
+  kind: input
+  description: Equal. True when A = B. (v36+ name of EQU)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+NE:
+  min_version: 36
+  kind: input
+  description: Not equal. True when A <> B. (v36+ name of NEQ)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+GT:
+  min_version: 36
+  kind: input
+  description: Greater than. True when A > B. (v36+ name of GRT)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+LT:
+  min_version: 36
+  kind: input
+  description: Less than. True when A < B. (v36+ name of LES)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+GE:
+  min_version: 36
+  kind: input
+  description: Greater than or equal. True when A >= B. (v36+ name of GEQ)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+LE:
+  min_version: 36
+  kind: input
+  description: Less than or equal. True when A <= B. (v36+ name of LEQ)
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+
+LIMIT:
+  min_version: 36
+  kind: input
+  description: Limit test. True when Test is between Low and High. (v36+ name of LIM)
+  operands:
+    - {name: low_limit, type: NUMERIC, role: read}
+    - {name: test, type: NUMERIC, role: read}
+    - {name: high_limit, type: NUMERIC, role: read}
