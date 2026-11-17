@@ -23,7 +23,7 @@ def test_seal_in():
 
 
 def test_de_morgan_and_comparison_complement():
-    assert texts("Lamp := NOT (A AND (B OR C > 5));") == ["[XIO(A) ,XIO(B)LEQ(C,5) ]OTE(Lamp);"]
+    assert texts("Lamp := NOT (A AND (B OR C > 5));") == ["[XIO(A) ,XIO(B) LEQ(C,5) ]OTE(Lamp);"]
 
 
 def test_nested_or_flattened():
@@ -31,7 +31,7 @@ def test_nested_or_flattened():
 
 
 def test_nested_branch():
-    assert texts("X := (A AND (B OR C)) OR D;") == ["[XIC(A)[XIC(B) ,XIC(C) ] ,XIC(D) ]OTE(X);"]
+    assert texts("X := (A AND (B OR C)) OR D;") == ["[XIC(A) [XIC(B) ,XIC(C) ] ,XIC(D) ]OTE(X);"]
 
 
 def test_comparisons_map_to_logix_mnemonics():

@@ -28,7 +28,7 @@ def test_ote_branch_split_when_safe():
 @pytest.mark.parametrize("text,why", [
     ("XIC(A)OTE(B)XIC(C)OTE(D);", "middle"),
     ("[XIC(A)OTE(B) ,XIC(C) ]OTE(D);", "middle"),
-    ("XIC(A)[ ,XIC(B) ]OTE(C);", "empty"),
+    ("XIC(A)[,XIC(B) ]OTE(C);", "empty"),
     ("XIC(A)TON(T1,?,?);", "preset"),
     ("[XIC(A) ,XIC(B) ]XIO(B)[OTE(B) ,OTE(C) ];", "reads its own"),
     ("XIC(A)JSR(Sub,0);", "outputs only"),
@@ -50,6 +50,6 @@ def test_compile_decompile_equivalent_random():
 
 
 def test_recompile_is_identical():
-    src = "[XIC(a)[XIC(b) ,XIO(c) ] ,GRT(n,5) ]XIO(d)OTE(q);"
+    src = "[XIC(a) [XIC(b) ,XIO(c) ] ,GRT(n,5) ]XIO(d)OTE(q);"
     spec = dec(src)
     assert compile_spec(spec, comments=False).texts == [src]

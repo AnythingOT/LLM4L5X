@@ -90,3 +90,11 @@ def test_decompile_fixture_with_presets():
     main = next(r for r in p.routines if r.name == "MainRoutine")
     out = [try_decompile(r.rung, p.presets())[0] for r in main.rungs[:3]]
     assert all(out)
+
+
+def test_survey_on_fixture_folder():
+    from explain.survey import survey
+    s = survey(FIX.parent)
+    assert s.files == 1 and s.rungs == 5 and s.parsed == 4
+    assert s.exact_round_trip == 4 and s.convertible == 3
+    assert "exact round trip" in s.report()

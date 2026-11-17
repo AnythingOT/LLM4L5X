@@ -212,21 +212,36 @@ Hold out part of the corpus. Report, per model and per prompt variant:
 Parse rate is 100% by construction and is not a metric. Without this harness there is no way to
 tell whether a model swap or prompt change helped.
 
-## 9. Claims to verify against real exports
+## 9. Format details: what real exports confirmed
 
-These were stated from memory during design. Confirm each one on real files before depending
-on it, and correct this document where it is wrong.
+Checked on 2026-11-17 against 179 public L5X files (3,160 rungs) from GitHub, including
+Rockwell's own `RockwellAutomation/ra-logix-cicd` samples. Re-run any time with
+`python cli.py survey <folder>`.
 
-- Timer and counter operands export as `TON(Timer1,?,?)`; preset and accum are tag members,
-  set in tag data, not operands.
-- Exact whitespace of branches in exported text (believed `[XIC(a) ,XIC(b) ]`).
-- How TIMER/COUNTER initial data must be written for import (L5K vs Decorated data forms).
-- Which `SoftwareRevision` the owner targets (the old code hard-coded 32.04) and whether
-  imports are tolerant of minor mismatches.
-- Any branch nesting or rung size limits in Logix.
-- Whether the Rockwell Logix Designer SDK supports the owner's version for automated import
-  tests.
-- That the help/manual operand tables are regular enough to parse with code.
+Confirmed:
+- **Timer/counter operands export as `TON(T,?,?)`** (261 of 261). Preset and accumulator live
+  in tag data.
+- **TIMER/COUNTER L5K data is `[control, PRE, ACC]`**, e.g. `[21092,1500,0]`.
+- **Branch spacing:** no separator at top level; inside `[...]` every element is followed by
+  one space; legs joined by `,`; empty legs are `[,X ]` / `[X ,]`. Our printer reproduces
+  3,157 of 3,160 rungs byte-for-byte. The 3 misses are one hand-written third-party file.
+- **AOI call operands** are the instance tag, then the required parameters in definition order
+  (e.g. `IO_Module_Status(inst,Module_In,Status)`). `MODULE`-type parameters take a module
+  name, not a tag.
+- Module I/O (`Local:3:I`, `FIT_2038:I1`) and system tags (`S:FS`) are not `<Tag>` elements.
+- `MOVE`, `CONCAT`, `RTOS`, `OSR`, `CMP`, `PID`, `FLL`, `MVM`, `MOD`, `GSV`, `SSV` and `EVENT`
+  occur in real code and are now in the catalog with the operand counts seen.
+
+Still unverified (needs a real import into Studio 5000):
+- Whether a **Rung-target** L5X written by `l5x/writer.py` imports without errors. The element
+  layout follows exports, but no import has been tried.
+- Which `SoftwareRevision` values import cleanly into the owner's version.
+- `MOV` with STRING tags appears in real exports; whether it verifies is unknown, so the
+  validator only warns.
+
+Coverage gap found: only 36% of real rungs convert to LogicSpec. The main blocker (1,667
+rungs) is that LogicSpec has no action for AOI calls, `JSR`, `COP`, `CPT`, `LIM` and similar.
+That limits few-shot mining, not code generation.
 
 ## 10. Non-goals for now
 

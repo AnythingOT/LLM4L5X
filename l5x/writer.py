@@ -1,8 +1,8 @@
 """Deterministic L5X writer for Rung and Routine imports.
 
 Built with lxml so names and comments are escaped correctly. The layout
-mirrors Studio 5000 exports; items marked UNVERIFIED in HANDOFF.md
-section 9 (tag data formats, Use attributes) must be confirmed by importing.
+mirrors Studio 5000 exports; what is confirmed and what still needs an
+import test is listed in docs/DESIGN.md section 9.
 """
 
 from __future__ import annotations
@@ -56,7 +56,7 @@ def _tag_element(parent, t: TagDef, use: str | None = None) -> None:
         _data_value(el, "REAL", "Float", "0.0")
     elif t.datatype in ("TIMER", "COUNTER"):
         pre = int(t.preset or 0)
-        # L5K layout [control word, PRE, ACC] -- UNVERIFIED, see HANDOFF.md section 9
+        # L5K layout [control word, PRE, ACC] -- confirmed on real exports
         _cdata(el, "Data", f"[0,{pre},0]").set("Format", "L5K")
         dec = etree.SubElement(el, "Data", Format="Decorated")
         st = etree.SubElement(dec, "Structure", DataType=t.datatype)

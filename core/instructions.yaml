@@ -1,8 +1,9 @@
 # Instruction catalog: the single source of truth for the parser, validator,
 # compiler, simulator and prompt snippets.
 #
-# Hand-checked core set (milestone M1). Every entry here must eventually be
-# confirmed against real Studio 5000 exports; see HANDOFF.md section 9.
+# Core set hand-checked; operand counts of everything below were confirmed
+# against 3,160 rungs from public Studio 5000 exports (2026-11-17), except
+# entries marked 'not seen in samples'. Semantics come from Rockwell docs.
 #
 # kind:
 #   input   - a condition instruction; passes rung power only when true
@@ -10,9 +11,10 @@
 # operand fields:
 #   name    - operand name
 #   type    - BOOL | NUMERIC | TIMER | COUNTER | ANY | ROUTINE | EXPR
+#             | NAME (an object/class/attribute name, not a tag)
 #   role    - read | write | struct (control structure, read and written)
 #             | display (shown on the instruction, really a tag member;
-#               exported as "?" -- unverified, see HANDOFF.md section 9)
+#               exported as "?" -- confirmed, see docs/DESIGN.md section 9)
 #   member  - for display operands: the member of the struct operand it shows
 
 XIC:
@@ -224,3 +226,119 @@ JSR:
   operands:
     - {name: routine_name, type: ROUTINE, role: read}
     - {name: input_count, type: NUMERIC, role: read}
+
+OSR:
+  kind: output
+  description: One shot rising with output. Output bit is true for one scan when the rung goes true.
+  operands:
+    - {name: storage_bit, type: BOOL, role: struct}
+    - {name: output_bit, type: BOOL, role: write}
+
+OSF:
+  kind: output
+  description: One shot falling with output (not seen in samples).
+  operands:
+    - {name: storage_bit, type: BOOL, role: struct}
+    - {name: output_bit, type: BOOL, role: write}
+
+MOVE:
+  kind: output
+  description: Move (appears in Rockwell's own sample exports; treated like MOV).
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+
+CMP:
+  kind: input
+  description: Compare. True when the expression is true.
+  operands:
+    - {name: expression, type: EXPR, role: read}
+
+MOD:
+  kind: output
+  description: Modulo. Dest = A MOD B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+NEG:
+  kind: output
+  description: Negate. Dest = -Source (not seen in samples).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+ABS:
+  kind: output
+  description: Absolute value (not seen in samples).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+FLL:
+  kind: output
+  description: File fill. Fills Length elements of Dest with Source.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+    - {name: length, type: NUMERIC, role: read}
+
+MVM:
+  kind: output
+  description: Masked move. Dest = (Source AND Mask) OR (Dest AND NOT Mask).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: mask, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+CONCAT:
+  kind: output
+  description: String concatenate. Dest = A + B.
+  operands:
+    - {name: source_a, type: ANY, role: read}
+    - {name: source_b, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+
+RTOS:
+  kind: output
+  description: Real to string.
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: ANY, role: write}
+
+GSV:
+  kind: output
+  description: Get system value.
+  operands:
+    - {name: class_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read}
+    - {name: attribute_name, type: NAME, role: read}
+    - {name: dest, type: ANY, role: write}
+
+SSV:
+  kind: output
+  description: Set system value.
+  operands:
+    - {name: class_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read}
+    - {name: attribute_name, type: NAME, role: read}
+    - {name: source, type: ANY, role: read}
+
+EVENT:
+  kind: output
+  description: Trigger an event task.
+  operands:
+    - {name: task, type: NAME, role: read}
+
+PID:
+  kind: output
+  description: PID loop.
+  operands:
+    - {name: pid, type: ANY, role: struct}
+    - {name: process_variable, type: ANY, role: read}
+    - {name: tieback, type: ANY, role: read}
+    - {name: control_variable, type: ANY, role: write}
+    - {name: feedforward, type: ANY, role: read}
+    - {name: alarm_disable, type: ANY, role: read}
+    - {name: hold, type: ANY, role: read}

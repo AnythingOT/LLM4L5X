@@ -71,8 +71,8 @@ class AOIInfo:
     def call_operands(self) -> list[AOIParam]:
         """Parameters that appear in the rung call after the instance tag.
 
-        Assumed: required parameters, in definition order, excluding the
-        implicit EnableIn/EnableOut. UNVERIFIED against real exports.
+        Required parameters, in definition order, excluding EnableIn/EnableOut.
+        Confirmed on public exports (e.g. IO_Module_Status(inst,Module_In,Status)).
         """
         return [p for p in self.params if p.required and p.name not in ("EnableIn", "EnableOut")]
 
@@ -104,7 +104,8 @@ class Project:
             ops = [Operand("instance", a.name, "struct")]
             for p in a.call_operands():
                 role = {"Input": "read", "Output": "write"}.get(p.usage, "struct")
-                ops.append(Operand(p.name, "ANY", role))
+                # MODULE parameters take a module name, which is not a tag
+                ops.append(Operand(p.name, "NAME" if (p.datatype or "").upper() == "MODULE" else "ANY", role))
             cat.add(Instruction(a.name, "output", tuple(ops), a.description or "", source="aoi"))
         return cat
 

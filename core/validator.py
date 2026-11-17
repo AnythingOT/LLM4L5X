@@ -35,7 +35,7 @@ def _last_is_output(s: Series, cat: Catalog) -> bool:
     if isinstance(last, Branch):
         return all(_last_is_output(l, cat) for l in last.legs)
     spec = cat.get(last.name)
-    return spec is not None and spec.is_output
+    return spec is None or spec.is_output  # unknown instructions are reported separately
 
 
 def _branch_warnings(node, rung_no, out):
@@ -95,20 +95,24 @@ def validate(
                 if op.type == "BOOL" and is_literal(arg):
                     issues.append(Issue("warning", n, f"{where} is a constant {arg}"))
                     continue
-                if is_literal(arg) or op.type in ("EXPR", "ROUTINE"):
+                if is_literal(arg) or op.type in ("EXPR", "ROUTINE", "NAME"):
                     continue
                 b = base_tag(arg)
-                if tag_types is not None and b and b not in types:
+                # "Local:3:I", "S:FS": module-defined I/O and system tags are not <Tag> elements
+                if tag_types is not None and b and ":" not in b and b not in types:
                     issues.append(Issue("error", n, f"{where}: tag {b} does not exist"))
                     continue
                 t = types.get(arg) if arg in types else None  # only check plain tags
-                if t:
+                if t and t not in ("ALIAS", ""):  # alias target type is not resolved
                     if op.type == "BOOL" and t != "BOOL":
                         issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs BOOL"))
                     elif op.type in ("TIMER", "COUNTER") and t != op.type:
                         issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs {op.type}"))
                     elif op.type == "NUMERIC" and t not in NUMERIC_TYPES:
-                        issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs a number"))
+                        # BOOL/TIMER/COUNTER in a numeric slot is wrong; strings and UDTs are
+                        # accepted by some instructions on some firmware, so only warn
+                        level = "error" if t in ("BOOL", "TIMER", "COUNTER") else "warning"
+                        issues.append(Issue(level, n, f"{where}: {arg} is {t}, expected a number"))
             name = ins.name.upper()
             if name == "ONS" and ins.args:
                 bit = ins.args[0]

@@ -171,18 +171,22 @@ def parse_rung(text: str, comment: str | None = None) -> Rung:
 
 
 # ---------------------------------------------------------------- printer
-# Canonical style: no space between series elements, " ," between legs and
-# " ]" before the closing bracket. This mirrors the export style seen in
-# the wild; confirm against real exports (HANDOFF.md section 9).
+# Export style, confirmed on 3,160 rungs from public Studio 5000 exports:
+#   top level:      elements are concatenated with no separator
+#   inside [ ... ]: every element is followed by one space, legs are
+#                   separated by "," and the branch closes with "]"
+#   e.g.  XIC(a)[XIC(b) XIO(c) ,XIC(d) [XIC(e) ,XIC(f) ] ]OTE(g);
 
 
-def format_elem(e) -> str:
+def format_elem(e, in_branch: bool = False) -> str:
     if isinstance(e, Instr):
         return f"{e.name}({','.join(e.args)})"
     if isinstance(e, Series):
+        if in_branch:
+            return "".join(format_elem(i, True) + " " for i in e.items)
         return "".join(format_elem(i) for i in e.items)
     if isinstance(e, Branch):
-        return "[" + " ,".join(format_elem(l) for l in e.legs) + " ]"
+        return "[" + ",".join(format_elem(l, True) for l in e.legs) + "]"
     raise TypeError(e)
 
 

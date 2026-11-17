@@ -7,7 +7,7 @@ numeric tags in comparisons and arithmetic. A small
 model therefore cannot invent a tag or compare a bit to 5.
 
 EXPERIMENTAL: generated text has not yet been run through llama.cpp.
-Test it before relying on it (HANDOFF.md section 7).
+Test it before relying on it (docs/DESIGN.md section 7).
 """
 
 from __future__ import annotations

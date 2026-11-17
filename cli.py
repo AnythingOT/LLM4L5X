@@ -5,6 +5,7 @@
   python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
   python cli.py inspect project.L5X [--xref TAG] [--decompile]
   python cli.py validate project.L5X
+  python cli.py survey folder_of_L5X_exports
   python cli.py grammar --project project.L5X [--program MainProgram] [--new-tags]
 """
 
@@ -142,6 +143,12 @@ def cmd_validate(a) -> int:
     return 1 if bad else 0
 
 
+def cmd_survey(a) -> int:
+    from explain.survey import survey
+    print(survey(a.folder).report())
+    return 0
+
+
 def cmd_grammar(a) -> int:
     tags = read_l5x(Path(a.project)).tag_types(a.program) if a.project else {}
     print(build_gbnf(tags, allow_new_tags=a.new_tags))
@@ -184,6 +191,10 @@ def main(argv: list[str] | None = None) -> int:
     v = sub.add_parser("validate", help="check every ladder rung in an L5X file")
     v.add_argument("file")
     v.set_defaults(fn=cmd_validate)
+
+    sv = sub.add_parser("survey", help="check parser/catalog/decompiler against a folder of L5X exports")
+    sv.add_argument("folder")
+    sv.set_defaults(fn=cmd_survey)
 
     g = sub.add_parser("grammar", help="print a GBNF grammar for llama.cpp (experimental)")
     g.add_argument("--project")

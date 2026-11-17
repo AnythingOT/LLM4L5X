@@ -66,6 +66,7 @@ python cli.py compile spec.txt --routine Generated --project plant.L5X --program
 python cli.py inspect plant.L5X --decompile
 python cli.py inspect plant.L5X --xref Pump
 python cli.py validate plant.L5X
+python cli.py survey folder_of_exports
 python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 ```
 
@@ -77,25 +78,28 @@ cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml, rung.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
-explain/            decompiler.py (rungs -> LogicSpec), describe.py (English)
+explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             front ends that produce LogicSpec: gbnf.py now; Excel C&E and LLM later
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (116 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (119 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```
 
 Run the tests with `pytest` from the repo folder.
 
-## Unverified until imported into Studio 5000
+## Checked against real exports
 
-- **Timer/counter operands** are written as `TON(T,?,?)` with the preset in tag data. If import rejects that, switch ⚙️ *Timer/counter operands* to `TON(T,5000,0)`.
-- **TIMER/COUNTER L5K data layout** `[0,PRE,0]`.
-- **Exact whitespace inside branches.** The parser accepts any spacing.
-- **AOI call operand order.**
-- **Rung-export element layout.**
+The parser was checked against 179 public L5X exports (3,160 rungs, including Rockwell's own samples):
+**100% parse, 99.9% print back byte-for-byte**, and the timer format `TON(T,?,?)`, the timer
+data layout and the AOI call format are all confirmed. Details are in docs/DESIGN.md section 9.
+Run the same check on your own exports:
 
-The most useful next step is to import a generated file into a test project and report what Studio 5000 says.
+```
+python cli.py survey C:\path\to\your\exports
+```
+
+**Not yet tested: importing a generated file into Studio 5000.** That is the most useful next step.
 
 ## Safety
 

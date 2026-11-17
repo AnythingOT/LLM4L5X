@@ -42,7 +42,7 @@ def test_types_and_unknown_tags():
 
 
 def test_levels():
-    issues = validate([parse_rung("XIC(a)[ ,XIC(b) ]OTE(c);")])
+    issues = validate([parse_rung("XIC(a)[,XIC(b) ]OTE(c);")])
     assert issues and not errors(issues)
 
 

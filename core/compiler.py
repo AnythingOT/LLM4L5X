@@ -77,7 +77,7 @@ class Compiler:
         """
         known_tags: existing project tags {name: datatype}; not re-created, checked for type.
         display_operands: "placeholder" writes TON(T,?,?); "values" writes TON(T,5000,0).
-            Which one imports correctly is unverified (HANDOFF.md section 9).
+            Real exports always use "?" (docs/DESIGN.md section 9); "values" is a fallback.
         """
         if display_operands not in ("placeholder", "values"):
             raise ValueError("display_operands must be 'placeholder' or 'values'")

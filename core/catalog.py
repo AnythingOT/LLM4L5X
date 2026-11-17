@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 
 ROLES = {"read", "write", "struct", "display"}
-TYPES = {"BOOL", "NUMERIC", "TIMER", "COUNTER", "ANY", "ROUTINE", "EXPR"}
+TYPES = {"BOOL", "NUMERIC", "TIMER", "COUNTER", "ANY", "ROUTINE", "EXPR", "NAME"}
 KINDS = {"input", "output"}
 
 
