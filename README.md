@@ -29,7 +29,9 @@ python app.py
 A chat-style page, same look as LLM4L5XGen:
 
 - **Type LogicSpec.** You get a plain-English read-back to check, the rungs, any new tags, the checks, and a **Download L5X** button.
-- **Paste rung text** (e.g. `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);`). You get LogicSpec and English back.
+- **Paste existing rungs** in either text form Studio 5000 uses. You get the other form, LogicSpec and English back:
+  - neutral text `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);`, which is what L5X files contain
+  - ASCII text `XIC a BST XIC b NXB XIO c BND OTE d`, the editor's ASCII mode (one rung per line; `SOR … EOR` accepted)
 - **Attach an `.L5X` export** (button or drag-and-drop). New logic is then checked against your real tags and AOIs. Project commands: `summary`, `decompile`, `validate`, `xref TagName`.
 - **⚙️ Settings:** rungs vs. new routine, routine/program/controller names, software revision, tag scope, timer operand style, auto-tag prefix, rung comments.
 
@@ -69,6 +71,7 @@ python cli.py inspect plant.L5X --xref Pump
 python cli.py validate plant.L5X
 python cli.py survey folder_of_exports
 python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
 
 ## Repo layout
@@ -76,23 +79,33 @@ python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 ```
 app.py              GUI server (python app.py)
 cli.py              command line (python cli.py ...)
-core/               catalog.py + instructions.yaml, rung.py, logicspec.py,
+core/               catalog.py + instructions.yaml (122 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             front ends that produce LogicSpec: gbnf.py now; Excel C&E and LLM later
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (122 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (144 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```
 
 Run the tests with `pytest` from the repo folder.
 
+## Neutral text vs ASCII text
+
+| | Neutral | ASCII |
+|---|---|---|
+| Example | `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` | `XIC a BST XIC b NXB XIO c BND OTE d` |
+| Branches | `[` `,` `]` | `BST` `NXB` `BND` |
+| In L5X files | **yes, always** | never |
+
+LLM4L5X always writes neutral text into L5X. Generated rungs are also shown as ASCII, so you can paste a single rung into the editor's ASCII mode. Reading ASCII needs each instruction's operand count, so Add-On Instructions are only understood when the project defining them is attached. An operand containing spaces (e.g. a `CPT` expression) is written in double quotes; whether the editor expects exactly that is **unverified**.
+
 ## Checked against real exports
 
 The parser was checked against 179 public L5X exports (3,160 rungs, including Rockwell's own samples):
-**100% parse, 99.9% print back byte-for-byte**, and the timer format `TON(T,?,?)`, the timer
+**100% parse, 99.9% print back byte-for-byte, 99.9% survive neutral → ASCII → neutral**, and the timer format `TON(T,?,?)`, the timer
 data layout and the AOI call format are all confirmed. Details are in docs/DESIGN.md section 9.
 Run the same check on your own exports:
 

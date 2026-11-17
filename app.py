@@ -15,6 +15,7 @@ import time
 from flask import Flask, jsonify, render_template, request
 
 from core.catalog import major_version
+from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_ascii
 from core.compiler import CompileError, Compiler
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import RungSyntaxError, format_rung, parse_rung
@@ -105,11 +106,19 @@ def _logicspec_or_rung(text: str, s: dict) -> dict:
     try:
         stmts = parse_spec(text)
     except SpecError as spec_err:
+        proj = _project()
+        catalog = proj.catalog() if proj else None
+        if looks_like_ascii(text, catalog):
+            try:
+                return _explain_rungs(parse_ascii(text, catalog), source="ASCII")
+            except AsciiSyntaxError as e:
+                return {"kind": "error", "message": f"Not valid ASCII rung text: {e}"}
         rung_out = _try_rungs(text)
         if rung_out:
             return rung_out
         return {"kind": "error", "message": f"Not valid LogicSpec: {spec_err}",
-                "hint": "Type 'help' for the LogicSpec syntax, or paste rung text like XIC(a)OTE(b);"}
+                "hint": "Type 'help' for the syntax. You can also paste rung text as neutral text "
+                        "(XIC(a)OTE(b);) or ASCII (XIC a OTE b)."}
     return _compile(stmts, s)
 
 
@@ -129,7 +138,7 @@ def _compile(stmts, s: dict) -> dict:
     out = {
         "kind": "compiled",
         "readback": [describe_statement(st) for st in res.statements],
-        "rungs": [{"text": format_rung(r), "comment": r.comment} for r in res.rungs],
+        "rungs": [{"text": format_rung(r), "ascii": format_ascii(r), "comment": r.comment} for r in res.rungs],
         "tags": [{"name": t.name, "type": t.datatype, "preset": t.preset,
                   "auto": t.allocated} for t in res.tags.values()],
         "warnings": res.warnings,
@@ -153,17 +162,23 @@ def _try_rungs(text: str) -> dict | None:
     if "(" not in text or ";" not in text:
         return None
     parts = [p.strip() + ";" for p in text.split(";") if p.strip()]
-    rungs = []
     try:
         parsed = [parse_rung(p) for p in parts]
     except RungSyntaxError:
         return None
+    return _explain_rungs(parsed, source="neutral")
+
+
+def _explain_rungs(parsed, source: str) -> dict:
+    """Rung ASTs -> neutral text, ASCII, LogicSpec and English, plus checks."""
+    rungs = []
     proj = _project()
     presets = proj.presets() if proj else {}
     for r in parsed:
         stmts, why = try_decompile(r, presets)
         rungs.append({
             "text": format_rung(r),
+            "ascii": format_ascii(r),
             "logicspec": format_spec(stmts) if stmts else None,
             "english": [describe_statement(x) for x in stmts] if stmts else [],
             "why": why,
@@ -171,7 +186,7 @@ def _try_rungs(text: str) -> dict | None:
     catalog = proj.catalog() if proj else None
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None
     issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None)
-    return {"kind": "rungs", "rungs": rungs, "issues": _issues_json(issues)}
+    return {"kind": "rungs", "source": source, "rungs": rungs, "issues": _issues_json(issues)}
 
 
 def _safe(name: str) -> str:

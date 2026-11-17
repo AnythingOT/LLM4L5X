@@ -28,13 +28,14 @@
                 <button class="chip" data-text="Alarm := DELAY(Level > 80.0, 5s) AND NOT Muted;">delay</button>
                 <button class="chip" data-text="IF RISE(Part_Sensor) THEN COUNT_UP(Parts, 10), Total := Total + 1;">counter</button>
                 <button class="chip" data-text="XIC(a)[XIC(b) ,XIO(c) ]OTE(d);">explain rung</button>
+                <button class="chip" data-text="XIC Start BST XIC Run NXB XIO Stop BND OTE Motor">ASCII rung</button>
                 <button class="chip project-only" data-text="decompile" hidden>decompile project</button>
                 <button class="chip project-only" data-text="validate" hidden>validate project</button>
             </div>
             <div class="input-row">
                 <div class="input-with-buttons">
                     <button id="attachButton" title="Attach an .L5X export">Attach</button>
-                    <textarea id="inputBox" placeholder="Type LogicSpec, paste rung text, or 'help'   (Enter = send, Shift+Enter = new line)"></textarea>
+                    <textarea id="inputBox" placeholder="Type LogicSpec, paste rungs (neutral or ASCII), or 'help'   (Enter = send, Shift+Enter = new line)"></textarea>
                     <button id="enterButton" title="Send" disabled>Enter</button>
                 </div>
             </div>

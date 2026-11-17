@@ -82,11 +82,11 @@ function button(label, onClick) {
     b.onclick = onClick;
     return b;
 }
-function copyButton(getText) {
-    const b = button('Copy', async () => {
+function copyButton(getText, label = 'Copy') {
+    const b = button(label, async () => {
         try { await navigator.clipboard.writeText(getText()); b.textContent = 'Copied'; }
         catch { b.textContent = 'Copy failed'; }
-        setTimeout(() => (b.textContent = 'Copy'), 1500);
+        setTimeout(() => (b.textContent = label), 1500);
     });
     return b;
 }
@@ -138,6 +138,11 @@ const render = {
                 'Actions: SET RESET CLEAR RESET_ACC START_TIMER(T,5s) START_OFF_TIMER(T,5s) N := A [+-*/ B]',
                 'Compare: =  <>  >  <  >=  <=        AND/OR mixed? parentheses are required',
             ].join('\n')),
+            title('Paste existing rungs (either form)'),
+            code([
+                'XIC(a)[XIC(b) ,XIO(c) ]OTE(d);          // neutral text (as in L5X)',
+                'XIC a BST XIC b NXB XIO c BND OTE d     // ASCII text (one rung per line, SOR/EOR ok)',
+            ].join('\n')),
             title('Commands (need an attached project)'),
             code('summary      decompile      validate      xref TagName'),
         );
@@ -156,9 +161,14 @@ const render = {
         d.readback.forEach((r) => ul.appendChild(el('li', { text: r })));
         parts.push(ul);
 
-        parts.push(title(`Rungs (${d.rungs.length})`));
+        parts.push(title(`Rungs (${d.rungs.length}) — neutral text, as stored in L5X`));
         const rungText = d.rungs.map((r) => r.text).join('\n');
         parts.push(code(rungText));
+        const asciiText = d.rungs.map((r) => r.ascii).join('\n');
+        const asciiBox = el('details');
+        asciiBox.appendChild(el('summary', { text: 'ASCII text (for the editor\'s ASCII mode, one rung at a time)' }));
+        asciiBox.appendChild(code(asciiText));
+        parts.push(asciiBox);
 
         if (d.tags.length) {
             parts.push(title(`New tags (${d.tags.length})`));
@@ -180,16 +190,18 @@ const render = {
 
         const row = el('div', { cls: 'btn-row' });
         if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
-        row.appendChild(copyButton(() => rungText));
+        row.appendChild(copyButton(() => rungText, 'Copy neutral'));
+        row.appendChild(copyButton(() => asciiText, 'Copy ASCII'));
         const dur = duration(d.seconds); if (dur) row.appendChild(dur);
         parts.push(row);
         return addBot(...parts);
     },
 
     rungs(d) {
-        const parts = [title(`Rung text → LogicSpec (${d.rungs.length})`)];
+        const parts = [title(`${d.source === 'ASCII' ? 'ASCII' : 'Neutral'} rung text → LogicSpec (${d.rungs.length})`)];
         d.rungs.forEach((r) => {
             parts.push(code(r.text));
+            parts.push(el('div', { cls: 'rung-comment', text: `ASCII: ${r.ascii}` }));
             if (r.logicspec) {
                 parts.push(code(r.logicspec));
                 r.english.forEach((e) => parts.push(el('div', { cls: 'rung-comment', text: e })));
@@ -202,6 +214,8 @@ const render = {
         const row = el('div', { cls: 'btn-row' });
         const specs = d.rungs.filter((r) => r.logicspec).map((r) => r.logicspec).join('\n');
         if (specs) row.appendChild(button('Edit as LogicSpec', () => { inputBox.value = specs; onInput(); inputBox.focus(); }));
+        row.appendChild(copyButton(() => d.rungs.map((r) => r.text).join('\n'), 'Copy neutral'));
+        row.appendChild(copyButton(() => d.rungs.map((r) => r.ascii).join('\n'), 'Copy ASCII'));
         const dur = duration(d.seconds); if (dur) row.appendChild(dur);
         parts.push(row);
         return addBot(...parts);

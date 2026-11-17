@@ -3,6 +3,7 @@
   python cli.py compile spec.txt -o out.L5X [--routine NAME] [--project existing.L5X]
   python cli.py explain "IF RISE(A) THEN SET B;"
   python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+  python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
   python cli.py inspect project.L5X [--xref TAG] [--decompile]
   python cli.py validate project.L5X
   python cli.py survey folder_of_L5X_exports
@@ -24,6 +25,7 @@ from core.compiler import Compiler
 from explain.decompiler import try_decompile
 from explain.describe import describe_statement
 from inputs.gbnf import build_gbnf
+from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_ascii
 from core.rung import RungSyntaxError, format_rung, parse_rung, walk
 from core.validator import errors, validate
 
@@ -75,15 +77,23 @@ def cmd_explain(a) -> int:
 
 
 def cmd_rung(a) -> int:
-    r = parse_rung(a.text)
-    print(format_rung(r))
-    stmts, why = try_decompile(r)
-    if stmts:
-        print(format_spec(stmts))
-        for s in stmts:
-            print("#", describe_statement(s))
+    """Neutral or ASCII rung text in; neutral, ASCII and LogicSpec out."""
+    text = _read_text(a.text) if not looks_like_ascii(a.text) else a.text
+    cat = read_l5x(Path(a.project)).catalog() if a.project else None
+    if looks_like_ascii(text, cat):
+        rungs = parse_ascii(text, cat)
     else:
-        print("# not convertible:", why)
+        rungs = [parse_rung(p.strip() + ";") for p in text.split(";") if p.strip()]
+    for r in rungs:
+        print("neutral:", format_rung(r))
+        print("ascii:  ", format_ascii(r))
+        stmts, why = try_decompile(r)
+        if stmts:
+            print("spec:   ", format_spec(stmts).replace("\n", "\n         "))
+            for s in stmts:
+                print("        #", describe_statement(s))
+        else:
+            print("spec:    not convertible:", why)
     return 0
 
 
@@ -180,8 +190,9 @@ def main(argv: list[str] | None = None) -> int:
     e.add_argument("spec")
     e.set_defaults(fn=cmd_explain)
 
-    r = sub.add_parser("rung", help="parse rung text, print canonical form and LogicSpec")
-    r.add_argument("text")
+    r = sub.add_parser("rung", help="neutral or ASCII rung text -> neutral, ASCII and LogicSpec")
+    r.add_argument("text", help='e.g. "XIC(a)OTE(b);" or "XIC a OTE b" (several: ; or one per line)')
+    r.add_argument("--project", help="L5X whose AOIs are needed to read ASCII text")
     r.set_defaults(fn=cmd_rung)
 
     i = sub.add_parser("inspect", help="summarise an L5X file")
@@ -207,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
     a = ap.parse_args(argv)
     try:
         return a.fn(a)
-    except (SpecError, RungSyntaxError, ValueError) as ex:
+    except (SpecError, RungSyntaxError, AsciiSyntaxError, ValueError) as ex:
         print(f"error: {ex}", file=sys.stderr)
         return 2
 

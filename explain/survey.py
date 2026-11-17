@@ -11,6 +11,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from core.ascii import AsciiSyntaxError, format_ascii, parse_ascii_rung
 from core.rung import format_rung, walk
 from core.validator import validate
 from explain.decompiler import try_decompile
@@ -24,6 +25,8 @@ class Survey:
     rungs: int = 0
     parsed: int = 0
     exact_round_trip: int = 0
+    ascii_round_trip: int = 0
+    ascii_failures: list[tuple[str, str, str]] = field(default_factory=list)  # file, rung, reason
     convertible: int = 0
     mismatches: list[tuple[str, str, str]] = field(default_factory=list)  # file, original, ours
     unknown_instructions: Counter = field(default_factory=Counter)
@@ -37,6 +40,7 @@ class Survey:
             f"files read:              {self.files - len(self.unreadable)}/{self.files}",
             f"rungs parsed:            {pct(self.parsed, self.rungs)}",
             f"exact round trip:        {pct(self.exact_round_trip, self.parsed)}",
+            f"ASCII round trip:        {pct(self.ascii_round_trip, self.parsed)}",
             f"convertible to LogicSpec:{pct(self.convertible, self.parsed):>16}",
             f"timer/counter operands:  {dict(self.timer_display_forms) or 'none seen'}",
             f"instructions not in catalog (AOIs excluded): {self.unknown_instructions.most_common(15) or 'none'}",
@@ -48,6 +52,9 @@ class Survey:
         if self.unreadable:
             lines.append("unreadable files:")
             lines += [f"  {f}: {e}" for f, e in self.unreadable[:10]]
+        if self.ascii_failures:
+            lines.append("ASCII round-trip failures (first 5):")
+            lines += [f"  {f}: {why}\n    {r[:150]}" for f, r, why in self.ascii_failures[:5]]
         if self.mismatches:
             lines.append("round-trip differences (first 5):")
             for f, a, b in self.mismatches[:5]:
@@ -90,6 +97,14 @@ def survey(folder: str | Path) -> Survey:
                     s.exact_round_trip += 1
                 else:
                     s.mismatches.append((f.name, r.text, ours))
+                try:
+                    back = parse_ascii_rung(format_ascii(r.rung), cat)
+                    if back.body == r.rung.body:
+                        s.ascii_round_trip += 1
+                    else:
+                        s.ascii_failures.append((f.name, r.text, "different after round trip"))
+                except AsciiSyntaxError as e:
+                    s.ascii_failures.append((f.name, r.text, str(e)[:100]))
                 for ins in walk(r.rung.body):
                     if cat.get(ins.name) is None:
                         s.unknown_instructions[ins.name] += 1

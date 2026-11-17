@@ -355,15 +355,15 @@ EVENT:
 
 PID:
   kind: output
-  description: PID loop.
+  description: PID loop. Operand names from Rockwell's neutral-text table.
   operands:
     - {name: pid, type: ANY, role: struct}
     - {name: process_variable, type: ANY, role: read}
     - {name: tieback, type: ANY, role: read}
     - {name: control_variable, type: ANY, role: write}
-    - {name: feedforward, type: ANY, role: read}
-    - {name: alarm_disable, type: ANY, role: read}
-    - {name: hold, type: ANY, role: read}
+    - {name: pid_master_loop, type: ANY, role: read}
+    - {name: inhold_bit, type: ANY, role: read}
+    - {name: inhold_value, type: ANY, role: read}
 
 # ---- v36+ mnemonics (IEC 61131-3 / PLCopen names) ----
 
@@ -423,3 +423,582 @@ LIMIT:
     - {name: low_limit, type: NUMERIC, role: read}
     - {name: test, type: NUMERIC, role: read}
     - {name: high_limit, type: NUMERIC, role: read}
+
+# ---- From Rockwell's 'Neutral text for ladder instructions' table (FactoryTalk Design
+# ---- Studio docs, fetched 2026-11-17): operand lists as published; kinds and roles
+# ---- assigned by us. Types are ANY (no type check) unless obvious.
+
+ACOS:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+AND:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ASIN:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ATAN:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+AVE:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+BRK:
+  kind: output
+  operands: []
+
+
+BSL:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: length, type: ANY, role: read}
+
+
+BSR:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: length, type: ANY, role: read}
+
+
+BTD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: destination_bit, type: ANY, role: read}
+    - {name: length, type: ANY, role: read}
+
+
+COS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+CPS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: length, type: ANY, role: read}
+
+
+DEG:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DELETE:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: quantity, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DTOS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DTR:
+  kind: input
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: reference, type: ANY, role: struct}
+
+
+EOT:
+  kind: output
+  operands:
+    - {name: data_bit, type: BOOL, role: read}
+
+
+ESTOP:
+  kind: output
+  operands:
+    - {name: estop_tag, type: ANY, role: struct}
+    - {name: reset_type, type: ANY, role: read}
+    - {name: channel_A, type: ANY, role: read}
+    - {name: channel_B, type: ANY, role: read}
+    - {name: circuit_reset, type: ANY, role: read}
+    - {name: fault_reset, type: ANY, role: read}
+
+
+FAL:
+  kind: output
+  operands:
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+    - {name: mode, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: expression, type: EXPR, role: read}
+
+
+FBC:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: reference, type: ANY, role: struct}
+    - {name: result, type: ANY, role: write}
+    - {name: cmp_control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+    - {name: result_control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+FFL:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: FIFO, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+FFU:
+  kind: output
+  operands:
+    - {name: FIFO, type: ANY, role: struct}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+FIND:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: search, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: result, type: ANY, role: write}
+
+
+FOR:
+  kind: output
+  operands:
+    - {name: routine_name, type: ROUTINE, role: read}
+    - {name: index, type: ANY, role: struct}
+    - {name: initial_value, type: ANY, role: read}
+    - {name: terminal_value, type: ANY, role: read}
+    - {name: step_size, type: ANY, role: read}
+
+
+BCD_TO:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+FSC:
+  kind: output
+  operands:
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+    - {name: mode, type: ANY, role: read}
+    - {name: expression, type: EXPR, role: read}
+
+
+INSERT:
+  kind: output
+  operands:
+    - {name: sourceA, type: ANY, role: read}
+    - {name: sourceB, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+IOT:
+  kind: output
+  operands:
+    - {name: output_tag, type: ANY, role: read}
+
+
+JMP:
+  kind: output
+  operands:
+    - {name: label_name, type: NAME, role: read}
+
+
+LBL:
+  kind: input
+  operands:
+    - {name: label_name, type: NAME, role: read}
+
+
+LFL:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: LIFO, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+LFU:
+  kind: output
+  operands:
+    - {name: LIFO, type: ANY, role: struct}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+LN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+LOG:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+LOWER:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+NOT:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+OR:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+RAD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SIN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SIZE:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dimension_to_vary, type: ANY, role: read}
+    - {name: size, type: ANY, role: write}
+
+
+SQI:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: source, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+SQL:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: write}
+    - {name: source, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+SQO:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+SQRT:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SRT:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+STD:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: ANY, role: read}
+    - {name: position, type: ANY, role: read}
+
+
+STOD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+STOR:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SWPB:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: order_mode, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TAN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TND:
+  kind: output
+  operands: []
+
+
+TO_BCD:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TRUNC:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+UID:
+  kind: output
+  operands: []
+
+
+UIE:
+  kind: output
+  operands: []
+
+
+UPPER:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+XOR:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+EXPT:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ACS:
+  kind: output
+  max_version: 35
+  renamed_to: ACOS
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ASN:
+  kind: output
+  max_version: 35
+  renamed_to: ASIN
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ATN:
+  kind: output
+  max_version: 35
+  renamed_to: ATAN
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SQR:
+  kind: output
+  max_version: 35
+  renamed_to: SQRT
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TRN:
+  kind: output
+  max_version: 35
+  renamed_to: TRUNC
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+XPY:
+  kind: output
+  max_version: 35
+  renamed_to: EXPT
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TOD:
+  kind: output
+  max_version: 35
+  renamed_to: TO_BCD
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+FRD:
+  kind: output
+  max_version: 35
+  renamed_to: BCD_TO
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+MEQ:
+  kind: input
+  description: Masked equal. True when (Source AND Mask) = (Compare AND Mask).
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: compare, type: ANY, role: read}
+
+MSG:
+  kind: output
+  description: Message (send/receive data over a network).
+  operands:
+    - {name: message_control, type: ANY, role: struct}
+
+MCR:
+  kind: output
+  description: Master control reset.
+  operands: []
+
+SBR:
+  kind: input
+  description: Subroutine parameters (first instruction of a subroutine); receives the JSR inputs.
+  variadic: true
+  operands: []
+
+RET:
+  kind: output
+  description: Return from subroutine with optional return parameters.
+  variadic: true
+  operands: []

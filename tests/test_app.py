@@ -82,3 +82,16 @@ def test_bad_upload(client):
     r = client.post("/api/project", data={"file": (io.BytesIO(b"x"), "x.txt")},
                     content_type="multipart/form-data").get_json()
     assert r["kind"] == "error" and ".L5X" in r["message"]
+
+
+def test_ascii_paste(client):
+    d = post(client, "XIC Start BST XIC Run NXB XIO Stop BND OTE Motor\nXIC a OTE b")
+    assert d["kind"] == "rungs" and d["source"] == "ASCII"
+    assert d["rungs"][0]["text"] == "XIC(Start)[XIC(Run) ,XIO(Stop) ]OTE(Motor);"
+    assert d["rungs"][0]["logicspec"] == "Motor := Start AND (Run OR NOT Stop);"
+    assert post(client, "XIC a BST XIC b OTE c")["kind"] == "error"
+
+
+def test_compiled_includes_ascii(client):
+    d = post(client, "Pump := (Start OR Pump) AND NOT Stop;")
+    assert d["rungs"][0]["ascii"] == "BST XIC Start NXB XIC Pump BND XIO Stop OTE Pump"

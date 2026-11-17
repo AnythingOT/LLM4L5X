@@ -245,7 +245,22 @@ Confirmed:
 - Unknown: whether v36+ still accepts the old names in an imported L5X. Until tested, the
   compiler always writes the names of the target version.
 
+- **Instruction catalog** (122 entries) now includes every instruction in Rockwell's published
+  "Neutral text for ladder instructions" table (FactoryTalk Design Studio docs), with the
+  operand lists as published. Kinds, roles and types for the new entries were assigned by us
+  (types mostly `ANY`, so no type checking on them). The table uses v36+ names; the pre-v36
+  names of the renamed math instructions (SQR, TRN, XPY, ACS, ASN, ATN, TOD, FRD) were added
+  with `max_version: 35`. Not from that table: MEQ, MSG, MCR, SBR, RET, JSR, GSV, SSV.
+  The table's JSR form (`JSR(routine,inputs...,returns...)`) differs from what exports
+  contain (`JSR(routine,input_count,...)`); the catalog follows the exports.
+- **ASCII rung text** (`XIC a BST ... NXB ... BND OTE b`) is an editor-only form; L5X always
+  holds neutral text. `core/ascii.py` converts both ways using catalog operand counts;
+  3,157 of 3,160 corpus rungs survive neutral → ASCII → neutral (the 3 failures call AOIs
+  whose definitions are not in that export, so their operand count is unknown).
+
 Still unverified (needs a real import into Studio 5000):
+- How the editor's ASCII mode writes an operand containing spaces (CPT expressions, string
+  literals). We use double quotes.
 - Whether a **Rung-target** L5X written by `l5x/writer.py` imports without errors. The element
   layout follows exports, but no import has been tried.
 - Which `SoftwareRevision` values import cleanly into the owner's version.
