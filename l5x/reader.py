@@ -12,8 +12,8 @@ from pathlib import Path
 
 from lxml import etree
 
-from ..catalog import Catalog, Instruction, Operand, default_catalog
-from ..rung import Rung, RungSyntaxError, parse_rung
+from core.catalog import Catalog, Instruction, Operand, default_catalog
+from core.rung import Rung, RungSyntaxError, parse_rung
 
 
 @dataclass

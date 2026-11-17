@@ -1,11 +1,11 @@
-"""Command line interface.
+"""Command line interface. Run from the repo root: python cli.py <command> ...
 
-  llm4l5x compile spec.txt -o out.L5X [--routine NAME] [--project existing.L5X]
-  llm4l5x explain "IF RISE(A) THEN SET B;"
-  llm4l5x rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
-  llm4l5x inspect project.L5X [--xref TAG] [--decompile]
-  llm4l5x validate project.L5X
-  llm4l5x grammar --project project.L5X [--program MainProgram] [--new-tags]
+  python cli.py compile spec.txt -o out.L5X [--routine NAME] [--project existing.L5X]
+  python cli.py explain "IF RISE(A) THEN SET B;"
+  python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+  python cli.py inspect project.L5X [--xref TAG] [--decompile]
+  python cli.py validate project.L5X
+  python cli.py grammar --project project.L5X [--program MainProgram] [--new-tags]
 """
 
 from __future__ import annotations
@@ -15,14 +15,16 @@ import json
 import sys
 from pathlib import Path
 
-from .l5x import cross_reference, read_l5x, write_routine, write_rungs
-from .logicspec import SpecError, format_spec, parse_spec
-from .logicspec.compiler import Compiler
-from .logicspec.decompiler import try_decompile
-from .logicspec.describe import describe_statement
-from .logicspec.gbnf import build_gbnf
-from .rung import RungSyntaxError, format_rung, parse_rung, walk
-from .validate import errors, validate
+from l5x.reader import read_l5x
+from l5x.writer import write_routine, write_rungs
+from l5x.xref import cross_reference
+from core.logicspec import SpecError, format_spec, parse_spec
+from core.compiler import Compiler
+from explain.decompiler import try_decompile
+from explain.describe import describe_statement
+from inputs.gbnf import build_gbnf
+from core.rung import RungSyntaxError, format_rung, parse_rung, walk
+from core.validator import errors, validate
 
 
 def _read_text(arg: str) -> str:
@@ -147,7 +149,7 @@ def cmd_grammar(a) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    ap = argparse.ArgumentParser(prog="llm4l5x", description="LogicSpec <-> Studio 5000 ladder")
+    ap = argparse.ArgumentParser(prog="python cli.py", description="LogicSpec <-> Studio 5000 ladder")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     c = sub.add_parser("compile", help="compile LogicSpec to rungs / L5X")

@@ -3,10 +3,12 @@ from pathlib import Path
 
 from lxml import etree
 
-from llm4l5x.l5x import cross_reference, read_l5x, write_routine, write_rungs
-from llm4l5x.logicspec.compiler import compile_spec
-from llm4l5x.logicspec.decompiler import try_decompile
-from llm4l5x.validate import errors, validate
+from l5x.reader import read_l5x
+from l5x.writer import write_routine, write_rungs
+from l5x.xref import cross_reference
+from core.compiler import compile_spec
+from explain.decompiler import try_decompile
+from core.validator import errors, validate
 
 FIX = Path(__file__).parent / "fixtures" / "sample_project.L5X"
 SPEC = """Pump := (Start_PB OR Pump) AND NOT Stop_PB;

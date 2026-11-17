@@ -12,8 +12,8 @@ from typing import Iterable
 
 from lxml import etree
 
-from ..logicspec.compiler import TagDef
-from ..rung import Rung, format_rung
+from core.compiler import TagDef
+from core.rung import Rung, format_rung
 
 EXPORT_OPTIONS = (
     "References NoRawData L5KData DecoratedData Context Dependencies "

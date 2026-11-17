@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 
-from ..rung import Branch, Instr, Rung, Series, is_literal
+from core.rung import Branch, Instr, Rung, Series, is_literal
 
 
 class SimError(RuntimeError):

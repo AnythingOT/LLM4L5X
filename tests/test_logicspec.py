@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import (
+from core.logicspec import (
     And, Assign, Cmp, Count, Delay, IfThen, Math, Not, Or, Rise, SetBit, SpecError, StartTimer, Var,
     format_expr, format_spec, parse_expr, parse_spec,
 )

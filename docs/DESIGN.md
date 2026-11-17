@@ -1,5 +1,7 @@
 # LLM4L5X — design and handoff
 
+(Formerly HANDOFF.md.)
+
 This file is the full brief for whoever continues the work (human or model). It records what the
 owner wants, what was decided and why, what is still unverified, and the build order with
 acceptance criteria. Read it fully before writing code.
@@ -90,12 +92,11 @@ Build in this order. Each layer has a test that does not need a model.
 8. **Eval harness** — section 8. Must exist before any model tuning.
 9. **LLM layer** — section 7.
 
-Suggested layout: `l5x/` (reader, writer), `rung/` (ast, parser, printer), `catalog/`,
-`logicspec/` (grammar, parser, compiler, decompiler), `validate/`, `sim/`, `llm/`, `eval/`,
-`tests/`. Python. In the session this was written in (Python 3.13), lxml, pytest and PyYAML were
-installed; lark and hypothesis were not, and package installs were blocked. Both grammars are
-small, so a hand-written recursive-descent parser is fine and removes the lark dependency;
-write property tests with plain `random` if hypothesis is unavailable.
+Layout (agreed 2026-11-17): run from the repo root, no installable package.
+`core/` (catalog, rung, logicspec, compiler, validator, simulator), `l5x/` (reader, writer, xref),
+`explain/` (decompiler, describe), `inputs/` (front ends that produce LogicSpec: gbnf now;
+excel_ce, llm later), `gui/` + `app.py` (Flask GUI), `cli.py`, `tests/`, `examples/`, `docs/`.
+Hand-written recursive-descent parsers; property tests use plain `random`.
 
 ## 6. LogicSpec: how branches are handled
 

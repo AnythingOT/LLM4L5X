@@ -8,7 +8,7 @@ import json
 import random
 import re
 
-from llm4l5x.logicspec import And, Cmp, Not, Or, Var
+from core.logicspec import And, Cmp, Not, Or, Var
 
 BOOLS = ["A", "B", "C", "D", "E", "F"]
 NUMS = ["N1", "N2"]

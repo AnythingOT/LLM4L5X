@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from importlib import resources
+from pathlib import Path
 
 import yaml
 
@@ -84,7 +84,7 @@ def _validate_entry(name: str, raw: dict) -> Instruction:
 def load_catalog(text: str | None = None) -> Catalog:
     """Load the builtin catalog, or a catalog from YAML text."""
     if text is None:
-        text = resources.files(__package__).joinpath("instructions.yaml").read_text("utf-8")
+        text = (Path(__file__).parent / "instructions.yaml").read_text("utf-8")
     raw = yaml.safe_load(text) or {}
     cat = Catalog()
     for name, entry in raw.items():

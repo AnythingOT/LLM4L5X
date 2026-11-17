@@ -8,8 +8,8 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..catalog import Catalog, default_catalog
-from ..rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_placeholder, walk
+from core.catalog import Catalog, default_catalog
+from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_placeholder, walk
 
 import re
 

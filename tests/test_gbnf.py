@@ -2,8 +2,8 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import Assign, format_statement
-from llm4l5x.logicspec.gbnf import build_gbnf
+from core.logicspec import Assign, format_statement
+from inputs.gbnf import build_gbnf
 from helpers import BOOLS, NUMS, Grammar, random_expr
 
 TAGS = {**{b: "BOOL" for b in BOOLS}, **{n: "DINT" for n in NUMS}, "OUT": "BOOL", "T1": "TIMER", "C1": "COUNTER"}

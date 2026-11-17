@@ -1,5 +1,5 @@
-from llm4l5x.rung import parse_rung
-from llm4l5x.validate import errors, validate
+from core.rung import parse_rung
+from core.validator import errors, validate
 
 
 def msgs(*texts, tags=None):

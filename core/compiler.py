@@ -10,14 +10,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from ..catalog import Catalog, default_catalog
-from ..rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_plain_tag, walk
-from . import (
+from core.catalog import Catalog, default_catalog
+from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_plain_tag, walk
+from core.logicspec import (
     And, Assign, Clear, Cmp, CMP_COMPLEMENT, Count, Delay, Expr, IfThen, Math, Not, Or,
     ResetAcc, ResetBit, Rise, SetBit, SpecError, StartTimer, Statement, Var, format_statement,
     parse_spec,
 )
-from .describe import describe_statement
+from explain.describe import describe_statement
 
 CMP_INSTR = {"=": "EQU", "<>": "NEQ", ">": "GRT", "<": "LES", ">=": "GEQ", "<=": "LEQ"}
 MATH_INSTR = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV"}
@@ -61,7 +61,7 @@ class CompileResult:
 
     @property
     def texts(self) -> list[str]:
-        from ..rung import format_rung
+        from core.rung import format_rung
         return [format_rung(r) for r in self.rungs]
 
 
@@ -299,7 +299,7 @@ def _is_float(s: str) -> bool:
 
 
 def _short(e: Expr) -> str:
-    from . import format_expr
+    from core.logicspec import format_expr
     s = format_expr(e)
     return s if len(s) <= 60 else s[:57] + "..."
 

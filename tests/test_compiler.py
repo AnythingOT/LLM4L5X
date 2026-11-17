@@ -2,11 +2,11 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import Assign, parse_spec
-from llm4l5x.logicspec.compiler import CompileError, Compiler, compile_spec, tag_name_problem
-from llm4l5x.rung import format_rung
-from llm4l5x.sim import Simulator, preset_state
-from llm4l5x.validate import errors, validate
+from core.logicspec import Assign, parse_spec
+from core.compiler import CompileError, Compiler, compile_spec, tag_name_problem
+from core.rung import format_rung
+from core.simulator import Simulator, preset_state
+from core.validator import errors, validate
 from helpers import environments, evaluate, random_expr
 
 

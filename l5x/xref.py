@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass
 
-from ..catalog import Catalog
-from ..rung import base_tag, walk
-from .reader import Project
+from core.catalog import Catalog
+from core.rung import base_tag, walk
+from l5x.reader import Project
 
 
 @dataclass(frozen=True)

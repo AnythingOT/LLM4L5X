@@ -1,6 +1,6 @@
 import pytest
 
-from llm4l5x.catalog import default_catalog, load_catalog
+from core.catalog import default_catalog, load_catalog
 
 
 def test_core_set_present():

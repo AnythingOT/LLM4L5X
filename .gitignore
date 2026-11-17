@@ -1,6 +1,4 @@
 __pycache__/
-*.egg-info/
 .pytest_cache/
-build/
-dist/
+.venv/
 *.L5X.out

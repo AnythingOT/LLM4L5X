@@ -2,11 +2,11 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import Assign, format_spec
-from llm4l5x.logicspec.compiler import Compiler, compile_spec
-from llm4l5x.logicspec.decompiler import NotConvertible, decompile_rung, try_decompile
-from llm4l5x.rung import parse_rung
-from llm4l5x.sim import Simulator
+from core.logicspec import Assign, format_spec
+from core.compiler import Compiler, compile_spec
+from explain.decompiler import NotConvertible, decompile_rung, try_decompile
+from core.rung import parse_rung
+from core.simulator import Simulator
 from helpers import environments, evaluate, random_expr
 
 

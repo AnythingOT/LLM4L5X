@@ -1,6 +1,6 @@
 import pytest
 
-from llm4l5x.rung import Branch, Instr, RungSyntaxError, base_tag, format_rung, is_literal, normalize, parse_rung
+from core.rung import Branch, Instr, RungSyntaxError, base_tag, format_rung, is_literal, normalize, parse_rung
 
 ROUND_TRIP = [
     "XIC(a)OTE(b);",
