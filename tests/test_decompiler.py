@@ -1,0 +1,55 @@
+import random
+
+import pytest
+
+from llm4l5x.logicspec import Assign, format_spec
+from llm4l5x.logicspec.compiler import Compiler, compile_spec
+from llm4l5x.logicspec.decompiler import NotConvertible, decompile_rung, try_decompile
+from llm4l5x.rung import parse_rung
+from llm4l5x.sim import Simulator
+from helpers import environments, evaluate, random_expr
+
+
+def dec(text, presets=None):
+    return format_spec(decompile_rung(parse_rung(text), presets))
+
+
+def test_basic_shapes():
+    assert dec("[XIC(Start) ,XIC(Pump) ]XIO(Stop)OTE(Pump);") == "Pump := (Start OR Pump) AND NOT Stop;"
+    assert dec("XIC(A)ONS(S)XIC(B)[OTL(C) ,CLR(N) ];") == "IF RISE(A) AND B THEN SET C, CLEAR N;"
+    assert dec("GRT(L,80)TON(T1,?,?);", {"T1": 5000}) == "IF L > 80 THEN START_TIMER(T1, 5s);"
+    assert dec("MOV(3,X);") == "IF TRUE THEN X := 3;"
+
+
+def test_ote_branch_split_when_safe():
+    assert dec("XIC(A)[OTE(B) ,OTE(C) ];") == "B := A;\nC := A;"
+
+
+@pytest.mark.parametrize("text,why", [
+    ("XIC(A)OTE(B)XIC(C)OTE(D);", "middle"),
+    ("[XIC(A)OTE(B) ,XIC(C) ]OTE(D);", "middle"),
+    ("XIC(A)[ ,XIC(B) ]OTE(C);", "empty"),
+    ("XIC(A)TON(T1,?,?);", "preset"),
+    ("[XIC(A) ,XIC(B) ]XIO(B)[OTE(B) ,OTE(C) ];", "reads its own"),
+    ("XIC(A)JSR(Sub,0);", "outputs only"),
+])
+def test_not_convertible(text, why):
+    stmts, reason = try_decompile(parse_rung(text))
+    assert stmts is None and why in reason
+
+
+def test_compile_decompile_equivalent_random():
+    rng = random.Random(3)
+    envs = list(environments())[::7]
+    for _ in range(100):
+        e = random_expr(rng)
+        rung = Compiler(comments=False).compile([Assign("OUT", e)]).rungs[0]
+        [back] = decompile_rung(rung)
+        for env in envs:
+            assert evaluate(back.expr, env) == evaluate(e, env)
+
+
+def test_recompile_is_identical():
+    src = "[XIC(a)[XIC(b) ,XIO(c) ] ,GRT(n,5) ]XIO(d)OTE(q);"
+    spec = dec(src)
+    assert compile_spec(spec, comments=False).texts == [src]
