@@ -72,8 +72,27 @@ Three pages, AnythingOT look, light and dark. Press **?** on the chat page for t
   - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the other form, what each rung does in English, the checks, **Copy** (the other form) and **Download**.
   - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `xref TagName`.
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
+  - **Logic | UDT** switch in the input box. In UDT mode you create data types (below).
 - **Settings** (`/settings`): model (backend, address, model, thinking), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
 - **Rules** (`/rules`): the 49 validation rules, grouped, with search and severity filter; switch each on or off.
+
+## UDTs: create and optimize
+
+Switch the input box to **UDT**.
+
+| Input | Uses the model | Output |
+|---|---|---|
+| Plain English: *"a motor with running and faulted bits, speed in rpm and 32 alarm bits"* | yes | `Name.L5X`, or `UDTs.zip` for several |
+| The UDT text form (`UDT Name "desc";` then `Member TYPE[n] "desc";` lines) | no | same |
+| An Excel sheet (`.xlsx`, template under ⓘ: one row per member, blank UDT cell = same UDT as above) | no | same |
+| An attached UDT export, or a program, then **optimize UDTs** | no | `Name_opt.L5X`, a zip of them, or the whole program |
+
+- New UDTs are checked (names, types, BOOL arrays in multiples of 32, nesting loops, names already in the attached project) and written in the order that wastes no memory: BOOLs packed into hidden SINT hosts the way Studio 5000 names them, then members by alignment. The model writes only the UDT text form, under a grammar on llama.cpp; a failed check goes back to it, as for rungs.
+- **Optimize** reorders members only. Every member's XML (descriptions, radix, external access, CDATA) is kept byte for byte; only BIT positions change. It shows per UDT the bytes now → after, instances (nested ones included) and the total saved, and flags what depends on byte offsets: COP/CPS, MSG local elements, produced/consumed tags. Only UDTs that save bytes and have no such risk are ticked.
+- The **whole-program** file also has to move tag values: each tag value is stored twice, by member name (Decorated) and by position (L5K). For affected tags the L5K copy is removed and the Decorated copy kept. UDTs used inside an AOI, or with a tag that has only L5K values, are left out, and the download says so. **Not yet confirmed by an import test: test it on a copy before you rely on it.**
+- Sizes are computed from the layout rules, not read from Studio 5000. A UDT can only be changed offline.
+
+The optimizer gives the same orders and sizes as [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer) on its samples; this repo replaces it.
 
 ## Validate: import checks and rules
 
@@ -140,15 +159,18 @@ cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
-lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, paths.py,
-                    udt_layout.py, lifecycle.json
+lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, paths.py, lifecycle.json
+udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
+                    writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
+                    an existing export, byte-preserving)
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
-inputs/             llm.py (Ollama, English -> LogicSpec), examples.yaml (few-shot), gbnf.py
+inputs/             llm.py (Ollama/llama.cpp, English -> LogicSpec), examples.yaml (few-shot), gbnf.py,
+                    udt_llm.py (English -> UDT text form)
 eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
                     instruction suite), rung_compare.py (behavioural oracle), mutation.py
 gui/                templates/ (base, index, settings, rules), static/ (style.css, common.js,
                     app.js, settings.js, rules.js, favicon.ico)
-tests/              pytest (267 tests); fixtures/ are hand-written, not real exports
+tests/              pytest (299 tests); fixtures/ are hand-written, except studio_single_udt.L5X (the public L5X_UDTOptimizer sample)
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

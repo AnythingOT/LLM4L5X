@@ -271,7 +271,7 @@ details summary { cursor: pointer; color: var(--muted); font-size: .8rem; }
     min-height: 44px;
     max-height: 200px;
     resize: vertical;
-    padding: 10px 112px 10px 80px;
+    padding: 10px 112px 10px 186px;
     font-size: .9rem;
     font-family: ui-monospace, Consolas, monospace;
     border-radius: 6px;
@@ -301,6 +301,17 @@ details summary { cursor: pointer; color: var(--muted); font-size: .8rem; }
 #examplesButton.active { color: var(--accent); }
 #attachButton:hover, #enterButton:hover, #examplesButton:hover { background: var(--btn-hover); }
 #enterButton:disabled { opacity: .5; cursor: not-allowed; }
+/* Logic | UDT segmented switch, inside the input box after Attach */
+.mode-toggle {
+    position: absolute; left: 76px; top: 50%; transform: translateY(-50%); z-index: 1;
+    display: flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; height: 26px;
+}
+.mode-toggle button {
+    border: 0; padding: 0 9px; font-size: .78rem; cursor: pointer; background: var(--input-bg); color: var(--muted);
+}
+.mode-toggle button + button { border-left: 1px solid var(--border); }
+.mode-toggle button.active { background: var(--accent); color: #fff; font-weight: 600; }
+a.chip { text-decoration: none; }
 #inputWrapper.dragging #inputBox { border-style: dashed; border-color: var(--accent); }
 
 /* ---------- help popup ---------- */
@@ -452,3 +463,15 @@ input.switch::after { content: ''; position: absolute; top: 2px; left: 2px; widt
 input.switch:checked { background: var(--ok); }
 input.switch:checked::after { left: 18px; }
 input.switch:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ---------- UDTs ---------- */
+.udt-head { display: flex; gap: 10px; align-items: baseline; margin-top: 6px; }
+.udt-name { font-family: ui-monospace, Consolas, monospace; font-weight: 700; }
+table.udt-plan td:nth-child(n+3):nth-child(-n+6) { text-align: right; white-space: nowrap; }
+table.udt-plan tr.skipped, table.udt-plan tr.optimal { color: var(--muted); }
+table.udt-plan td .code { margin-left: 4px; }
+details.order > summary { cursor: pointer; color: var(--muted); font-size: .75rem; }
+.small { font-size: .75rem; }
+.mono { font-family: ui-monospace, Consolas, monospace; }
+button.caution { border: 1px solid var(--warn); }
+.help-tips { grid-column: 1 / -1; }

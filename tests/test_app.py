@@ -1,5 +1,8 @@
 """GUI back end: the JSON API behind the chat page."""
+import base64
 import io
+import json
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -178,3 +181,65 @@ def test_pages_and_rule_list(client):
         assert client.get(page).status_code == 200
     rules = client.get("/api/rules").get_json()["rules"]
     assert len(rules) == 49 and {"code", "title", "description", "severity", "scope", "group"} <= set(rules[0])
+
+
+# ---------------------------------------------------------------- UDTs
+
+def test_udt_text_in_udt_mode_gives_a_file(client):
+    d = client.post("/api/process", json={"text": 'UDT Motor "m";\nSpeed REAL;\nRun BOOL;', "mode": "udt",
+                                          "settings": {}}).get_json()
+    assert d["kind"] == "udt_created" and d["filename"] == "Motor.L5X" and 'TargetType="DataType"' in d["l5x"]
+    assert [m["name"] for m in d["udts"][0]["members"]] == ["Run", "Speed"] and d["udts"][0]["size"] == 8
+
+
+def test_udt_problems_are_listed(client):
+    d = client.post("/api/process", json={"text": "UDT Bad;\nFlags BOOL[20];", "mode": "udt"}).get_json()
+    assert d["kind"] == "error" and any("multiple of 32" in x for x in d["details"])
+
+
+def test_excel_attach_builds_udts_without_touching_the_project(client):
+    from udt.excel import template
+    r = client.post("/api/project", data={"file": (io.BytesIO(template()), "udts.xlsx")},
+                    content_type="multipart/form-data").get_json()
+    assert r["kind"] == "udt_created" and r["filename"] == "UDTs.zip" and len(r["udts"]) == 2
+    z = zipfile.ZipFile(io.BytesIO(base64.b64decode(r["zip_b64"])))
+    assert sorted(z.namelist()) == ["Line_Status.L5X", "Motor_Status.L5X"]
+    assert client.get("/api/status").get_json()["project"] is None
+
+
+def test_attach_udt_export_shows_the_plan_and_downloads(client):
+    fx = Path(__file__).parent / "fixtures" / "studio_single_udt.L5X"
+    r = client.post("/api/project", data={"file": (fx.open("rb"), "B322.L5X")},
+                    content_type="multipart/form-data").get_json()
+    plan = r["udt_plan"]
+    assert plan["target"] == "B322" and not plan["full"] and plan["plans"][0]["saved"] == 36
+    f = client.post("/api/udt/download", json={"selected": ["B322"], "output": "single"})
+    assert f.status_code == 200 and "B322_opt.L5X" in f.headers["Content-Disposition"]
+    assert client.post("/api/udt/download", json={"selected": ["B322"], "output": "program"}).status_code == 400
+
+
+def test_optimize_command_and_full_program_download(client):
+    fx = Path(__file__).parent / "fixtures" / "udt_program.L5X"
+    client.post("/api/project", data={"file": (fx.open("rb"), "plant.L5X")}, content_type="multipart/form-data")
+    d = post(client, "optimize")
+    by = {p["name"]: p for p in d["plans"]}
+    assert d["kind"] == "udt_plan" and d["full"] and by["Pad_UDT"]["default"] and not by["Copy_UDT"]["default"]
+    assert not by["InAoi_UDT"]["default"]  # reordered but saves nothing
+    f = client.post("/api/udt/download", json={"selected": ["Pad_UDT"], "output": "program"})
+    notes = json.loads(base64.b64decode(f.headers["X-Notes"]))
+    assert f.status_code == 200 and any("Test the import" in n for n in notes)
+    z = client.post("/api/udt/download", json={"selected": ["Pad_UDT", "Copy_UDT"], "output": "zip"})
+    assert z.mimetype == "application/zip"
+    assert client.get("/api/udt/template").mimetype.endswith("sheet")
+
+
+def test_plain_english_udt_goes_through_the_model(client, monkeypatch):
+    class Fake:
+        supports_grammar, url = True, "http://x"
+
+        def chat(self, messages, grammar=None):
+            return 'UDT Pump "A pump";\nSpeed REAL "rpm";\nRunning BOOL "running";'
+    monkeypatch.setattr(gui, "_llm", lambda s: Fake())
+    d = client.post("/api/process", json={"text": "a pump with speed and running", "mode": "udt"}).get_json()
+    assert d["kind"] == "udt_created" and d["grammar"] and d["filename"] == "Pump.L5X"
+    assert [m["name"] for m in d["udts"][0]["members"]] == ["Running", "Speed"]

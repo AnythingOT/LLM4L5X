@@ -9,8 +9,12 @@ forgotten when the server stops. Nothing is sent anywhere.
 
 from __future__ import annotations
 
+import base64
+import io
+import json
 import re
 import time
+import zipfile
 
 from flask import Flask, jsonify, render_template, request
 
@@ -30,7 +34,7 @@ import lint
 app = Flask(__name__, template_folder="gui/templates", static_folder="gui/static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB L5X upload limit
 
-STATE: dict = {"project": None, "filename": None}
+STATE: dict = {"project": None, "filename": None, "raw": None}
 
 DEFAULTS = {
     "output": "routine",        # routine (Routine.L5X) | rungs (Rung.L5X)
@@ -152,6 +156,10 @@ def process():
         out = _xref(cmd[1].strip() if len(cmd) > 1 else "")
     elif head in ("decompile", "validate", "summary") and len(cmd) == 1:
         out = _project_action(head, s)
+    elif head == "optimize" and len(cmd) == 1:
+        out = _udt_plan() if _project() else {"kind": "error", "message": "'optimize' needs an attached L5X with UDTs."}
+    elif data.get("mode") == "udt" or re.match(r"\s*UDT\s+[A-Za-z_]\w*\s*(\"[^\"]*\")?\s*;", text):
+        out = _udt_text(text, s)
     else:
         out = _logicspec_or_rung(text, s)
     out["seconds"] = round(time.perf_counter() - t0, 3)
@@ -328,19 +336,33 @@ def attach_project():
     f = request.files.get("file")
     if not f or not f.filename:
         return jsonify(kind="error", message="No file received.")
-    if not f.filename.lower().endswith(".l5x"):
-        return jsonify(kind="error", message="Attach an .L5X export from Studio 5000.")
+    low = f.filename.lower()
+    if low.endswith((".xlsx", ".xlsm")):  # a UDT sheet: build UDTs, the attached project stays
+        from udt.excel import read_excel
+        from udt.model import UdtError
+        s = _settings(json.loads(request.form.get("settings") or "{}"))
+        try:
+            udts = read_excel(f.read())
+        except UdtError as e:
+            return jsonify(kind="error", message=f"{f.filename}: {e}", hint="Download the template: ⓘ in UDT mode.")
+        return jsonify(_udt_created(udts, s, source=f"Excel sheet {f.filename}"))
+    if not low.endswith(".l5x"):
+        return jsonify(kind="error", message="Attach an .L5X export from Studio 5000, or an Excel UDT sheet (.xlsx).")
+    raw = f.read()
     try:
-        p = read_l5x(f.read())
+        p = read_l5x(raw)
     except Exception as e:  # lxml / format errors -> show the user, keep running
         return jsonify(kind="error", message=f"Could not read {f.filename}: {e}")
-    STATE["project"], STATE["filename"] = p, f.filename
-    return jsonify(_summary(p))
+    STATE["project"], STATE["filename"], STATE["raw"] = p, f.filename, raw
+    out = _summary(p)
+    if p.target_type == "DataType":  # a UDT export: show what reordering would do straight away
+        out["udt_plan"] = _udt_plan()
+    return jsonify(out)
 
 
 @app.delete("/api/project")
 def detach_project():
-    STATE["project"], STATE["filename"] = None, None
+    STATE["project"], STATE["filename"], STATE["raw"] = None, None, None
     return jsonify(kind="info", message="Project detached. New tags will no longer be checked against it.")
 
 
@@ -375,6 +397,149 @@ def _project_action(action: str, s: dict) -> dict:
     return {"kind": "validated", "target": p.target_type, "filename": STATE["filename"],
             "import": [{"where": i.where, "level": i.level, "message": i.message} for i in validate_project(p)],
             "lint": rep.to_dict()}
+
+
+# ---------------------------------------------------------------- UDTs
+
+
+def _known_types() -> dict[str, str]:
+    p = _project()
+    if not p:
+        return {}
+    out = {n: ("STRING" if (d.family or "") == "StringFamily" else "UDT") for n, d in p.datatypes.items()}
+    out.update({n: "AOI" for n in p.aois})
+    return out
+
+
+def _udt_text(text: str, s: dict) -> dict:
+    """UDT mode: the UDT text form directly, or plain English through the model."""
+    from udt.model import UdtError, parse_spec
+    if re.match(r"\s*UDT\s+[A-Za-z_]\w*", text):
+        try:
+            udts = parse_spec(text)
+        except UdtError as e:
+            return {"kind": "error", "message": f"Not a valid UDT: {e}"}
+        return _udt_created(udts, s, source="UDT text")
+    from inputs.llm import BACKENDS, LLMError
+    from inputs.udt_llm import generate
+    client = _llm(s)
+    try:
+        r = generate(client, text, known=_known_types())
+    except LLMError as e:
+        return {"kind": "error", "message": str(e),
+                "hint": f"{BACKENDS[s['backend']]['label']} at {client.url} (change in ⚙️ Settings)."}
+    attempts = [{"error": a["error"]} for a in r.attempts]
+    if r.udts is None:
+        return {"kind": "error", "message": f"The model could not produce a valid UDT: {r.error}",
+                "hint": "Try rewording, or name the members and their types.", "attempts": attempts}
+    out = _udt_created(r.udts, s, source="your description")
+    out.update(model=s["model"] or s["backend"], backend=BACKENDS[s["backend"]]["label"], attempts=attempts,
+               model_seconds=r.seconds, grammar=bool(getattr(client, "supports_grammar", False)))
+    out["warnings"] = r.warnings + out["warnings"]
+    return out
+
+
+def _udt_created(udts, s: dict, source: str) -> dict:
+    """New UDTs (from text, Excel or the model): checked, ordered, sized, written."""
+    from udt.model import check, dependency_order
+    from udt.writer import ordered, sizes, write_udt
+    known = _known_types()
+    problems = check(udts, known)
+    if problems:
+        return {"kind": "error", "message": f"{len(problems)} problem(s) in the UDTs from {source}:",
+                "details": problems}
+    p = _project()
+    known_sizes = {}
+    if p:  # project UDTs used as members: size them with the layout rules
+        from udt import layout
+        from udt.layout import M
+        types = {n: [M(m.name, m.datatype, m.dimension) for m in d.members if not m.name.startswith(layout.HOST_PREFIX)]
+                 for n, d in p.datatypes.items() if (d.family or "NoFamily") == "NoFamily"}
+        try:
+            for n in layout.dependency_order(types):
+                known_sizes[n] = layout.size_of(types[n], known_sizes)
+        except ValueError:
+            pass
+    sz = sizes(udts, known_sizes)
+    as_written = sizes(udts, known_sizes, optimal=False)
+    user = {u.name for u in udts} | set(known)
+    warnings = [f"{u.name} already exists in {STATE['filename']}: importing replaces it"
+                for u in udts if p and u.name in p.datatypes]
+    rev = s["revision"]
+    files = {f"{u.name}.L5X": write_udt(u, udts, controller=s["controller"], revision=rev, project_types=set(known))
+             for u in udts}
+    out = {"kind": "udt_created", "source": source, "warnings": warnings, "udts": [], "seconds": None}
+    for u in dependency_order(udts):
+        out["udts"].append({
+            "name": u.name, "description": u.description, "size": sz[u.name], "size_as_written": as_written[u.name],
+            "members": [{"name": m.name, "type": f"{m.datatype}[{m.dim}]" if m.dim else m.datatype,
+                         "description": m.description} for m in ordered(u, user)]})
+    if len(files) == 1:
+        (name, text), = files.items()
+        out.update(filename=name, l5x=text)
+    else:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+            for name, text in files.items():
+                z.writestr(name, text.encode("utf-8"))
+        out.update(filename="UDTs.zip", zip_b64=base64.b64encode(buf.getvalue()).decode("ascii"))
+    return out
+
+
+def _udt_plan() -> dict:
+    """What reordering would do to every UDT of the attached file."""
+    from udt.optimize import analyse
+    p = _project()
+    if p is None or STATE["raw"] is None:
+        return {"kind": "error", "message": "Attach an L5X with UDTs first."}
+    an = analyse(STATE["raw"])
+    plans = [x.to_dict() for x in an.plans.values()]
+    for x in plans:
+        # tick only what pays: a reorder that saves nothing still moves offsets
+        x["default"] = x["status"] == "reordered" and not x["risks"] and bool(x["saved"])
+    plans.sort(key=lambda x: (x["status"] != "reordered", -(x["total_saved"] or x["saved"]), x["name"]))
+    return {"kind": "udt_plan", "filename": STATE["filename"], "target": an.target, "full": an.full_program,
+            "plans": plans}
+
+
+@app.post("/api/udt/download")
+def udt_download():
+    from flask import Response
+    from udt.optimize import analyse, file_name, full_program, single_file, zip_files
+    if STATE["raw"] is None:
+        return jsonify(kind="error", message="No attached file."), 400
+    d = request.get_json(silent=True) or {}
+    an = analyse(STATE["raw"])
+    selected = {n for n in d.get("selected") or [] if n in an.plans and an.plans[n].status == "reordered"}
+    out = d.get("output")
+    if not selected:
+        return jsonify(kind="error", message="Select at least one UDT that changes."), 400
+    stem = re.sub(r"\.l5x$", "", STATE["filename"] or "Project", flags=re.I)
+    if out == "program":
+        if not an.full_program:
+            return jsonify(kind="error", message="The whole-program file needs a controller export."), 400
+        text, notes = full_program(an, selected)
+        r = Response(text.encode("utf-8"), mimetype="application/xml")
+        r.headers["Content-Disposition"] = f'attachment; filename="{file_name(stem)}"'
+        r.headers["X-Notes"] = base64.b64encode(json.dumps(notes).encode()).decode()
+        return r
+    if out == "single" and len(selected) == 1:
+        (n,) = selected
+        r = Response(single_file(an, n, selected).encode("utf-8"), mimetype="application/xml")
+        r.headers["Content-Disposition"] = f'attachment; filename="{file_name(n)}"'
+        return r
+    r = Response(zip_files(an, selected), mimetype="application/zip")
+    r.headers["Content-Disposition"] = f'attachment; filename="{stem[:28]}_UDTs_opt.zip"'
+    return r
+
+
+@app.get("/api/udt/template")
+def udt_template():
+    from flask import Response
+    from udt.excel import template
+    r = Response(template(), mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    r.headers["Content-Disposition"] = 'attachment; filename="UDT_template.xlsx"'
+    return r
 
 
 def _xref(tag: str) -> dict:

@@ -380,6 +380,37 @@ AST, keeping its codes (CRT/ERR/WAR/INF; the prefix fixes the severity). Differe
   one-shot) send the model back for another attempt, the others are shown.
 - Not ported: the Excel/PDF report exports, the lifecycle import page, configurable naming
   prefixes (SFTY_/STD_ are fixed in checks_tags.py).
+- WAR010/WAR011/WAR020 use `udt/layout.py`, the same layout code as the UDT optimizer.
 
 `tests/test_lint.py` runs every rule on `tests/fixtures/lint_project.L5X`, which breaks each rule
 at a known place next to a compliant twin.
+
+## UDTs (udt/)
+
+Four flows; only the first uses the model.
+
+1. **English → UDT** (`inputs/udt_llm.py`). The model writes the UDT text form
+   (`UDT Name "desc";` + `Member TYPE[n] "desc";`), constrained by a GBNF grammar that lists the
+   allowed types plus the attached project's UDTs. `udt.model.check` judges it; a failure goes back
+   to the model with the problem (2 retries). The model never chooses the member order.
+2. **Excel → UDT** (`udt/excel.py`): one row per member, headers matched loosely, a blank UDT cell
+   continues the UDT above. Same checks.
+3. **One UDT export → optimized export** and 4. **program → reordered UDTs** (`udt/optimize.py`).
+
+Layout (`udt/layout.py`): BOOL members pack into hidden SINT hosts named `ZZZZZZZZZZ` + the first
+10 characters of the UDT name + the host's member index; BOOL[n] is stored as DINTs (n a multiple
+of 32); each member aligns to its type; the total pads to the largest alignment (minimum 4). The
+best order sorts by (alignment, group, type, natural name). Sizes are computed, not read from
+Studio 5000.
+
+The optimizer edits the export **as text**, not through an XML round trip, so the BOM, CRLF,
+CDATA and every attribute survive. Only the `<Members>` block of a reordered UDT changes (members
+reused verbatim, BIT `Target`/`BitNumber` rewritten) and, in the whole-program file, the L5K
+`<Data>` of tags whose type contains a reordered UDT. The Decorated data (by member name) stays and
+is meant to carry the values. **Unverified until an import test on a real controller export.**
+
+Not reordered, or left out of the whole-program file: string families (Studio owns the layout);
+UDTs that use types missing from the file; UDTs used in an AOI (AOI definitions carry their own
+data); UDTs with a tag that has only L5K data. Flagged as a layout risk and not ticked by
+default: COP/CPS operands (rungs and ST), MSG local elements, produced/consumed tags, and the
+same through nesting.

@@ -32,6 +32,7 @@ class TagInfo:
     remote_tag: str | None = None  # consumed tags: the producer's tag
     decorated_presets: dict[str, int] | None = None  # TIMER: {"" or "[n]": PRE} from Decorated data
     message_type: str | None = None
+    message_local: str | None = None  # MSG configuration: the local element it reads or writes
 
     @property
     def preset(self) -> int | None:
@@ -270,6 +271,7 @@ def _tags(holder, scope: str, path: str = "Tag") -> list[TagInfo]:
             remote_tag=consume.get("RemoteTag") if consume is not None else None,
             decorated_presets=_decorated_presets(t),
             message_type=mp.get("MessageType") if mp is not None else None,
+            message_local=mp.get("LocalElement") if mp is not None else None,
         ))
     return out
 

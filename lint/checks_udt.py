@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from core.rung import walk
-from lint import udt_layout
+from udt import layout as udt_layout
 from lint.context import Context, Finding
 from lint.registry import check
-from lint.udt_layout import HOST_PREFIX, M, natural_key
+from udt.layout import HOST_PREFIX, M, natural_key
 
 
 def _user_udts(ctx: Context):

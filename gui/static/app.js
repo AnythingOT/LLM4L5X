@@ -41,6 +41,23 @@ function setChips(open) {
 $('examplesButton').onclick = () => setChips(chips.hidden);
 setChips(store.get('llm4l5x.chips', false));
 
+// ---------------------------------------------------------------- Logic / UDT mode
+const PLACEHOLDER = {
+    logic: 'Describe the logic in plain English, or paste rungs (neutral or ASCII text).  Enter = send, Shift+Enter = new line',
+    udt: 'Describe a UDT: "A motor with running and faulted bits, speed in rpm and 32 alarm bits."  Or attach an Excel sheet.',
+};
+let mode = store.get('llm4l5x.mode', 'logic');
+function setMode(m) {
+    mode = m === 'udt' ? 'udt' : 'logic';
+    store.set('llm4l5x.mode', mode);
+    document.querySelectorAll('#modeToggle button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    document.querySelectorAll('.logic-only').forEach((e) => (e.hidden = mode !== 'logic'));
+    document.querySelectorAll('.udt-only').forEach((e) => (e.hidden = mode !== 'udt'));
+    inputBox.placeholder = PLACEHOLDER[mode];
+}
+document.querySelectorAll('#modeToggle button').forEach((b) => (b.onclick = () => { setMode(b.dataset.mode); inputBox.focus(); }));
+setMode(mode);
+
 // ---------------------------------------------------------------- message helpers
 function scrollDown() { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
 function addUser(text) { chatWindow.appendChild(el('div', { cls: 'chat-message user', text })); scrollDown(); }
@@ -70,8 +87,8 @@ function copyButton(getText, label) {
     });
     return b;
 }
-function download(filename, text) {
-    const blob = new Blob([text], { type: 'application/xml' });
+function download(filename, text, type = 'application/xml') {
+    const blob = text instanceof Blob ? text : new Blob([text], { type });
     const a = el('a');
     a.href = URL.createObjectURL(blob);
     a.download = filename;
@@ -79,7 +96,31 @@ function download(filename, text) {
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
-function duration(s) { return s === undefined ? null : el('span', { cls: 'duration', text: `⏱️ ${s.toFixed(2)}s` }); }
+function downloadBase64(filename, b64) {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    download(filename, new Blob([bytes], { type: 'application/zip' }));
+}
+async function downloadUdt(selected, output, notesBox) {
+    const res = await fetch('/api/udt/download', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ selected, output }),
+    });
+    if (!res.ok) {
+        let msg = `Download failed (${res.status})`;
+        try { msg = (await res.json()).message || msg; } catch { /* not JSON */ }
+        notesBox.replaceChildren(el('div', { cls: 'err', text: `✖ ${msg}` }));
+        return;
+    }
+    const cd = res.headers.get('Content-Disposition') || '';
+    const name = (cd.match(/filename="([^"]+)"/) || [])[1] || 'download';
+    const notes = res.headers.get('X-Notes');
+    notesBox.replaceChildren();
+    if (notes) {
+        JSON.parse(atob(notes)).forEach((n) => notesBox.appendChild(el('div', {
+            cls: /left out|only L5K/.test(n) ? 'warn' : 'rung-comment', text: n })));
+    }
+    download(name, await res.blob());
+}
+function duration(s) { return s === undefined || s === null ? null : el('span', { cls: 'duration', text: `⏱️ ${s.toFixed(2)}s` }); }
 function table(headers, rows, monoCols = []) {
     const t = el('table', { cls: 'grid' });
     const hr = el('tr');
@@ -159,6 +200,7 @@ const render = {
 
     error(d) {
         const parts = [el('div', { cls: 'err', text: d.message })];
+        (d.details || []).forEach((x) => parts.push(el('div', { cls: 'err small', text: `• ${x}` })));
         if (d.hint) parts.push(el('div', { cls: 'rung-comment', text: d.hint }));
         if (d.attempts && d.attempts.length) parts.push(attemptsBlock(d.attempts));
         return addBot(...parts);
@@ -212,12 +254,17 @@ const render = {
         ];
         if (unparsed) parts.push(el('div', { cls: 'warn', text: `⚠ ${unparsed} rung(s) could not be read: Validate lists them.` }));
         const v36 = (d.revision_major ?? 0) >= 36;
-        parts.push(el('div', { cls: 'rung-comment', text: `New logic now uses this project's tags and AOIs, with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
+        if (d.target !== 'DataType') parts.push(el('div', { cls: 'rung-comment', text: `New logic now uses this project's tags and AOIs, with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
         const row = el('div', { cls: 'btn-row' });
-        row.appendChild(button('Explain all rungs', () => send('decompile')));
-        row.appendChild(button('Validate', () => send('validate')));
+        if (d.target !== 'DataType') {
+            row.appendChild(button('Explain all rungs', () => send('decompile')));
+            row.appendChild(button('Validate', () => send('validate')));
+        }
+        if (d.udts.length && !d.udt_plan) row.appendChild(button(`Optimize UDTs (${d.udts.length})`, () => send('optimize')));
         parts.push(row);
-        return addBot(...parts);
+        const msg = addBot(...parts);
+        if (d.udt_plan) render.udt_plan(d.udt_plan);
+        return msg;
     },
 
     decompiled(d) {
@@ -291,6 +338,106 @@ const render = {
         return addBot(...parts);
     },
 
+    udt_created(d) {
+        const parts = [];
+        if (d.model) {
+            parts.push(el('div', { cls: 'duration', text: `🤖 ${d.model} via ${d.backend}${d.grammar ? ', grammar-constrained' : ''}: `
+                + `${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` }));
+            if (d.attempts.length > 1) parts.push(attemptsBlock(d.attempts));
+        }
+        parts.push(el('div', { cls: 'status-line', text: `${d.udts.length} UDT${d.udts.length > 1 ? 's' : ''} from ${d.source}` }));
+        d.udts.forEach((u) => {
+            const head = el('div', { cls: 'udt-head' }, el('span', { cls: 'udt-name', text: u.name }),
+                el('span', { cls: 'muted', text: `${u.size} bytes${u.size_as_written > u.size ? ` (${u.size_as_written} in the order given)` : ''}` }));
+            parts.push(head);
+            if (u.description) parts.push(el('div', { cls: 'rung-comment', text: u.description }));
+            parts.push(table(['Member', 'Data type', 'Description'], u.members.map((m) => [m.name, m.type, m.description]), [0, 1]));
+        });
+        (d.warnings || []).forEach((w) => parts.push(el('div', { cls: 'warn', text: `⚠ ${w}` })));
+        parts.push(el('div', { cls: 'rung-comment', text: 'Members are in the order that wastes no memory (BOOLs packed together, then by size). Import with Data Types → Import Data Type.' }));
+        const row = el('div', { cls: 'btn-row' });
+        if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
+        if (d.zip_b64) row.appendChild(button(`Download ${d.filename}`, () => downloadBase64(d.filename, d.zip_b64)));
+        const dur = duration(d.seconds); if (dur) row.appendChild(dur);
+        parts.push(row);
+        return addBot(...parts);
+    },
+
+    udt_plan(d) {
+        const parts = [el('div', { cls: 'status-line', text: d.target
+            ? `UDT export: ${d.target}${d.plans.length > 1 ? ` (+${d.plans.length - 1} nested)` : ''}`
+            : `UDTs in ${d.filename}: ${d.plans.length}` })];
+        if (!d.plans.length) return addBot(el('div', { text: 'This file has no UDTs.' }));
+        const reorder = d.plans.filter((p) => p.status === 'reordered');
+        const t = el('table', { cls: 'grid udt-plan' });
+        const hr = el('tr');
+        ['', 'UDT', 'Bytes now → after', 'Saved / instance', 'Instances', 'Saved in total', 'Notes'].forEach((h) => hr.appendChild(el('th', { text: h })));
+        t.appendChild(hr);
+        const boxes = [];
+        d.plans.forEach((p) => {
+            const tr = el('tr', { cls: p.status });
+            const cb = el('input');
+            cb.type = 'checkbox';
+            cb.disabled = p.status !== 'reordered';
+            cb.checked = !!p.default;
+            cb.dataset.name = p.name;
+            boxes.push(cb);
+            tr.appendChild(el('td', {}, cb));
+            tr.appendChild(el('td', { cls: 'mono', text: p.name }));
+            tr.appendChild(el('td', { text: p.status === 'skipped' ? '—' : `${p.size_now} → ${p.size_best}` }));
+            tr.appendChild(el('td', { text: p.saved ? String(p.saved) : '0' }));
+            tr.appendChild(el('td', { text: p.instances === null ? '—' : String(p.instances) }));
+            tr.appendChild(el('td', { text: p.total_saved === null || p.total_saved === undefined ? '—' : String(p.total_saved) }));
+            const notes = el('td');
+            if (p.status === 'skipped') notes.appendChild(el('span', { cls: 'muted', text: `not changed: ${p.reason}` }));
+            else if (p.status === 'optimal') notes.appendChild(el('span', { cls: 'muted', text: p.saved
+                ? 'order already optimal; smaller once its nested UDTs are reordered' : 'already optimal' }));
+            if (p.risks.length) notes.appendChild(el('span', { cls: 'code error', text: 'layout risk', title: p.risks.join('\n') }));
+            if (p.in_aoi.length) notes.appendChild(el('span', { cls: 'code info', text: 'in AOI', title: `Used inside ${p.in_aoi.join(', ')}` }));
+            if (p.status === 'reordered' && !p.saved) notes.appendChild(el('span', { cls: 'muted', text: 'saves nothing ' }));
+            if (p.status === 'reordered') {
+                const det = el('details', { cls: 'order' });
+                det.appendChild(el('summary', { text: 'order' }));
+                det.appendChild(el('div', { cls: 'mono small', text: `before: ${p.before.join(', ')}` }));
+                det.appendChild(el('div', { cls: 'mono small', text: `after:  ${p.after.join(', ')}` }));
+                p.risks.forEach((r) => det.appendChild(el('div', { cls: 'err small', text: `⚠ ${r}` })));
+                notes.appendChild(det);
+            }
+            tr.appendChild(notes);
+            t.appendChild(tr);
+        });
+        parts.push(t);
+        parts.push(el('div', { cls: 'rung-comment', text: reorder.length
+            ? 'Sizes are estimates from the layout rules: check them in Studio 5000. Reordering moves byte offsets: '
+              + 'anything that copies a UDT by offset (COP/CPS, MSG, produced/consumed, an HMI reading the raw block) must be checked. '
+              + 'Only UDTs that save bytes and have no layout risk are ticked. A UDT can only change offline.'
+            : 'Nothing to reorder: every UDT is already in the best order, or cannot be analysed.' }));
+        const notesBox = el('div');
+        const sel = () => boxes.filter((b) => b.checked).map((b) => b.dataset.name);
+        const row = el('div', { cls: 'btn-row' });
+        if (reorder.length) {
+            const label = () => (sel().length === 1 ? `Download ${sel()[0]}_opt.L5X` : `Download ${sel().length} UDTs (zip)`);
+            const one = button(label(), () => downloadUdt(sel(), sel().length === 1 ? 'single' : 'zip', notesBox));
+            row.appendChild(one);
+            let full = null;
+            if (d.full) {
+                full = button('Download whole program (test the import first)', () => downloadUdt(sel(), 'program', notesBox));
+                full.classList.add('caution');
+                row.appendChild(full);
+            }
+            const refresh = () => {
+                one.textContent = label();
+                one.disabled = !sel().length;
+                if (full) full.disabled = !sel().length;
+            };
+            boxes.forEach((b) => b.addEventListener('change', refresh));
+            refresh();
+        }
+        parts.push(row);
+        parts.push(notesBox);
+        return addBot(...parts);
+    },
+
     xref(d) {
         if (!d.refs.length) return addBot(el('div', { text: `No references to ${d.tag}.` }));
         return addBot(
@@ -308,13 +455,14 @@ async function send(text) {
     settings = loadSettings();
     if (/^\s*(help|\?)\s*$/i.test(text)) { openHelp(); return; }
     addUser(text);
-    const english = !/:=|;|^\s*(summary|decompile|validate|xref)\b/i.test(text) && !/^\s*\w+\s*\(/.test(text)
-        && !/^\s*(XIC|XIO|SOR|BST)\b/i.test(text);
+    const command = /^\s*(summary|decompile|validate|optimize|xref)\b/i.test(text);
+    const english = !command && !/:=|;/.test(text) && !/^\s*\w+\s*\(/.test(text) && !/^\s*(XIC|XIO|SOR|BST)\b/i.test(text);
     const who = settings.backend === 'llamacpp' ? 'the model' : (settings.model || 'the model');
     const wait = loading(english ? `Asking ${who} (can take a minute on a CPU)` : 'Working');
     try {
         const res = await fetch('/api/process', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, settings }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ text, settings, mode: command ? 'logic' : mode }),
         });
         wait.remove();
         show(await res.json());
@@ -357,14 +505,18 @@ function setProject(name, programs, preferred) {
 
 async function upload(file) {
     addUser(`📎 ${file.name}`);
-    const wait = loading('Reading the L5X');
+    const excel = /\.xls[xm]$/i.test(file.name);
+    const wait = loading(excel ? 'Reading the UDT sheet' : 'Reading the L5X');
     const fd = new FormData();
     fd.append('file', file);
+    fd.append('settings', JSON.stringify(loadSettings()));
     try {
         const res = await fetch('/api/project', { method: 'POST', body: fd });
         wait.remove();
         if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
-        show(await res.json());
+        const d = await res.json();
+        if (excel && d.kind === 'udt_created') setMode('udt');
+        show(d);
     } catch (e) {
         wait.remove();
         render.error({ message: `Upload failed: ${e.message}` });
@@ -390,6 +542,6 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
     updateBadge();
     addBot(
         el('div', { text: 'Describe ladder logic in plain English, or paste rungs, and get checked Studio 5000 rungs. Everything runs on this PC.' }),
-        el('div', { cls: 'rung-comment', text: 'Press ? for what it can do, ⓘ in the input box for examples. Attach your .L5X so the logic uses your real tag names.' }),
+        el('div', { cls: 'rung-comment', text: 'Press ? for what it can do, ⓘ in the input box for examples. Switch Logic / UDT to create a data type. Attach your .L5X so the logic uses your real tag names.' }),
     );
 })();

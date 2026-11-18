@@ -1,0 +1,208 @@
+﻿<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.00" TargetName="Plant" TargetType="Controller" ContainsContext="false" ExportOptions="NoRawData L5KData DecoratedData ForceProtectedEncoding AllProjDocTrans">
+<Controller Use="Target" Name="Plant" ProcessorType="1756-L83E" MajorRev="33" MinorRev="11">
+<DataTypes>
+<DataType Name="Pad_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="ZZZZZZZZZZPad_UDT0" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="true" ExternalAccess="Read/Write"/>
+<Member Name="Flag_A" DataType="BIT" Dimension="0" Radix="Decimal" Hidden="false" Target="ZZZZZZZZZZPad_UDT0" BitNumber="0" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[first flag]]>
+</Description>
+</Member>
+<Member Name="Value" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write">
+<Description>
+<![CDATA[a value]]>
+</Description>
+</Member>
+<Member Name="ZZZZZZZZZZPad_UDT2" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="true" ExternalAccess="Read/Write"/>
+<Member Name="Flag_B" DataType="BIT" Dimension="0" Radix="Decimal" Hidden="false" Target="ZZZZZZZZZZPad_UDT2" BitNumber="0" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="Holder_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="Count" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="Pads" DataType="Pad_UDT" Dimension="2" Radix="NullType" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="Copy_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="Small" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="Big" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="Small2" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="InAoi_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="Big" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="Small" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="Good_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="A" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="B" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="Lost_UDT" Family="NoFamily" Class="User">
+<Members>
+<Member Name="Small" DataType="SINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="Ext" DataType="Missing_T" Dimension="0" Radix="NullType" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+<DataType Name="STR20" Family="StringFamily" Class="User">
+<Members>
+<Member Name="LEN" DataType="DINT" Dimension="0" Radix="Decimal" Hidden="false" ExternalAccess="Read/Write"/>
+<Member Name="DATA" DataType="SINT" Dimension="20" Radix="ASCII" Hidden="false" ExternalAccess="Read/Write"/>
+</Members>
+</DataType>
+</DataTypes>
+<AddOnInstructionDefinitions>
+<AddOnInstructionDefinition Name="Uses_UDT" Revision="1.0" ExecutePrescan="false">
+<Parameters>
+<Parameter Name="EnableIn" TagType="Base" DataType="BOOL" Usage="Input" Radix="Decimal" Required="false" Visible="false" ExternalAccess="Read Only"/>
+<Parameter Name="EnableOut" TagType="Base" DataType="BOOL" Usage="Output" Radix="Decimal" Required="false" Visible="false" ExternalAccess="Read Only"/>
+</Parameters>
+<LocalTags>
+<LocalTag Name="Work" DataType="InAoi_UDT" ExternalAccess="None">
+<DefaultData Format="L5K">
+<![CDATA[[0,0]]]>
+</DefaultData>
+<DefaultData Format="Decorated">
+<Structure DataType="InAoi_UDT">
+<DataValueMember Name="Big" DataType="DINT" Value="0"/>
+</Structure>
+</DefaultData>
+</LocalTag>
+</LocalTags>
+<Routines>
+<Routine Name="Logic" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Text>
+<![CDATA[NOP();]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+</Routines>
+</AddOnInstructionDefinition>
+</AddOnInstructionDefinitions>
+<Tags>
+<Tag Name="PadTag" TagType="Base" DataType="Pad_UDT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[1,42]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="Pad_UDT">
+<DataValueMember Name="Flag_A" DataType="BOOL" Value="1"/>
+<DataValueMember Name="Value" DataType="DINT" Radix="Decimal" Value="42"/>
+<DataValueMember Name="Flag_B" DataType="BOOL" Value="0"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="PadArr" TagType="Base" DataType="Pad_UDT" Dimensions="10" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[[0,0],[0,0]]]]>
+</Data>
+<Data Format="Decorated">
+<Array DataType="Pad_UDT" Dimensions="10">
+<Element Index="[0]">
+<Structure DataType="Pad_UDT">
+<DataValueMember Name="Flag_A" DataType="BOOL" Value="1"/>
+<DataValueMember Name="Value" DataType="DINT" Radix="Decimal" Value="42"/>
+<DataValueMember Name="Flag_B" DataType="BOOL" Value="0"/>
+</Structure>
+</Element>
+</Array>
+</Data>
+</Tag>
+<Tag Name="HolderTag" TagType="Base" DataType="Holder_UDT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[7,[[1,1],[0,0]]]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="Holder_UDT">
+<DataValueMember Name="Count" DataType="DINT" Radix="Decimal" Value="7"/>
+<ArrayMember Name="Pads" DataType="Pad_UDT" Dimensions="2">
+<Element Index="[0]">
+<Structure DataType="Pad_UDT">
+<DataValueMember Name="Value" DataType="DINT" Radix="Decimal" Value="1"/>
+</Structure>
+</Element>
+</ArrayMember>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="CopySrc" TagType="Base" DataType="Copy_UDT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[1,2,3]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="Copy_UDT">
+<DataValueMember Name="Big" DataType="DINT" Value="2"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="CopyDst" TagType="Base" DataType="Copy_UDT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[0,0,0]]]>
+</Data>
+</Tag>
+<Tag Name="GoodTag" TagType="Base" DataType="Good_UDT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[[1,2]]]>
+</Data>
+<Data Format="Decorated">
+<Structure DataType="Good_UDT">
+<DataValueMember Name="A" DataType="DINT" Value="1"/>
+</Structure>
+</Data>
+</Tag>
+<Tag Name="Plain" TagType="Base" DataType="DINT" Constant="false" ExternalAccess="Read/Write">
+<Data Format="L5K">
+<![CDATA[5]]>
+</Data>
+<Data Format="Decorated">
+<DataValue DataType="DINT" Radix="Decimal" Value="5"/>
+</Data>
+</Tag>
+</Tags>
+<Programs>
+<Program Name="MainProgram" MainRoutineName="MainRoutine">
+<Tags/>
+<Routines>
+<Routine Name="MainRoutine" Type="RLL">
+<RLLContent>
+<Rung Number="0" Type="N">
+<Comment>
+<![CDATA[keep   this  comment
+as is]]>
+</Comment>
+<Text>
+<![CDATA[COP(CopySrc,CopyDst,1);]]>
+</Text>
+</Rung>
+<Rung Number="1" Type="N">
+<Comment>
+<![CDATA[keep   this  comment
+as is]]>
+</Comment>
+<Text>
+<![CDATA[XIC(PadTag.Flag_A)OTE(PadTag.Flag_B);]]>
+</Text>
+</Rung>
+</RLLContent>
+</Routine>
+</Routines>
+</Program>
+</Programs>
+<Tasks>
+<Task Name="MainTask" Type="CONTINUOUS" Watchdog="500">
+<ScheduledPrograms>
+<ScheduledProgram Name="MainProgram"/>
+</ScheduledPrograms>
+</Task>
+</Tasks>
+</Controller>
+</RSLogix5000Content>
