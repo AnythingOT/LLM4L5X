@@ -25,9 +25,19 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Plain English (needs Ollama)
+## Plain English (needs a local model)
 
-1. Install Ollama from ollama.com, then `ollama pull phi4-mini` (or any model; set it in ⚙️).
+Pick where the model runs in ⚙️ Settings (or click the model badge in the header). The model list is read from the server.
+
+| Runs on | Start it | Answers |
+|---|---|---|
+| **Ollama** (default) | install from ollama.com, `ollama pull phi4-mini` | free text; syntax mistakes are sent back to the model to fix |
+| **llama.cpp server**, direct GGUF | `llama-server -m model.gguf --port 8080` (Windows CPU build from llama.cpp's GitHub releases, GGUF from Hugging Face) | **grammar-constrained**: every answer is valid LogicSpec using only allowed tag names |
+| OpenAI-compatible (LM Studio, Jan, vLLM) | start its local server | free text, as Ollama |
+
+**llama.cpp is the recommended choice for accuracy.** The grammar removes the whole class of syntax errors. In the first phi4-mini run, those were 65 of 98 failures.
+
+1. Start a model server (above).
 2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
 3. You get the **LogicSpec the model understood**, a plain-English read-back, the rungs and a Download button. Check the read-back: it tells you what the logic will actually do.
 
@@ -101,6 +111,7 @@ python cli.py validate plant.L5X
 python cli.py survey folder_of_exports
 python cli.py ask "run the pump from start, stop with stop" --project plant.L5X --model phi4-mini -o pump.L5X
 python cli.py eval --model qwen3.6:35b-a3b --no-think
+python cli.py suite --backend llamacpp --per 1 --excel suite_llamacpp.xlsx   # grammar-constrained
 python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
@@ -118,7 +129,7 @@ inputs/             llm.py (Ollama, English -> LogicSpec), examples.yaml (few-sh
 eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
                     instruction suite), rung_compare.py (behavioural oracle), mutation.py
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (180 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (197 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

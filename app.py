@@ -41,9 +41,10 @@ DEFAULTS = {
     "display": "placeholder",   # placeholder | values
     "comments": True,
     "prefix": "L4X",
+    "backend": "ollama",        # ollama | llamacpp | openai
+    "llm_url": "",              # empty = the backend's usual local address
     "model": "phi4-mini",
-    "ollama": "http://127.0.0.1:11434",
-    "think": "default",         # default | off
+    "think": "default",         # default | off (Ollama)
 }
 
 
@@ -61,7 +62,17 @@ def _settings(raw: dict | None) -> dict:
     s["comments"] = bool(s["comments"])
     if s["think"] not in ("default", "off"):
         s["think"] = "default"
+    if s["backend"] not in ("ollama", "llamacpp", "openai"):
+        s["backend"] = "ollama"
+    if not s["llm_url"] and (raw or {}).get("ollama") and s["backend"] == "ollama":
+        s["llm_url"] = raw["ollama"]  # settings saved by the previous version
     return s
+
+
+def _llm(s: dict):
+    from inputs.llm import make_client
+    return make_client(s["backend"], s["llm_url"] or None, s["model"],
+                       think=False if s["think"] == "off" else None)
 
 
 def _project() -> Project | None:
@@ -171,9 +182,9 @@ def _looks_like_logicspec(text: str) -> bool:
 
 def _english(text: str, s: dict) -> dict:
     """Plain English -> local model -> LogicSpec -> compiled, checked rungs."""
-    from inputs.llm import Generator, LLMError, OllamaClient
+    from inputs.llm import BACKENDS, Generator, LLMError
     proj = _project()
-    client = OllamaClient(model=s["model"], url=s["ollama"], think=False if s["think"] == "off" else None)
+    client = _llm(s)
     try:
         r = Generator(client).generate(
             text,
@@ -185,15 +196,17 @@ def _english(text: str, s: dict) -> dict:
             string_types=proj.string_types if proj else None)
     except LLMError as e:
         return {"kind": "error", "message": str(e),
-                "hint": f"Model: {s['model']} at {s['ollama']} (change in ⚙️ Settings)."}
+                "hint": f"{BACKENDS[s['backend']]['label']}, model '{s['model'] or 'default'}' at {client.url} "
+                        "(change in ⚙️ Settings)."}
     attempts = [{"spec": a.spec, "error": a.error} for a in r.attempts]
     if r.spec is None:
         return {"kind": "error", "message": f"The model could not produce valid logic: {r.error}",
                 "hint": "Try rewording, or name the tags you mean.", "attempts": attempts}
     out = _compile(r.compiled.statements, s)
     if out["kind"] == "compiled":
-        out.update(kind="generated", spec=r.spec, model=s["model"], attempts=attempts,
-                   model_seconds=r.seconds)
+        out.update(kind="generated", spec=r.spec, model=s["model"] or s["backend"], attempts=attempts,
+                   model_seconds=r.seconds, backend=BACKENDS[s["backend"]]["label"],
+                   grammar=bool(getattr(client, "supports_grammar", False)))
         out["warnings"] = r.warnings + out["warnings"]
     return out
 
@@ -345,6 +358,20 @@ def _xref(tag: str) -> dict:
     return {"kind": "xref", "tag": tag, "refs": [
         {"where": f"{r.program}/{r.routine} rung {r.rung}", "instruction": r.instruction,
          "operand": r.operand, "role": r.role} for r in refs]}
+
+
+@app.post("/api/llm/models")
+def llm_models():
+    """Models available on the chosen local backend, and whether it is reachable."""
+    from inputs.llm import BACKENDS, LLMError
+    s = _settings((request.get_json(silent=True) or {}).get("settings"))
+    client = _llm(s)
+    try:
+        models = client.list_models()
+        return jsonify(ok=True, models=models, url=client.url, backend=BACKENDS[s["backend"]]["label"],
+                       grammar=bool(getattr(client, "supports_grammar", False)))
+    except LLMError as e:
+        return jsonify(ok=False, models=[], url=client.url, backend=BACKENDS[s["backend"]]["label"], error=str(e))
 
 
 @app.get("/api/status")

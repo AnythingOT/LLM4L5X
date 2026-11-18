@@ -158,8 +158,8 @@ def cmd_validate(a) -> int:
 
 
 def _client(a):
-    from inputs.llm import OllamaClient
-    return OllamaClient(model=a.model, url=a.ollama, think=False if a.no_think else None)
+    from inputs.llm import make_client
+    return make_client(a.backend, a.url, a.model, think=False if a.no_think else None)
 
 
 def cmd_ask(a) -> int:
@@ -280,8 +280,10 @@ def main(argv: list[str] | None = None) -> int:
     v.set_defaults(fn=cmd_validate)
 
     def llm_args(p):
-        p.add_argument("--model", default="phi4-mini", help="Ollama model name (default phi4-mini)")
-        p.add_argument("--ollama", default="http://127.0.0.1:11434", help="Ollama address")
+        p.add_argument("--backend", choices=["ollama", "llamacpp", "openai"], default="ollama",
+                       help="ollama | llamacpp (llama-server, grammar-constrained) | openai (LM Studio etc.)")
+        p.add_argument("--model", default="phi4-mini", help="model name (default phi4-mini; llama-server ignores it)")
+        p.add_argument("--url", "--ollama", dest="url", help="server address (default: the backend's usual port)")
         p.add_argument("--no-think", action="store_true", help="ask thinking models (Qwen3 etc.) not to think")
 
     ak = sub.add_parser("ask", help="plain English -> LogicSpec -> rungs, with a local model via Ollama")

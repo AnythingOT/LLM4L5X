@@ -11,7 +11,7 @@ from dataclasses import dataclass
 
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, walk
 from core.logicspec import (
-    And, Assign, Clear, Cmp, Copy, Count, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit, Rise,
+    And, Assign, Clear, Cmp, Copy, Count, Energize, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit, Rise,
     SetBit, StartTimer, Statement, Var,
 )
 
@@ -75,6 +75,8 @@ def _preset(tag: str, display: tuple[str, ...], presets: dict[str, int]) -> int:
 
 def _action(i: Instr, presets: dict[str, int]):
     n, a = i.name.upper(), i.args
+    if n == "OTE":
+        return Energize(a[0])
     if n == "OTL":
         return SetBit(a[0])
     if n == "OTU":
@@ -135,21 +137,11 @@ def decompile_rung(r: Rung, presets: dict[str, int] | None = None) -> list[State
     else:
         cond = And(tuple(_flatten_and(parts)))
 
-    otes = [o for o in outs if o.name.upper() == "OTE"]
-    others = [o for o in outs if o.name.upper() != "OTE"]
-    if otes and cond is None:
-        raise NotConvertible("OTE with no condition (always on)")
-    if len(outs) > 1 and otes:
-        # Splitting into several rungs re-evaluates the condition, which is only
-        # equivalent if no output of this rung is read by the condition and no ONS.
-        written = {base_tag(o.args[0]) for o in outs if o.args}
-        read = {base_tag(x) for c in conds for ins in walk(c) for x in ins.args}
-        if ons_at or written & read:
-            raise NotConvertible("OTE in an output branch whose condition reads its own outputs or uses ONS")
-    stmts: list[Statement] = [Assign(o.args[0], cond) for o in otes]
-    if others:
-        stmts.append(IfThen(cond, tuple(_action(o, presets) for o in others)))
-    return stmts
+    if len(outs) == 1 and outs[0].name.upper() == "OTE":
+        if cond is None:
+            raise NotConvertible("OTE with no condition (always on)")
+        return [Assign(outs[0].args[0], cond)]
+    return [IfThen(cond, tuple(_action(o, presets) for o in outs))]
 
 
 def try_decompile(r: Rung, presets: dict[str, int] | None = None) -> tuple[list[Statement] | None, str | None]:

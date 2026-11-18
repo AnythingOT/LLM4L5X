@@ -14,6 +14,9 @@
             <span id="projectName"></span>
             <button id="detachButton" title="Detach project">&times;</button>
         </span>
+        <button id="modelBadge" class="model-badge" title="Model connection - click to change">
+            <span id="modelDot" class="dot"></span><span id="modelBadgeText">model</span>
+        </button>
         <button id="toggleTheme" title="Toggle dark/light mode">🌓</button>
         <button id="settingsButton" title="Settings">⚙️</button>
     </div>
@@ -48,7 +51,41 @@
                 <span class="close-button" title="Close">&times;</span>
                 <h2>Settings</h2>
                 <p class="modal-description">Saved in this browser. Applied to the next message.</p>
+                <input id="setModel" type="hidden" />
                 <div class="settings-grid">
+                    <div class="settings-section">Model (runs on this PC)</div>
+
+                    <label for="setBackend">Runs on</label>
+                    <select id="setBackend">
+                        <option value="ollama">Ollama</option>
+                        <option value="llamacpp">llama.cpp server (direct GGUF, grammar-checked)</option>
+                        <option value="openai">OpenAI-compatible server (LM Studio, Jan, vLLM)</option>
+                    </select>
+                    <div></div>
+                    <div id="backendHelp" class="settings-help"></div>
+
+                    <label for="setLlmUrl">Server address</label>
+                    <input id="setLlmUrl" type="text" />
+
+                    <label for="setModelSelect">Model</label>
+                    <div class="model-pick">
+                        <select id="setModelSelect"></select>
+                        <button id="refreshModels" class="modal-button small" title="Reload the model list">⟳</button>
+                    </div>
+                    <div></div>
+                    <div class="model-extra">
+                        <input id="setModelCustom" type="text" placeholder="model name, e.g. qwen3.6:35b-a3b" hidden />
+                        <div id="modelStatus" class="settings-help"></div>
+                    </div>
+
+                    <label for="setThink" class="think-row" title="Qwen3 and similar models think before answering; slow on CPU">Model thinking</label>
+                    <select id="setThink" class="think-row">
+                        <option value="default">Model default</option>
+                        <option value="off">Off (faster)</option>
+                    </select>
+
+                    <div class="settings-section">Output</div>
+
                     <label for="setOutput">Download as</label>
                     <select id="setOutput">
                         <option value="rungs">Rungs (paste into a routine)</option>
@@ -85,18 +122,6 @@
 
                     <label for="setComments">Rung comments</label>
                     <input id="setComments" type="checkbox" />
-
-                    <label for="setModel" title="Any model installed in Ollama (ollama list)">Local model</label>
-                    <input id="setModel" type="text" placeholder="phi4-mini" />
-
-                    <label for="setOllama">Ollama address</label>
-                    <input id="setOllama" type="text" />
-
-                    <label for="setThink" title="Qwen3 and similar models think before answering; slow on CPU">Model thinking</label>
-                    <select id="setThink">
-                        <option value="default">Model default</option>
-                        <option value="off">Off (faster)</option>
-                    </select>
                 </div>
                 <div class="modal-actions">
                     <button id="resetSettings" class="modal-button">Reset</button>

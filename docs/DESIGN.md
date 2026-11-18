@@ -182,6 +182,17 @@ take a custom grammar); the retry loop covers syntax. `eval/` scores models by t
 equivalence. Tested with fake models and a stand-in HTTP server only. Accuracy of phi4-mini,
 Qwen or Gemma is unknown until someone runs `python cli.py eval`.
 
+**First real model run (2026-11-18, phi4-mini via Ollama, suite --per 1, 120 cases): 22/120
+(18%).** 65 failures were syntax, 29 wrong logic. Causes found and fixed: tag names mangled
+(case/underscores) -> deterministic snapping; examples copied verbatim -> rejected when unrelated
+to the request; misspelt request tags -> "did you mean" retry; no way to energize a coil next
+to other actions -> `ENERGIZE X`; `!=`/`==`/`&&`/`||` accepted; statement-level math and bare
+actions get errors that state the right form; examples for timers, counters, math, copy and
+multi-action added. Replaying the 29 wrong answers: 3 fixed by snapping alone, 12 now get a
+targeted retry, 14 are genuine reasoning errors. Backends: Ollama, llama.cpp `llama-server` (per-request
+GBNF over the allowed tags; the grammar accepts every expected suite answer in tests), and other
+OpenAI-compatible servers. Raw replies are now stored in the suite Excel.
+
 Original plan:
 
 Runtime: llama.cpp (GBNF grammars per request). Ollama's structured output is JSON-schema

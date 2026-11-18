@@ -20,13 +20,21 @@ const store = {
 const DEFAULTS = {
     output: 'rungs', routine: 'GeneratedRoutine', program: 'MainProgram', controller: 'LLM4L5X',
     revision: '32.04', scope: 'controller', display: 'placeholder', prefix: 'L4X', comments: true,
-    model: 'phi4-mini', ollama: 'http://127.0.0.1:11434', think: 'default',
+    backend: 'ollama', llm_url: '', model: 'phi4-mini', think: 'default',
+};
+const BACKEND_INFO = {
+    ollama: { url: 'http://127.0.0.1:11434', label: 'Ollama',
+        help: 'Models installed with "ollama pull <name>". No grammar: syntax mistakes are sent back to the model to fix.' },
+    llamacpp: { url: 'http://127.0.0.1:8080', label: 'llama.cpp',
+        help: 'Start it with: llama-server -m your-model.gguf --port 8080. Every answer is grammar-constrained to valid LogicSpec using your tag names. The server runs the model it was started with.' },
+    openai: { url: 'http://127.0.0.1:1234', label: 'OpenAI-compatible',
+        help: 'Any local server with the OpenAI chat API (LM Studio, Jan, vLLM). No grammar.' },
 };
 let settings = Object.assign({}, DEFAULTS, store.get('llm4l5x.settings', {}));
 const fields = {
     output: 'setOutput', routine: 'setRoutine', program: 'setProgram', controller: 'setController',
     revision: 'setRevision', scope: 'setScope', display: 'setDisplay', prefix: 'setPrefix', comments: 'setComments',
-    model: 'setModel', ollama: 'setOllama', think: 'setThink',
+    backend: 'setBackend', llm_url: 'setLlmUrl', model: 'setModel', think: 'setThink',
 };
 function fillSettings() {
     for (const [k, id] of Object.entries(fields)) {
@@ -42,11 +50,99 @@ function readSettings() {
     store.set('llm4l5x.settings', settings);
 }
 const modal = $('settingsModal');
-$('settingsButton').onclick = () => { fillSettings(); modal.classList.add('show'); };
+function openSettings() { fillSettings(); updateBackendUi(); modal.classList.add('show'); refreshModels(); }
+$('settingsButton').onclick = openSettings;
+$('modelBadge').onclick = openSettings;
+
+// ---------------------------------------------------------------- model backend / selector
+function currentLlmSettings() {
+    return Object.assign({}, settings, {
+        backend: $('setBackend').value,
+        llm_url: $('setLlmUrl').value.trim(),
+        model: $('setModel').value.trim(),
+    });
+}
+function updateBackendUi() {
+    const b = $('setBackend').value;
+    const info = BACKEND_INFO[b];
+    $('backendHelp').textContent = info.help;
+    $('setLlmUrl').placeholder = info.url;
+    document.querySelectorAll('.think-row').forEach((e) => (e.hidden = b !== 'ollama'));
+}
+$('setBackend').onchange = () => {
+    // a default address of another backend would be wrong here
+    const url = $('setLlmUrl').value.trim();
+    if (Object.values(BACKEND_INFO).some((i) => i.url === url)) $('setLlmUrl').value = '';
+    updateBackendUi();
+    refreshModels();
+};
+$('setLlmUrl').onchange = () => refreshModels();
+$('refreshModels').onclick = () => refreshModels();
+$('setModelSelect').onchange = () => {
+    const v = $('setModelSelect').value;
+    const custom = v === '__custom__';
+    $('setModelCustom').hidden = !custom;
+    if (custom) { $('setModelCustom').focus(); } else { $('setModel').value = v; }
+};
+$('setModelCustom').oninput = () => { $('setModel').value = $('setModelCustom').value.trim(); };
+
+async function fetchModels(s) {
+    const res = await fetch('/api/llm/models', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: s }),
+    });
+    return res.json();
+}
+async function refreshModels() {
+    const status = $('modelStatus');
+    status.className = 'settings-help';
+    status.textContent = 'Checking…';
+    const s = currentLlmSettings();
+    let d;
+    try { d = await fetchModels(s); } catch (e) { d = { ok: false, models: [], error: e.message }; }
+    const sel = $('setModelSelect');
+    let current = $('setModel').value;
+    // Ollama treats "phi4-mini" as "phi4-mini:latest"
+    if (current && !current.includes(':') && d.models.includes(`${current}:latest`)) {
+        current = `${current}:latest`;
+        $('setModel').value = current;
+    }
+    const opts = [];
+    d.models.forEach((m) => { const o = el('option', { text: m }); o.value = m; opts.push(o); });
+    if (current && !d.models.includes(current) && s.backend !== 'llamacpp') {
+        const o = el('option', { text: `${current} (not found)` }); o.value = current; opts.unshift(o);
+    }
+    const other = el('option', { text: 'Other (type a name)…' }); other.value = '__custom__'; opts.push(other);
+    sel.replaceChildren(...opts);
+    if (d.models.includes(current) || (current && s.backend !== 'llamacpp')) sel.value = current;
+    else if (d.models.length) { sel.value = d.models[0]; $('setModel').value = d.models[0]; }
+    $('setModelCustom').hidden = sel.value !== '__custom__';
+    if (d.ok) {
+        status.className = 'settings-help ok';
+        status.textContent = `● Connected to ${d.backend} at ${d.url}: ${d.models.length} model${d.models.length === 1 ? '' : 's'}`
+            + (d.grammar ? ' · grammar-checked answers' : '');
+    } else {
+        status.className = 'settings-help bad';
+        status.textContent = `○ ${d.error}`;
+    }
+}
+async function updateBadge() {
+    const dot = $('modelDot');
+    const label = BACKEND_INFO[settings.backend] ? BACKEND_INFO[settings.backend].label : settings.backend;
+    $('modelBadgeText').textContent = `${settings.model || 'default model'} · ${label}`;
+    dot.className = 'dot';
+    try {
+        const d = await fetchModels(settings);
+        dot.className = 'dot ' + (d.ok ? 'ok' : 'bad');
+        $('modelBadge').title = d.ok ? `Connected: ${d.url}${d.grammar ? ' (grammar-checked)' : ''} - click to change`
+            : `${d.error} - click to change`;
+    } catch { dot.className = 'dot bad'; }
+}
 modal.querySelector('.close-button').onclick = () => modal.classList.remove('show');
 modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
-$('saveSettings').onclick = () => { readSettings(); modal.classList.remove('show'); };
-$('resetSettings').onclick = () => { settings = Object.assign({}, DEFAULTS); fillSettings(); };
+$('saveSettings').onclick = () => { readSettings(); modal.classList.remove('show'); updateBadge(); };
+$('resetSettings').onclick = () => {
+    settings = Object.assign({}, DEFAULTS); fillSettings(); updateBackendUi(); refreshModels();
+};
 
 // ---------------------------------------------------------------- theme
 if (store.get('llm4l5x.theme', 'light') === 'dark') document.body.classList.add('dark-mode');
@@ -176,7 +272,7 @@ const render = {
     generated(d) {
         // plain English -> model -> LogicSpec; then the normal compiled view
         const head = [
-            title(`Understood as (LogicSpec from ${d.model})`),
+            title(`Understood as (LogicSpec from ${d.model}${d.grammar ? ', grammar-checked' : ''})`),
             code(d.spec),
         ];
         const row = el('div', { cls: 'btn-row' });
@@ -417,6 +513,9 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
         const s = await (await fetch('/api/status')).json();
         setProject(s.project, s.programs);
     } catch { /* server not ready */ }
+    if (!settings.backend) settings.backend = 'ollama';
+    if (!settings.llm_url && settings.ollama) settings.llm_url = settings.ollama;  // older saved settings
+    updateBadge();
     addBot(
         el('div', { text: 'LLM4L5X — describe ladder logic in plain English, get checked Studio 5000 rungs. Everything runs on this PC.' }),
         el('div', { cls: 'rung-comment', text: "Try a chip below or type 'help'. Attach your .L5X so the model uses your real tag names." }),

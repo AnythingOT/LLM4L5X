@@ -39,6 +39,7 @@ class Outcome:
     reason: str
     attempts: int = 0
     seconds: float = 0.0
+    replies: str = ""  # raw model replies, all attempts
 
 
 def _check_case(case: Case, version: int) -> list[str]:
@@ -89,14 +90,16 @@ def model_run(cases: list[Case], client, version: int, progress=None) -> list[Ou
     for n, c in enumerate(cases, 1):
         t0 = time.perf_counter()
         r = gen.generate(c.english, known_tags=c.tags, compiler_kw={"revision": f"{version}.00", "comments": False})
+        replies = "\n---\n".join(f"#{i + 1}: {a.reply.strip()}" + (f"\n  -> {a.error}" if a.error else "")
+                                 for i, a in enumerate(r.attempts))
         if r.compiled is None:
             o = Outcome(c, None, [], False, False, r.error or "no answer", len(r.attempts),
-                        round(time.perf_counter() - t0, 2))
+                        round(time.perf_counter() - t0, 2), replies)
         else:
             got = [format_rung(x) for x in r.compiled.rungs]
             ok, why = compare(Side([parse_rung(t) for t in c.rungs], c.presets),
                               Side(r.compiled.rungs, _presets(r.compiled)), seed=n)
-            o = Outcome(c, r.spec, got, ok, got == c.rungs, why, len(r.attempts), r.seconds)
+            o = Outcome(c, r.spec, got, ok, got == c.rungs, why, len(r.attempts), r.seconds, replies)
         out.append(o)
         if progress:
             progress(n, len(cases), o)
@@ -140,7 +143,8 @@ def write_excel(outcomes: list[Outcome], path: str, title: str) -> None:
     ws = wb.active
     ws.title = "Results"
     head = ["ID", "Instruction", "Structure", "Question (English)", "Expected LogicSpec", "Expected rungs",
-            "Got LogicSpec", "Got rungs", "Attempts", "Seconds", "Match (behaviour)", "EXACT (old)", "Why not"]
+            "Got LogicSpec", "Got rungs", "Attempts", "Seconds", "Match (behaviour)", "EXACT (old)", "Why not",
+            "Model replies (raw)"]
     ws.append(head)
     for c in ws[1]:
         c.font = Font(bold=True)
@@ -148,9 +152,9 @@ def write_excel(outcomes: list[Outcome], path: str, title: str) -> None:
     for o in outcomes:
         ws.append([o.case.id, o.case.feature, o.case.structure, o.case.english, o.case.spec,
                    "\n".join(o.case.rungs), o.got_spec or "", "\n".join(o.got_rungs), o.attempts, o.seconds,
-                   "TRUE" if o.ok else "FALSE", "TRUE" if o.exact else "FALSE", o.reason])
+                   "TRUE" if o.ok else "FALSE", "TRUE" if o.exact else "FALSE", o.reason, o.replies])
         ws.cell(ws.max_row, 11).fill = green if o.ok else red
-    widths = [20, 10, 12, 60, 45, 55, 45, 55, 9, 9, 10, 10, 60]
+    widths = [20, 10, 12, 60, 45, 55, 45, 55, 9, 9, 10, 10, 60, 70]
     for i, w in enumerate(widths, 1):
         ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
     for row in ws.iter_rows(min_row=2):

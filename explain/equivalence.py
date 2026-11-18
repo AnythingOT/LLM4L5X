@@ -16,7 +16,7 @@ from __future__ import annotations
 import itertools
 import random
 
-from core.logicspec import (And, Assign, Cmp, Delay, IfThen, Not, Or, Rise, Var, format_action,
+from core.logicspec import (And, Assign, Cmp, Delay, Energize, IfThen, Not, Or, Rise, Var, format_action,
                             format_expr, parse_spec)
 
 # a <op> b with op in {<=, <, <>} becomes NOT (a <op'> b), so N <= 5 and NOT N > 5 match
@@ -75,7 +75,7 @@ def effects(text: str) -> dict:
             out.setdefault(("OTE", s.target), []).append(_norm(s.expr))
         else:
             for a in s.actions:
-                key = ("ACT", format_action(a))
+                key = ("OTE", a.tag) if isinstance(a, Energize) else ("ACT", format_action(a))
                 out.setdefault(key, []).append(None if s.cond is None else _norm(s.cond))
     return out
 

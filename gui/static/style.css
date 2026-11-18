@@ -290,6 +290,30 @@ footer {
     font-style: italic;
 }
 
+/* ---------- model badge ---------- */
+.model-badge {
+    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: .75rem;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--btn-bg);
+    color: var(--btn-text);
+    cursor: pointer;
+    max-width: 40vw;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.model-badge:hover { background: var(--btn-hover); }
+.model-badge + #toggleTheme { margin-left: 0; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.dot.ok { background: var(--ok); }
+.dot.bad { background: var(--err); }
+
 /* ---------- settings modal ---------- */
 .modal {
     display: none;
@@ -330,6 +354,29 @@ footer {
     font-size: .85rem;
 }
 .settings-grid input[type=checkbox] { justify-self: start; }
+.settings-section {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    padding-bottom: 2px;
+    border-bottom: 1px solid var(--border);
+    font-size: .72rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+}
+.settings-help { font-size: .75rem; color: var(--muted); margin-top: -4px; }
+.settings-help.ok { color: var(--ok); }
+.settings-help.bad { color: var(--err); }
+.model-pick { display: flex; gap: 6px; }
+.model-extra { display: flex; flex-direction: column; gap: 6px; }
+.model-extra input { padding: 6px 8px; border-radius: 4px; border: 1px solid var(--input-border);
+    background: var(--input-bg); color: var(--text); font-size: .85rem; }
+.model-extra input[hidden] { display: none; }
+.settings-grid [hidden] { display: none; }
+.model-pick select { flex: 1; min-width: 0; }
+.modal-button.small { padding: 2px 10px; }
+.modal-content { max-height: 90vh; overflow-y: auto; }
+.chip.grammar { border-color: var(--ok); }
 .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .modal-button {
     padding: 6px 14px;

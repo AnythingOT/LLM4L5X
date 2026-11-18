@@ -23,7 +23,7 @@ import yaml
 
 from core.catalog import Catalog
 from core.compiler import CompileError, CompileResult, Compiler
-from core.logicspec import SpecError, format_spec, parse_spec
+from core.logicspec import SpecError, format_spec, format_statement, parse_spec
 from core.validator import errors, validate
 
 EXAMPLES_FILE = Path(__file__).parent / "examples.yaml"
@@ -39,13 +39,17 @@ Conditions: Tag, NOT Tag, AND, OR, comparisons (= <> > < >= <=),
   RISE(condition) = only at the moment it becomes true,
   DELAY(condition, 5s) = condition has been true for 5 s,
   OFFDELAY(condition, 5s) = condition is true or went false less than 5 s ago.
-Actions: SET X; RESET X; CLEAR N; N := value; N := A + B (also - * /);
+Actions: ENERGIZE X (on while the condition is true; a coil); SET X (latch); RESET X (unlatch);
+  CLEAR N; N := value; N := A + B (also - * /);
   COUNT_UP(C, 10); COUNT_DOWN(C, 10); RESET_ACC C; START_TIMER(T, 5s);
   COPY(Source, Dest, 10) copies 10 array elements.
 Rules:
   - Never mix AND and OR without parentheses: write (A AND B) OR C.
   - "keeps running until", "stays on until" = seal-in: X := (Start OR X) AND NOT Stop;
-  - "latch"/"set" = SET, "unlatch"/"reset"/"clear a bit" = RESET.
+  - "turn on"/"energize" with other actions = ENERGIZE; "latch"/"keep it set" = SET; "unlatch" = RESET.
+  - "run/start the timer T with a 5 second preset" = START_TIMER(T, 5s) (START_OFF_TIMER for off-delay).
+  - "at the moment X turns on", "on the rising edge of X" = RISE(X).
+  - Copy tag names EXACTLY as written in the request (same spelling, case and underscores).
   - Times need units: 500ms, 5s, 2min, 1h."""
 
 _WORD = re.compile(r"[A-Za-z]+|\d+")
@@ -64,14 +68,36 @@ class LLMError(RuntimeError):
     pass
 
 
+def _get_json(url: str, timeout: float = 5.0) -> dict:
+    try:
+        with urllib.request.urlopen(url, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise LLMError(f"{url}: HTTP {e.code}") from None
+    except (urllib.error.URLError, TimeoutError, ConnectionError, OSError) as e:
+        raise LLMError(f"cannot reach {url} ({getattr(e, 'reason', e)})") from None
+
+
+BACKENDS = {
+    "ollama": {"label": "Ollama", "url": "http://127.0.0.1:11434"},
+    "llamacpp": {"label": "llama.cpp server (GGUF, grammar-constrained)", "url": "http://127.0.0.1:8080"},
+    "openai": {"label": "OpenAI-compatible (LM Studio, Jan, vLLM...)", "url": "http://127.0.0.1:1234"},
+}
+
+
 @dataclass
 class OllamaClient:
     model: str = "phi4-mini"
     url: str = "http://127.0.0.1:11434"
     timeout: float = 300.0  # CPU-only machines can be slow
     think: bool | None = None  # None = model default; False = ask thinking models not to think
+    supports_grammar = False  # Ollama only constrains to JSON schemas
 
-    def chat(self, messages: list[dict]) -> str:
+    def list_models(self) -> list[str]:
+        data = _get_json(f"{self.url.rstrip('/')}/api/tags")
+        return sorted(m.get("name") or m.get("model") for m in data.get("models", []))
+
+    def chat(self, messages: list[dict], grammar: str | None = None) -> str:
         body = {"model": self.model, "messages": messages, "stream": False,
                 "options": {"temperature": 0, "num_predict": 400}}
         if self.think is not None:
@@ -89,6 +115,56 @@ class OllamaClient:
         except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
             raise LLMError(f"Cannot reach Ollama at {self.url} ({e}). Is Ollama running?") from None
         return (data.get("message") or {}).get("content", "")
+
+
+@dataclass
+class OpenAICompatClient:
+    """Any local server with the OpenAI chat API: llama.cpp's llama-server, LM Studio, Jan, vLLM.
+
+    With grammar=True (llama-server) each request carries a GBNF grammar, so the
+    reply is guaranteed to be valid LogicSpec over the allowed tags.
+    """
+    model: str = ""
+    url: str = "http://127.0.0.1:8080"
+    timeout: float = 300.0
+    grammar: bool = False
+
+    @property
+    def supports_grammar(self) -> bool:
+        return self.grammar
+
+    def list_models(self) -> list[str]:
+        data = _get_json(f"{self.url.rstrip('/')}/v1/models")
+        return sorted(m.get("id", "") for m in data.get("data", []) if m.get("id"))
+
+    def chat(self, messages: list[dict], grammar: str | None = None) -> str:
+        body = {"messages": messages, "temperature": 0, "max_tokens": 400, "stream": False}
+        if self.model:
+            body["model"] = self.model
+        if grammar and self.grammar:
+            body["grammar"] = grammar
+        req = urllib.request.Request(f"{self.url.rstrip('/')}/v1/chat/completions", data=json.dumps(body).encode(),
+                                     headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout) as r:
+                data = json.loads(r.read().decode("utf-8"))
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode("utf-8", "replace")[:300]
+            if grammar and e.code in (400, 500) and "grammar" in detail.lower():
+                raise LLMError(f"the server rejected the LogicSpec grammar: {detail}") from None
+            raise LLMError(f"server error {e.code}: {detail}") from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            raise LLMError(f"Cannot reach the model server at {self.url} ({e}). Is it running?") from None
+        choices = data.get("choices") or [{}]
+        return (choices[0].get("message") or {}).get("content", "") or ""
+
+
+def make_client(backend: str = "ollama", url: str | None = None, model: str = "", think: bool | None = None):
+    backend = backend if backend in BACKENDS else "ollama"
+    url = url or BACKENDS[backend]["url"]
+    if backend == "ollama":
+        return OllamaClient(model=model or "phi4-mini", url=url, think=think)
+    return OpenAICompatClient(model=model, url=url, grammar=(backend == "llamacpp"))
 
 
 # ---------------------------------------------------------------- prompt pieces
@@ -144,9 +220,56 @@ def extract_spec(reply: str) -> str:
 # ---------------------------------------------------------------- generator
 
 
+_TAGLIKE = re.compile(r"\b[A-Za-z][A-Za-z0-9]*(?:_[A-Za-z0-9]+)+\b|\b[A-Za-z]*[a-z][A-Z][A-Za-z0-9]*\b"
+                      r"|\b[A-Z]{1,4}\d{2,}[A-Za-z0-9_]*\b")
+
+
+def request_identifiers(request: str) -> set[str]:
+    """Tag-like names written in the request: Pump_Run, FlowRate, PT101_PV."""
+    from core.logicspec import KEYWORDS
+    return {m for m in _TAGLIKE.findall(request) if m.upper() not in KEYWORDS}
+
+
+def _norm(name: str) -> str:
+    return name.replace("_", "").lower()
+
+
+def spec_tags(spec: str) -> set[str]:
+    """Base tag names used in LogicSpec text."""
+    from core.logicspec import tokenize
+    out = set()
+    for t in tokenize(spec):
+        if t.kind == "TAG":
+            out.add(re.split(r"[.\[]", t.value)[0])
+    return out
+
+
+def snap_tags(spec: str, allowed: set[str]) -> tuple[str, list[str]]:
+    """Fix tag names that differ from an allowed name only in case or underscores
+    (Press_Hi_Limit -> PressHiLimit, SPEED_REF -> Speed_Ref). Unambiguous matches only."""
+    from core.logicspec import tokenize
+    by_norm: dict[str, list[str]] = {}
+    for a in allowed:
+        by_norm.setdefault(_norm(a), []).append(a)
+    fixes, out, last = [], [], 0
+    for t in tokenize(spec):
+        if t.kind != "TAG":
+            continue
+        base = re.split(r"[.\[]", t.value)[0]
+        if base in allowed:
+            continue
+        cand = by_norm.get(_norm(base), [])
+        if len(cand) == 1:
+            out.append(spec[last:t.pos] + cand[0])
+            last = t.pos + len(base)
+            fixes.append(f"{base} -> {cand[0]}")
+    out.append(spec[last:])
+    return "".join(out), sorted(set(fixes))
+
+
 @dataclass
 class Attempt:
-    reply: str
+    reply: str  # raw model reply, kept for diagnosis
     spec: str
     error: str | None
 
@@ -168,6 +291,9 @@ class Generator:
         self.examples = load_examples() if examples is None else examples
         self.retries = retries
 
+    def shown_examples(self, request: str) -> list[dict]:
+        return pick_examples(request, self.examples, k=4)
+
     def messages(self, request: str, tags: list[tuple[str, str, str]]) -> list[dict]:
         system = SYSTEM_PROMPT
         if tags:
@@ -177,7 +303,7 @@ class Generator:
         else:
             system += "\nInvent short, clear tag names like Pump_Run or Tank_Level (letters, digits, single _)."
         msgs = [{"role": "system", "content": system}]
-        for ex in pick_examples(request, self.examples):
+        for ex in self.shown_examples(request):
             msgs += [{"role": "user", "content": ex["english"]},
                      {"role": "assistant", "content": ex["spec"]}]
         msgs.append({"role": "user", "content": request})
@@ -190,14 +316,63 @@ class Generator:
         res = Result(request, None, None)
         tags = pick_tags(request, known_tags or {}, descriptions)
         msgs = self.messages(request, tags)
-        for _ in range(self.retries + 1):
-            reply = self.client.chat(msgs)
+        idents = request_identifiers(request)
+        allowed = set(known_tags or {}) | idents
+        # statements of the examples shown; a reply that repeats one copied the example
+        example_stmts = set()
+        for ex in self.shown_examples(request):
+            try:
+                example_stmts |= {format_statement(s) for s in parse_spec(ex["spec"])}
+            except SpecError:
+                pass
+        grammar = None
+        if getattr(self.client, "supports_grammar", False):
+            from inputs.gbnf import build_gbnf
+            types = dict(known_tags or {})
+            types.update({i: "ANY" for i in idents if i not in types})
+            grammar = build_gbnf(types, allow_new_tags=not allowed)
+        for attempt in range(self.retries + 1):
+            last = attempt == self.retries
+            if grammar:
+                try:
+                    reply = self.client.chat(msgs, grammar=grammar)
+                except LLMError as e:
+                    if "rejected the LogicSpec grammar" not in str(e):
+                        raise
+                    res.warnings.append(f"grammar not accepted by the server, continuing without it: {e}")
+                    grammar = None
+                    reply = self.client.chat(msgs)
+            else:
+                reply = self.client.chat(msgs)
             spec = extract_spec(reply)
             error = None
             if not spec:
                 error = "no LogicSpec statement found; reply with statements ending in ';' only"
             else:
                 try:
+                    if allowed:
+                        spec, fixes = snap_tags(spec, allowed)
+                        res.warnings += [f"tag name corrected: {f}" for f in fixes]
+                    used = spec_tags(spec)
+                    # an example repeated word for word is fine if it is about this request
+                    # (same words in its tag names); otherwise the model copied an unrelated example
+                    rw = _words(request)
+                    copied = []
+                    for st in parse_spec(spec):
+                        text = format_statement(st)
+                        if text in example_stmts:
+                            tw = set().union(*(_words(t) for t in spec_tags(text))) or {""}
+                            if len(tw & rw) / len(tw) < 0.5:
+                                copied.append(text)
+                    if copied:
+                        raise SpecError(f"'{copied[0]}' is copied from the examples; "
+                                        "write logic only for this request, using its tag names")
+                    if allowed and not last:
+                        for u in sorted(used - allowed):
+                            close = difflib.get_close_matches(u, sorted(allowed), n=1, cutoff=0.6)
+                            if close:
+                                raise SpecError(f"tag {u} is not in the request; did you mean {close[0]}? "
+                                                "Use tag names exactly as written")
                     stmts = parse_spec(spec)
                     compiled = Compiler(known_tags=known_tags, catalog=catalog,
                                         **(compiler_kw or {})).compile(stmts)

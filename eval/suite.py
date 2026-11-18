@@ -314,14 +314,12 @@ def make_case(rng: random.Random, feature: str, structure: str, n: int, version:
     else:
         english = f"{act_text[0].upper()}{act_text[1:]} if {cond[0]}."
 
-    # expected LogicSpec: OTE targets become `X := cond;`, the rest one IF
+    # expected LogicSpec: a lone coil is `X := cond;`, anything else one IF (coils as ENERGIZE)
     specs = list(b.pre_specs)
-    others = [a[1] for a in acts if a[1] is not None]
-    for a in acts:
-        if a[3]:
-            specs.append(f"{a[3]} := {cond_spec};")
-    if others:
-        specs.append(f"IF {cond_spec} THEN {', '.join(others)};")
+    if len(acts) == 1 and acts[0][3]:
+        specs.append(f"{acts[0][3]} := {cond_spec};")
+    else:
+        specs.append(f"IF {cond_spec} THEN " + ", ".join(a[1] or f"ENERGIZE {a[3]}" for a in acts) + ";")
 
     # expected rungs (reference builder: one rung, output branch for several actions)
     outs = [a[2] for a in acts]

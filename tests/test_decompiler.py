@@ -21,8 +21,10 @@ def test_basic_shapes():
     assert dec("MOV(3,X);") == "IF TRUE THEN X := 3;"
 
 
-def test_ote_branch_split_when_safe():
-    assert dec("XIC(A)[OTE(B) ,OTE(C) ];") == "B := A;\nC := A;"
+def test_ote_in_output_branch_becomes_energize():
+    assert dec("XIC(A)[OTE(B) ,OTE(C) ];") == "IF A THEN ENERGIZE B, ENERGIZE C;"
+    # condition reading its own outputs stays one rung, so it is still exact
+    assert dec("[XIC(A) ,XIC(B) ]XIO(B)[OTE(B) ,OTE(C) ];") == "IF (A OR B) AND NOT B THEN ENERGIZE B, ENERGIZE C;"
 
 
 @pytest.mark.parametrize("text,why", [
@@ -30,7 +32,6 @@ def test_ote_branch_split_when_safe():
     ("[XIC(A)OTE(B) ,XIC(C) ]OTE(D);", "middle"),
     ("XIC(A)[,XIC(B) ]OTE(C);", "empty"),
     ("XIC(A)TON(T1,?,?);", "preset"),
-    ("[XIC(A) ,XIC(B) ]XIO(B)[OTE(B) ,OTE(C) ];", "reads its own"),
     ("XIC(A)JSR(Sub,0);", "outputs only"),
 ])
 def test_not_convertible(text, why):

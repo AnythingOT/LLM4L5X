@@ -60,3 +60,29 @@
 
 - english: When the recipe is loaded, copy 10 values from the recipe buffer into the active recipe.
   spec: IF RISE(Recipe_Loaded) THEN COPY(Recipe_Buffer, Active_Recipe, 10);
+
+- english: While the oven door is closed and heating is requested, run the warm-up timer Warmup_TMR for 20 seconds; the oven is ready when it is done.
+  spec: |-
+    IF Oven_Door_Closed AND Heat_Request THEN START_TIMER(Warmup_TMR, 20s);
+    Oven_Ready := Warmup_TMR.DN;
+
+- english: Keep the off-delay timer Fan_TMR (45 seconds) running from the burner signal.
+  spec: IF Burner_On THEN START_OFF_TIMER(Fan_TMR, 45s);
+
+- english: Clear the reject counter Reject_CTR when the shift reset button is pressed.
+  spec: IF Shift_Reset_PB THEN RESET_ACC Reject_CTR;
+
+- english: When the line is running and a carton is detected, energize the label printer, add one to Carton_Total and latch Line_Busy.
+  spec: IF Line_Running AND Carton_Detected THEN ENERGIZE Label_Printer, Carton_Total := Carton_Total + 1, SET Line_Busy;
+
+- english: If the scale is stable, put Gross_Kg minus Tare_Kg into Net_Kg and set Weight_Valid; otherwise Weight_Valid stays as it was.
+  spec: IF Scale_Stable THEN Net_Kg := Gross_Kg - Tare_Kg, SET Weight_Valid;
+
+- english: Scale the raw input - Raw_Input times Gain_Factor into Scaled_Out - whenever the module is healthy.
+  spec: IF Module_OK THEN Scaled_Out := Raw_Input * Gain_Factor;
+
+- english: The moment the barcode reader sees a code while the conveyor runs, copy 4 words from Scan_Buffer into Scan_Record.
+  spec: IF RISE(Code_Seen) AND Conveyor_Running THEN COPY(Scan_Buffer, Scan_Record, 4);
+
+- english: Unlatch Motor_Enable if the motor temperature reaches 95 or the emergency stop is not healthy.
+  spec: IF Motor_Temp >= 95 OR NOT EStop_Healthy THEN RESET Motor_Enable;

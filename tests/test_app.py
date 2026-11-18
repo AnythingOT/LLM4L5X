@@ -131,3 +131,26 @@ def test_broken_logicspec_is_not_sent_to_the_model(client, monkeypatch):
     monkeypatch.setattr(llm.OllamaClient, "chat", lambda self, m: (_ for _ in ()).throw(AssertionError("called")))
     d = post(client, "X := A AND B OR C;")
     assert d["kind"] == "error" and "parentheses" in d["message"]
+
+
+def test_model_list_endpoint(client, monkeypatch):
+    import inputs.llm as llm
+    monkeypatch.setattr(llm.OllamaClient, "list_models", lambda self: ["phi4-mini:latest", "qwen3.6:35b-a3b"])
+    d = client.post("/api/llm/models", json={"settings": {"backend": "ollama"}}).get_json()
+    assert d["ok"] and d["models"] == ["phi4-mini:latest", "qwen3.6:35b-a3b"] and d["url"].endswith(":11434")
+    def down(self):
+        raise llm.LLMError("cannot reach http://127.0.0.1:8080/v1/models")
+    monkeypatch.setattr(llm.OpenAICompatClient, "list_models", down)
+    d = client.post("/api/llm/models", json={"settings": {"backend": "llamacpp"}}).get_json()
+    assert not d["ok"] and "cannot reach" in d["error"] and d["url"].endswith(":8080")
+
+
+def test_english_through_llamacpp_backend_uses_grammar(client, monkeypatch):
+    import inputs.llm as llm
+    seen = {}
+    def chat(self, messages, grammar=None):
+        seen["grammar"] = grammar
+        return "Pump_Run := Start_PB;"
+    monkeypatch.setattr(llm.OpenAICompatClient, "chat", chat)
+    d = post(client, "Turn on Pump_Run while Start_PB is on.", backend="llamacpp", model="")
+    assert d["kind"] == "generated" and d["grammar"] is True and "Pump_Run" in seen["grammar"]

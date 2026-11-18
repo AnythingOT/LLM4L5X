@@ -65,6 +65,11 @@ Expr = Union[Var, Not, And, Or, Cmp, Rise, Delay]
 
 
 @dataclass(frozen=True)
+class Energize:
+    tag: str  # OTE inside IF ... THEN: on while the condition is true, off otherwise
+
+
+@dataclass(frozen=True)
 class SetBit:
     tag: str
 
@@ -113,7 +118,7 @@ class Math:
     b: str | None = None
 
 
-Action = Union[SetBit, ResetBit, Clear, ResetAcc, Count, StartTimer, Copy, Math]
+Action = Union[Energize, SetBit, ResetBit, Clear, ResetAcc, Count, StartTimer, Copy, Math]
 
 
 @dataclass(frozen=True)
@@ -135,7 +140,7 @@ CMP_COMPLEMENT = {"=": "<>", "<>": "=", ">": "<=", "<=": ">", "<": ">=", ">=": "
 KEYWORDS = {
     "AND", "OR", "NOT", "IF", "THEN", "TRUE", "SET", "RESET", "CLEAR", "RISE",
     "DELAY", "OFFDELAY", "COUNT_UP", "COUNT_DOWN", "START_TIMER",
-    "START_OFF_TIMER", "RESET_ACC", "COPY",
+    "START_OFF_TIMER", "RESET_ACC", "COPY", "ENERGIZE",
 }
 
 # ---------------------------------------------------------------- lexer
@@ -159,7 +164,7 @@ _TOKEN = re.compile(
   | (?P<dur>\d+(?:\.\d+)?(?:ms|min|s|m|h)\b)
   | (?P<num>\d+\.\d*(?:[eE][+-]?\d+)?|\d+(?:[eE][+-]?\d+)?|\.\d+)
   | (?P<tag>[A-Za-z_][A-Za-z0-9_]*(?::[A-Za-z0-9_]+)*(?:\.[A-Za-z0-9_]+|\[[^\[\]]*\])*)
-  | (?P<op>:=|<>|>=|<=|[=<>(),;+\-*/])
+  | (?P<op>:=|<>|>=|<=|!=|==|&&|\|\||[=<>(),;+\-*/])
     """,
     re.VERBOSE,
 )
@@ -174,6 +179,11 @@ def _dur_ms(text: str) -> int:
     return int(ms)
 
 
+_OP_ALIAS = {"!=": ("OP", "<>"), "==": ("OP", "="), "&&": ("KW", "AND"), "||": ("KW", "OR")}
+_ACTION_KW = {"SET", "RESET", "CLEAR", "RESET_ACC", "ENERGIZE", "COUNT_UP", "COUNT_DOWN", "START_TIMER",
+              "START_OFF_TIMER", "COPY"}
+
+
 def tokenize(text: str) -> list[Tok]:
     toks, i = [], 0
     while i < len(text):
@@ -186,6 +196,9 @@ def tokenize(text: str) -> list[Tok]:
             toks.append(Tok("KW", val.upper(), i))
         elif kind == "dur":
             toks.append(Tok("DUR", val, i, _dur_ms(val)))
+        elif kind == "op" and val in _OP_ALIAS:  # forms small models write: != == && ||
+            k2, v2 = _OP_ALIAS[val]
+            toks.append(Tok(k2, v2, i))
         elif kind != "ws":
             toks.append(Tok(kind.upper(), val, i))
         i = m.end()
@@ -242,8 +255,20 @@ class _P:
                 acts.append(self.action())
             self.expect("OP", ";")
             return IfThen(cond, tuple(acts))
+        if self.cur.kind == "KW" and self.cur.value in _ACTION_KW:
+            self.err(f"{self.cur.value} is an action and needs a condition: "
+                     f"IF condition THEN {self.cur.value} ...; (or IF TRUE THEN ... for always)")
         tgt = self.expect("TAG", what="a tag or IF").value
+        if self.cur.kind == "OP" and self.cur.value == "=":
+            self.err("assign with := not =")
         self.expect("OP", ":=")
+        nxt = self.toks[self.k + 1] if self.k + 1 < len(self.toks) else None
+        if self.cur.kind == "NUM" or (self.cur.kind == "TAG" and nxt and nxt.kind == "OP"
+                                      and nxt.value in "+-*/" and nxt.value):
+            self.err(f"math and moves go inside IF: IF condition THEN {tgt} := ...; "
+                     f"('{tgt} := condition;' is only for turning a bit on and off)")
+        if self.cur.kind == "KW" and self.cur.value == "TRUE":
+            self.err(f"write '{tgt} := condition;' (on while true), or IF condition THEN SET {tgt};")
         e = self.expr()
         self.expect("OP", ";")
         return Assign(tgt, e)
@@ -311,11 +336,15 @@ class _P:
         self.err(f"expected {what}")
 
     def action(self) -> Action:
-        simple = {"SET": SetBit, "RESET": ResetBit, "CLEAR": Clear, "RESET_ACC": ResetAcc}
+        simple = {"SET": SetBit, "RESET": ResetBit, "CLEAR": Clear, "RESET_ACC": ResetAcc, "ENERGIZE": Energize}
         if self.cur.kind == "KW" and self.cur.value in simple:
             cls = simple[self.cur.value]
             self.k += 1
-            return cls(self.expect("TAG", what="a tag").value)
+            paren = self.accept("OP", "(")  # SET(X) is accepted as SET X
+            tag = self.expect("TAG", what="a tag").value
+            if paren:
+                self.expect("OP", ")")
+            return cls(tag)
         for kw, down in (("COUNT_UP", False), ("COUNT_DOWN", True)):
             if self.accept("KW", kw):
                 self.expect("OP", "(")
@@ -404,6 +433,8 @@ def format_expr(e: Expr, parent: str | None = None) -> str:
 
 
 def format_action(a: Action) -> str:
+    if isinstance(a, Energize):
+        return f"ENERGIZE {a.tag}"
     if isinstance(a, SetBit):
         return f"SET {a.tag}"
     if isinstance(a, ResetBit):
