@@ -35,7 +35,28 @@ Pick where the model runs on the ⚙️ Settings page (or click the model badge 
 | **llama.cpp server**, direct GGUF | `llama-server -m model.gguf --port 8080` (Windows CPU build from llama.cpp's GitHub releases, GGUF from Hugging Face) | **grammar-constrained**: every answer is valid LogicSpec using only allowed tag names |
 | OpenAI-compatible (LM Studio, Jan, vLLM) | start its local server | free text, as Ollama |
 
-**Measured:** Qwen3.6-35B-A3B (UD-Q4_K_M) on llama.cpp, CPU only: 238/240 on a fresh suite seed, about 12 s per request. With that model the grammar made no measurable difference (it is insurance); for a small model such as phi4-mini, malformed answers were 65 of its 98 failures. Thinking is always off on llama.cpp: forced think tags break the grammar.
+### The setup that worked for us
+
+**Qwen3.6-35B-A3B, `UD-Q4_K_M` GGUF ([unsloth/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF), about 22 GB) on llama.cpp's `llama-server`, CPU only, 64 GB RAM, no GPU.**
+
+- 238/240 on a fresh instruction-suite seed (226/240 and 114/120 on earlier seeds, before suite fixes), about 12 s per request.
+- With this model the grammar made no measurable difference (113 vs 114 of 120 on the same seed): it is insurance against unparseable answers. For a small model it matters: with phi4-mini, malformed answers were 65 of its 98 failures.
+
+Start the server in its own terminal and keep it open while you use the app:
+
+```
+llama-server -m "C:\path\to\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf" --alias Qwen3.6-35B-A3B --host 127.0.0.1 --port 8080 -c 16384 --jinja
+```
+
+- `--jinja` is required: the app switches thinking off through the model's chat template.
+- Do **not** add `--reasoning-budget 0`: it breaks the grammar ("Unexpected empty grammar stack"). The app turns thinking off per request instead.
+- `--host 127.0.0.1` keeps the server reachable from this PC only; llama-server has no password.
+- `-c 16384` covers the prompt, your project's tags and the answer; raise it for very large projects.
+- `--alias` only sets the model name shown in the app.
+
+Then start the app (`start.bat`) and choose **llama.cpp** in ⚙️ Settings; `http://127.0.0.1:8080` is the default address. Settings only says where the server is; it does not start it.
+
+Ollama's `qwen3.6:35b-a3b` is the same model but untested here. If you use it, set **Thinking: off** in Settings (Ollama's default for Qwen3.6 is on, which is much slower on a CPU), and note that Ollama accepts no GBNF grammar.
 
 1. Start a model server (above).
 2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
@@ -92,7 +113,7 @@ Switch the input box to **UDT**.
 - The **whole-program** file also has to move tag values: each tag value is stored twice, by member name (Decorated) and by position (L5K). For affected tags the L5K copy is removed and the Decorated copy kept. UDTs used inside an AOI, or with a tag that has only L5K values, are left out, and the download says so. **Not yet confirmed by an import test: test it on a copy before you rely on it.**
 - Sizes are computed from the layout rules, not read from Studio 5000. A UDT can only be changed offline.
 
-The optimizer gives the same orders and sizes as [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer) on its samples; this repo replaces it.
+This replaces two archived repos: [LLM4UDT](https://github.com/AnythingOT/LLM4UDT) (UDTs from English, L5X and CSV/Excel) and [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer). The optimizer here gives the same orders and sizes as L5X_UDTOptimizer on its samples.
 
 ## Validate: import checks and rules
 
