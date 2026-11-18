@@ -181,8 +181,10 @@ def test_no_think_asks_the_template_to_skip_thinking(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", fake)
     make_client("llamacpp", think=False).chat([{"role": "user", "content": "x"}])
     make_client("llamacpp").chat([{"role": "user", "content": "x"}])
+    make_client("openai").chat([{"role": "user", "content": "x"}])
     assert seen[0]["chat_template_kwargs"] == {"enable_thinking": False}
-    assert "chat_template_kwargs" not in seen[1]
+    assert seen[1]["chat_template_kwargs"] == {"enable_thinking": False}  # llama.cpp: always, the grammar needs it
+    assert "chat_template_kwargs" not in seen[2]
 
 
 def test_openai_compatible_client_has_no_grammar(monkeypatch):

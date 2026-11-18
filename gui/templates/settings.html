@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block bodyclass %}page{% endblock %}
+{% block body %}
+<main class="page-main">
+    <div class="page-head">
+        <h1>Settings</h1>
+        <span class="muted">Saved in this browser as you change them. <span id="savedNote" class="saved-note"></span></span>
+        <div class="page-actions">
+            <button id="resetSettings" class="btn">Reset to defaults</button>
+            <a class="btn primary" href="/">Back to chat</a>
+        </div>
+    </div>
+
+    <div class="cards">
+        <section class="card">
+            <h2>Model <span class="muted">· runs on this PC</span></h2>
+            <div class="form">
+                <label for="setBackend">Runs on</label>
+                <select id="setBackend">
+                    <option value="ollama">Ollama</option>
+                    <option value="llamacpp">llama.cpp server (grammar-constrained)</option>
+                    <option value="openai">OpenAI-compatible (LM Studio, Jan, vLLM)</option>
+                </select>
+                <p id="backendHelp" class="help full"></p>
+
+                <label for="setLlmUrl">Server address</label>
+                <input id="setLlmUrl" type="text" spellcheck="false" />
+
+                <label for="setModelSelect">Model</label>
+                <div class="inline">
+                    <select id="setModelSelect"></select>
+                    <button id="refreshModels" class="btn square" title="Reload the model list">⟳</button>
+                </div>
+                <label for="setModelCustom" class="custom-row" hidden>Model name</label>
+                <input id="setModelCustom" class="custom-row" type="text" placeholder="e.g. qwen3.6:35b-a3b" spellcheck="false" hidden />
+                <p id="modelStatus" class="help full"></p>
+
+                <label for="setThink">Model thinking</label>
+                <select id="setThink">
+                    <option value="default">Model default (always off on llama.cpp)</option>
+                    <option value="off">Off: faster, recommended on a CPU</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="card">
+            <h2>Output</h2>
+            <div class="form">
+                <label for="setRungFormat">Rung text</label>
+                <select id="setRungFormat">
+                    <option value="neutral">Neutral text, as stored in L5X</option>
+                    <option value="ascii">ASCII text, for the editor's ASCII mode</option>
+                </select>
+
+                <label for="setOutput">Download</label>
+                <select id="setOutput">
+                    <option value="routine">Routine.L5X: a new routine</option>
+                    <option value="rungs">Rung.L5X: rungs to paste into a routine</option>
+                </select>
+
+                <label for="setRoutine">Routine name</label>
+                <input id="setRoutine" type="text" spellcheck="false" />
+
+                <label for="setProgram">Program</label>
+                <input id="setProgram" type="text" list="programList" spellcheck="false" />
+                <datalist id="programList"></datalist>
+
+                <label for="setController">Controller</label>
+                <input id="setController" type="text" spellcheck="false" />
+
+                <label for="setRevision">Logix Designer version</label>
+                <input id="setRevision" type="text" spellcheck="false" />
+                <p class="help full">36 and newer write GT, EQ, MOVE; older versions GRT, EQU, MOV. Attaching a project sets this for you.</p>
+
+                <label for="setScope">New tags in</label>
+                <select id="setScope">
+                    <option value="controller">Controller scope</option>
+                    <option value="program">Program scope</option>
+                </select>
+            </div>
+        </section>
+
+        <details class="card advanced" id="advanced">
+            <summary><h2>Advanced</h2><span class="muted">Most people never change these.</span></summary>
+            <div class="form">
+                <label for="setDisplay">Timer/counter operands</label>
+                <select id="setDisplay">
+                    <option value="placeholder">TON(T,?,?): as Studio 5000 exports (recommended)</option>
+                    <option value="values">TON(T,5000,0): preset and accumulator written out</option>
+                </select>
+
+                <label for="setPrefix">Helper tag prefix</label>
+                <input id="setPrefix" type="text" spellcheck="false" />
+                <p class="help full">Some logic needs tags you did not ask for: the storage bit of a one-shot, the timer behind "for 5 seconds". They are created as <code>L4X_ONS_1</code>, <code>L4X_TMR_1</code> ... The prefix makes them easy to find and keeps them apart from your own tags. L4X is short for LLM4L5X.</p>
+
+                <label for="setComments">Rung comments</label>
+                <label class="switch-row"><input id="setComments" type="checkbox" /> Write the plain-English read-back as the rung comment</label>
+            </div>
+        </details>
+    </div>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='settings.js') }}"></script>{% endblock %}

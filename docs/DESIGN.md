@@ -362,3 +362,24 @@ M1–M4 need no model.
 - Wants every reply to end by teaching one relevant thing.
 - Do not commit or push unless asked. The current clone is read-only; pushing needs the repo
   attached with push access.
+
+## Validation rules (lint/)
+
+Import checks (`core/validator.py`) answer "will Studio 5000 accept it". The checklist rules
+(`lint/`) answer "is it good"; they were rewritten from L5X_Lint for this repo's reader and rung
+AST, keeping its codes (CRT/ERR/WAR/INF; the prefix fixes the severity). Differences from L5X_Lint:
+
+- Operand roles (read/write) come from `core/instructions.yaml`, not hand lists, so writes to status
+  bits, one-shot storage and literals are judged per operand of every catalog instruction.
+- Coil conflicts (ERR001-003) are keyed by tag scope, so a controller tag driven from two programs is found.
+- Guards for array indexes and divisors recognise the v36 names (LT, GE ...).
+- WAR008 counts only a *write* to .PRE as setting the preset (L5X_Lint accepted any reference).
+- An AOI's logic is checked like any routine; severity is never downgraded.
+- Partial exports run the 19 rung rules only and say so.
+- Generated rungs are checked with the rung rules; ERR014 (reused timer) and ERR015 (reused
+  one-shot) send the model back for another attempt, the others are shown.
+- Not ported: the Excel/PDF report exports, the lifecycle import page, configurable naming
+  prefixes (SFTY_/STD_ are fixed in checks_tags.py).
+
+`tests/test_lint.py` runs every rule on `tests/fixtures/lint_project.L5X`, which breaks each rule
+at a known place next to a compliant twin.

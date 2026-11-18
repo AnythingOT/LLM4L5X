@@ -1,164 +1,47 @@
-// LLM4L5X chat GUI. All text is inserted with textContent (never innerHTML)
-// so tag names and comments from L5X files cannot inject markup.
+// Chat page.
 'use strict';
 
-const $ = (id) => document.getElementById(id);
 const chatWindow = $('chatWindow');
 const inputBox = $('inputBox');
 const enterButton = $('enterButton');
-const attachButton = $('attachButton');
-const fileInput = $('fileInput');
 const inputWrapper = $('inputWrapper');
+let settings = loadSettings();
+window.addEventListener('focus', () => { settings = loadSettings(); updateBadge(); });  // changed in another tab
 
-// ---------------------------------------------------------------- storage (may be unavailable)
-const store = {
-    get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* ignore */ } },
-};
-
-// ---------------------------------------------------------------- settings
-const DEFAULTS = {
-    output: 'rungs', routine: 'GeneratedRoutine', program: 'MainProgram', controller: 'LLM4L5X',
-    revision: '32.04', scope: 'controller', display: 'placeholder', prefix: 'L4X', comments: true,
-    backend: 'ollama', llm_url: '', model: 'phi4-mini', think: 'default',
-};
-const BACKEND_INFO = {
-    ollama: { url: 'http://127.0.0.1:11434', label: 'Ollama',
-        help: 'Models installed with "ollama pull <name>". No grammar: syntax mistakes are sent back to the model to fix.' },
-    llamacpp: { url: 'http://127.0.0.1:8080', label: 'llama.cpp',
-        help: 'Start it with: llama-server -m your-model.gguf --port 8080. Every answer is grammar-constrained to valid LogicSpec using your tag names. The server runs the model it was started with.' },
-    openai: { url: 'http://127.0.0.1:1234', label: 'OpenAI-compatible',
-        help: 'Any local server with the OpenAI chat API (LM Studio, Jan, vLLM). No grammar.' },
-};
-let settings = Object.assign({}, DEFAULTS, store.get('llm4l5x.settings', {}));
-const fields = {
-    output: 'setOutput', routine: 'setRoutine', program: 'setProgram', controller: 'setController',
-    revision: 'setRevision', scope: 'setScope', display: 'setDisplay', prefix: 'setPrefix', comments: 'setComments',
-    backend: 'setBackend', llm_url: 'setLlmUrl', model: 'setModel', think: 'setThink',
-};
-function fillSettings() {
-    for (const [k, id] of Object.entries(fields)) {
-        const el = $(id);
-        if (el.type === 'checkbox') el.checked = !!settings[k]; else el.value = settings[k];
-    }
-}
-function readSettings() {
-    for (const [k, id] of Object.entries(fields)) {
-        const el = $(id);
-        settings[k] = el.type === 'checkbox' ? el.checked : el.value.trim();
-    }
-    store.set('llm4l5x.settings', settings);
-}
-const modal = $('settingsModal');
-function openSettings() { fillSettings(); updateBackendUi(); modal.classList.add('show'); refreshModels(); }
-$('settingsButton').onclick = openSettings;
-$('modelBadge').onclick = openSettings;
-
-// ---------------------------------------------------------------- model backend / selector
-function currentLlmSettings() {
-    return Object.assign({}, settings, {
-        backend: $('setBackend').value,
-        llm_url: $('setLlmUrl').value.trim(),
-        model: $('setModel').value.trim(),
-    });
-}
-function updateBackendUi() {
-    const b = $('setBackend').value;
-    const info = BACKEND_INFO[b];
-    $('backendHelp').textContent = info.help;
-    $('setLlmUrl').placeholder = info.url;
-}
-$('setBackend').onchange = () => {
-    // a default address of another backend would be wrong here
-    const url = $('setLlmUrl').value.trim();
-    if (Object.values(BACKEND_INFO).some((i) => i.url === url)) $('setLlmUrl').value = '';
-    updateBackendUi();
-    refreshModels();
-};
-$('setLlmUrl').onchange = () => refreshModels();
-$('refreshModels').onclick = () => refreshModels();
-$('setModelSelect').onchange = () => {
-    const v = $('setModelSelect').value;
-    const custom = v === '__custom__';
-    $('setModelCustom').hidden = !custom;
-    if (custom) { $('setModelCustom').focus(); } else { $('setModel').value = v; }
-};
-$('setModelCustom').oninput = () => { $('setModel').value = $('setModelCustom').value.trim(); };
-
-async function fetchModels(s) {
-    const res = await fetch('/api/llm/models', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ settings: s }),
-    });
-    return res.json();
-}
-async function refreshModels() {
-    const status = $('modelStatus');
-    status.className = 'settings-help';
-    status.textContent = 'Checking…';
-    const s = currentLlmSettings();
-    let d;
-    try { d = await fetchModels(s); } catch (e) { d = { ok: false, models: [], error: e.message }; }
-    const sel = $('setModelSelect');
-    let current = $('setModel').value;
-    // Ollama treats "phi4-mini" as "phi4-mini:latest"
-    if (current && !current.includes(':') && d.models.includes(`${current}:latest`)) {
-        current = `${current}:latest`;
-        $('setModel').value = current;
-    }
-    const opts = [];
-    d.models.forEach((m) => { const o = el('option', { text: m }); o.value = m; opts.push(o); });
-    if (current && !d.models.includes(current) && s.backend !== 'llamacpp') {
-        const o = el('option', { text: `${current} (not found)` }); o.value = current; opts.unshift(o);
-    }
-    const other = el('option', { text: 'Other (type a name)…' }); other.value = '__custom__'; opts.push(other);
-    sel.replaceChildren(...opts);
-    if (d.models.includes(current) || (current && s.backend !== 'llamacpp')) sel.value = current;
-    else if (d.models.length) { sel.value = d.models[0]; $('setModel').value = d.models[0]; }
-    $('setModelCustom').hidden = sel.value !== '__custom__';
-    if (d.ok) {
-        status.className = 'settings-help ok';
-        status.textContent = `● Connected to ${d.backend} at ${d.url}: ${d.models.length} model${d.models.length === 1 ? '' : 's'}`
-            + (d.grammar ? ' · grammar-checked answers' : '');
-    } else {
-        status.className = 'settings-help bad';
-        status.textContent = `○ ${d.error}`;
-    }
-}
+// ---------------------------------------------------------------- model badge
 async function updateBadge() {
     const dot = $('modelDot');
     const label = BACKEND_INFO[settings.backend] ? BACKEND_INFO[settings.backend].label : settings.backend;
-    $('modelBadgeText').textContent = `${settings.model || 'default model'} · ${label}`;
+    $('modelBadgeText').textContent = settings.backend === 'llamacpp' ? label : `${settings.model || 'default model'} · ${label}`;
     dot.className = 'dot';
     try {
         const d = await fetchModels(settings);
         dot.className = 'dot ' + (d.ok ? 'ok' : 'bad');
-        $('modelBadge').title = d.ok ? `Connected: ${d.url}${d.grammar ? ' (grammar-checked)' : ''} - click to change`
-            : `${d.error} - click to change`;
+        if (d.ok && settings.backend === 'llamacpp' && d.models.length) $('modelBadgeText').textContent = `${d.models[0]} · ${label}`;
+        $('modelBadge').title = d.ok ? `Connected: ${d.url}${d.grammar ? ' (grammar-constrained)' : ''}. Click to change.`
+            : `${d.error}. Click to change.`;
     } catch { dot.className = 'dot bad'; }
 }
-modal.querySelector('.close-button').onclick = () => modal.classList.remove('show');
-modal.onclick = (e) => { if (e.target === modal) modal.classList.remove('show'); };
-$('saveSettings').onclick = () => { readSettings(); modal.classList.remove('show'); updateBadge(); };
-$('resetSettings').onclick = () => {
-    settings = Object.assign({}, DEFAULTS); fillSettings(); updateBackendUi(); refreshModels();
-};
 
-// ---------------------------------------------------------------- theme
-if (store.get('llm4l5x.theme', 'light') === 'dark') document.body.classList.add('dark-mode');
-$('toggleTheme').onclick = () => {
-    document.body.classList.toggle('dark-mode');
-    store.set('llm4l5x.theme', document.body.classList.contains('dark-mode') ? 'dark' : 'light');
-};
+// ---------------------------------------------------------------- help popup and examples row
+const helpModal = $('helpModal');
+function openHelp() { helpModal.classList.add('show'); }
+$('helpButton').onclick = openHelp;
+helpModal.querySelector('.close-button').onclick = () => helpModal.classList.remove('show');
+helpModal.onclick = (e) => { if (e.target === helpModal) helpModal.classList.remove('show'); };
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape') helpModal.classList.remove('show'); });
 
-// ---------------------------------------------------------------- DOM helpers
-function el(tag, opts = {}, ...children) {
-    const e = document.createElement(tag);
-    if (opts.cls) e.className = opts.cls;
-    if (opts.text !== undefined) e.textContent = opts.text;
-    if (opts.title) e.title = opts.title;
-    for (const c of children) if (c) e.appendChild(c);
-    return e;
+const chips = $('chips');
+function setChips(open) {
+    chips.hidden = !open;
+    $('examplesButton').setAttribute('aria-expanded', String(open));
+    $('examplesButton').classList.toggle('active', open);
+    store.set('llm4l5x.chips', open);
 }
+$('examplesButton').onclick = () => setChips(chips.hidden);
+setChips(store.get('llm4l5x.chips', false));
+
+// ---------------------------------------------------------------- message helpers
 function scrollDown() { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
 function addUser(text) { chatWindow.appendChild(el('div', { cls: 'chat-message user', text })); scrollDown(); }
 function addBot(...children) {
@@ -179,7 +62,7 @@ function button(label, onClick) {
     b.onclick = onClick;
     return b;
 }
-function copyButton(getText, label = 'Copy') {
+function copyButton(getText, label) {
     const b = button(label, async () => {
         try { await navigator.clipboard.writeText(getText()); b.textContent = 'Copied'; }
         catch { b.textContent = 'Copy failed'; }
@@ -196,7 +79,7 @@ function download(filename, text) {
     a.click();
     setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
 }
-function duration(s) { return s === undefined ? null : el('span', { cls: 'duration', text: `⏱️ ${s.toFixed(3)}s` }); }
+function duration(s) { return s === undefined ? null : el('span', { cls: 'duration', text: `⏱️ ${s.toFixed(2)}s` }); }
 function table(headers, rows, monoCols = []) {
     const t = el('table', { cls: 'grid' });
     const hr = el('tr');
@@ -209,57 +92,70 @@ function table(headers, rows, monoCols = []) {
     });
     return t;
 }
-function issuesBlock(issues) {
-    if (!issues || !issues.length) return null;
-    const box = el('div');
-    issues.forEach((i) => box.appendChild(el('div', {
+const fmtName = (f) => (f === 'ascii' ? 'ASCII' : 'neutral');
+
+// import checks (will it import) and rule findings (is it good), one list
+function checksBlock(issues, findings, warnings) {
+    const box = el('div', { cls: 'checks' });
+    (warnings || []).forEach((w) => box.appendChild(el('div', { cls: 'warn', text: `⚠ ${w}` })));
+    (issues || []).forEach((i) => box.appendChild(el('div', {
         cls: i.level === 'error' ? 'err' : 'warn',
-        text: `${i.level === 'error' ? '✖' : '⚠'} ${i.where ?? 'rung ' + i.rung}: ${i.message}`,
+        text: `${i.level === 'error' ? '✖' : '⚠'} ${i.where ?? 'Rung ' + i.rung}: ${i.message}`,
     })));
-    return box;
+    (findings || []).forEach((f) => box.appendChild(findingRow(f)));
+    return box.childNodes.length ? box : null;
+}
+function findingRow(f) {
+    return el('div', { cls: 'finding' },
+        el('span', { cls: `code ${f.severity}`, text: f.code, title: f.title }),
+        el('span', { cls: 'finding-where', text: f.location }),
+        el('span', { text: f.message }));
 }
 
 function attemptsBlock(attempts) {
     const det = el('details');
-    det.appendChild(el('summary', { text: `Model attempts (${attempts.length})` }));
-    attempts.forEach((a, i) => {
-        det.appendChild(el('div', { cls: a.error ? 'warn' : 'ok', text: `#${i + 1}: ${a.error ? a.error : 'ok'}` }));
-        if (a.spec) det.appendChild(code(a.spec));
-    });
+    det.appendChild(el('summary', { text: `The model needed ${attempts.length} attempts` }));
+    attempts.forEach((a, i) => det.appendChild(el('div', { cls: a.error ? 'warn' : 'ok',
+        text: `#${i + 1}: ${a.error ? a.error : 'accepted'}` })));
     return det;
+}
+
+// rungs, read-back, tags, checks, then Copy + Download (formats from Settings)
+function resultBody(d, { rungs, english, copyForm }) {
+    const parts = [];
+    if (english && english.length) {
+        parts.push(title('What this does: check it'));
+        const ul = el('ul', { cls: 'readback' });
+        english.forEach((r) => ul.appendChild(el('li', { text: r })));
+        parts.push(ul);
+    }
+    const shown = rungs.map((r) => (copyForm === 'ascii' ? r.ascii : r.text)).join('\n');
+    parts.push(title(`Rungs (${rungs.length}), ${fmtName(copyForm)} text`));
+    parts.push(code(shown));
+    if (d.tags && d.tags.length) {
+        parts.push(title(`Tags in the download (${d.tags.length})`));
+        parts.push(table(['Tag', 'Type', 'Preset', ''],
+            d.tags.map((t) => [t.name, t.type, t.preset ?? '', t.auto ? 'helper' : '']), [0]));
+    }
+    const cb = checksBlock(d.issues, d.lint, d.warnings);
+    if (cb) { parts.push(title('Checks')); parts.push(cb); }
+    const errs = (d.issues || []).filter((i) => i.level === 'error').length;
+    parts.push(el('div', {
+        cls: 'status-line ' + (errs ? 'err' : 'ok'),
+        text: errs ? `✖ ${errs} import error(s): no L5X produced`
+            : `✔ Ready${d.used_project ? `, checked against ${d.used_project}` : ': no project attached, so tag names are not checked'}`,
+    }));
+    const row = el('div', { cls: 'btn-row' });
+    row.appendChild(copyButton(() => shown, `Copy ${fmtName(copyForm)}`));
+    if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
+    const dur = duration(d.seconds); if (dur) row.appendChild(dur);
+    parts.push(row);
+    return parts;
 }
 
 // ---------------------------------------------------------------- renderers
 const render = {
-    help() {
-        return addBot(
-            el('div', { text: 'Describe the logic in plain English. A local model (⚙️ Settings, via Ollama) turns it into LogicSpec; checked code builds the rungs. Attach your .L5X so it uses your real tags.' }),
-            title('Plain English (examples)'),
-            code([
-                'Start the pump with the start button and keep it running until stop is pressed.',
-                'Raise a high level alarm when level stays above 80 for 5 seconds.',
-                'Count boxes on the photo eye; the batch is done at 12.',
-            ].join('\n')),
-            title('LogicSpec (what the model writes; you can type it directly)'),
-            code([
-                'Pump := (Start_PB OR Pump) AND NOT Stop_PB;      // OTE, OR = branch',
-                'IF A AND N > 5 THEN SET B, CLEAR N;              // several outputs',
-                'IF TRUE THEN Total := Total + 1;                 // unconditional math',
-                'X := RISE(PB) AND Ready;                         // one-shot',
-                'Alarm := DELAY(Level > 80.0, 5s [, TimerTag]);   // on-delay (OFFDELAY too)',
-                'IF RISE(P) THEN COUNT_UP(C, 10);                 // counter (COUNT_DOWN too)',
-                'Actions: SET RESET CLEAR RESET_ACC ON_DELAY_TIMER(T,5s) OFF_DELAY_TIMER(T,5s) N := A [+-*/ B]',
-                'Compare: =  <>  >  <  >=  <=        AND/OR mixed? parentheses are required',
-            ].join('\n')),
-            title('Paste existing rungs (either form)'),
-            code([
-                'XIC(a)[XIC(b) ,XIO(c) ]OTE(d);          // neutral text (as in L5X)',
-                'XIC a BST XIC b NXB XIO c BND OTE d     // ASCII text (one rung per line, SOR/EOR ok)',
-            ].join('\n')),
-            title('Commands (need an attached project)'),
-            code('summary      decompile      validate      xref TagName'),
-        );
-    },
+    help() { openHelp(); return null; },
 
     error(d) {
         const parts = [el('div', { cls: 'err', text: d.message })];
@@ -268,150 +164,131 @@ const render = {
         return addBot(...parts);
     },
 
-    generated(d) {
-        // plain English -> model -> LogicSpec; then the normal compiled view
-        const head = [
-            title(`Understood as (LogicSpec from ${d.model}${d.grammar ? ', grammar-checked' : ''})`),
-            code(d.spec),
-        ];
-        const row = el('div', { cls: 'btn-row' });
-        row.appendChild(button('Edit', () => { inputBox.value = d.spec; onInput(); inputBox.focus(); }));
-        row.appendChild(el('span', { cls: 'duration', text:
-            `🤖 ${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` }));
-        head.push(row);
-        if (d.attempts.length > 1) head.push(attemptsBlock(d.attempts));
-        const msg = render.compiled(d);
-        msg.prepend(...head);
-        return msg;
-    },
-
     info(d) { return addBot(el('div', { text: d.message })); },
 
-    compiled(d) {
-        const parts = [];
-        parts.push(title('What this does — check it'));
-        const ul = el('ul', { cls: 'readback' });
-        d.readback.forEach((r) => ul.appendChild(el('li', { text: r })));
-        parts.push(ul);
-
-        parts.push(title(`Rungs (${d.rungs.length}) — neutral text, as stored in L5X`));
-        const rungText = d.rungs.map((r) => r.text).join('\n');
-        parts.push(code(rungText));
-        const asciiText = d.rungs.map((r) => r.ascii).join('\n');
-        const asciiBox = el('details');
-        asciiBox.appendChild(el('summary', { text: 'ASCII text (for the editor\'s ASCII mode, one rung at a time)' }));
-        asciiBox.appendChild(code(asciiText));
-        parts.push(asciiBox);
-
-        if (d.tags.length) {
-            parts.push(title(`New tags (${d.tags.length})`));
-            parts.push(table(['Tag', 'Type', 'Preset', ''],
-                d.tags.map((t) => [t.name, t.type, t.preset ?? '', t.auto ? 'auto' : '']), [0]));
-        }
-        const notes = [];
-        (d.warnings || []).forEach((w) => notes.push({ level: 'warning', where: 'note', message: w }));
-        (d.issues || []).forEach((i) => notes.push(i));
-        const ib = issuesBlock(notes);
-        if (ib) { parts.push(title('Checks')); parts.push(ib); }
-
-        const errs = (d.issues || []).filter((i) => i.level === 'error').length;
-        parts.push(el('div', {
-            cls: 'status-line ' + (errs ? 'err' : 'ok'),
-            text: errs ? `✖ ${errs} error(s): no L5X produced` :
-                `✔ Ready${d.used_project ? ' — checked against ' + d.used_project : ' — no project attached, tags not checked'}`,
-        }));
-
-        const row = el('div', { cls: 'btn-row' });
-        if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
-        row.appendChild(copyButton(() => rungText, 'Copy neutral'));
-        row.appendChild(copyButton(() => asciiText, 'Copy ASCII'));
-        const dur = duration(d.seconds); if (dur) row.appendChild(dur);
-        parts.push(row);
+    generated(d) {
+        const parts = resultBody(d, { rungs: d.rungs, english: d.readback, copyForm: settings.rung_format });
+        const meta = el('div', { cls: 'duration', text: `🤖 ${d.model} via ${d.backend}${d.grammar ? ', grammar-constrained' : ''}: `
+            + `${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` });
+        parts.unshift(meta);
+        if (d.attempts.length > 1) parts.splice(1, 0, attemptsBlock(d.attempts));
         return addBot(...parts);
     },
 
+    compiled(d) {  // typed in the logic language (kept for testing; not advertised)
+        return addBot(...resultBody(d, { rungs: d.rungs, english: d.readback, copyForm: settings.rung_format }));
+    },
+
     rungs(d) {
-        const parts = [title(d.source === 'ASCII'
-            ? `ASCII → neutral text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`
-            : `Neutral → ASCII text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`)];
-        d.rungs.forEach((r) => {
-            // show the form the user did not type
-            parts.push(code(d.source === 'ASCII' ? r.text : r.ascii));
-            if (r.logicspec) {
-                parts.push(code(r.logicspec));
-                r.english.forEach((e) => parts.push(el('div', { cls: 'rung-comment', text: e })));
-            } else {
-                parts.push(el('div', { cls: 'warn', text: `Not convertible: ${r.why}` }));
-            }
+        // show and copy the form the user did NOT type
+        const other = d.source === 'ASCII' ? 'neutral' : 'ascii';
+        const english = [];
+        const parts = [];
+        d.rungs.forEach((r, i) => {
+            if (r.english.length) r.english.forEach((e) => english.push(d.rungs.length > 1 ? `Rung ${i}: ${e}` : e));
+            else english.push(`Rung ${i}: not explained (${r.why})`);
         });
-        const ib = issuesBlock(d.issues);
-        if (ib) { parts.push(title('Checks')); parts.push(ib); }
-        if (d.tags && d.tags.length) {
-            parts.push(title(`New tags (${d.tags.length})`));
-            parts.push(table(['Tag', 'Type', 'Preset'], d.tags.map((t) => [t.name, t.type, t.preset ?? '']), [0]));
-        }
-        (d.warnings || []).forEach((w) => parts.push(el('div', { cls: 'warn', text: `⚠ ${w}` })));
-        const row = el('div', { cls: 'btn-row' });
-        if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
-        // offer only the form the user did not type
-        if (d.source === 'ASCII') row.appendChild(copyButton(() => d.rungs.map((r) => r.text).join('\n'), 'Copy neutral'));
-        else row.appendChild(copyButton(() => d.rungs.map((r) => r.ascii).join('\n'), 'Copy ASCII'));
-        const specs = d.rungs.filter((r) => r.logicspec).map((r) => r.logicspec).join('\n');
-        if (specs) row.appendChild(button('Edit as LogicSpec', () => { inputBox.value = specs; onInput(); inputBox.focus(); }));
-        const dur = duration(d.seconds); if (dur) row.appendChild(dur);
-        parts.push(row);
+        parts.push(...resultBody(d, { rungs: d.rungs, english, copyForm: other }));
+        parts.unshift(el('div', { cls: 'status-line', text: d.source === 'ASCII'
+            ? `ASCII → neutral text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`
+            : `Neutral → ASCII text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})` }));
         return addBot(...parts);
     },
 
     project(d) {
-        setProject(d.filename, d.programs);
+        setProject(d.filename, d.programs, d.default_program);
         if (d.revision_major) {
+            settings = loadSettings();
             settings.revision = `${d.revision_major}.00`;
-            store.set('llm4l5x.settings', settings);
+            saveSettings(settings);
         }
         const unparsed = d.routines.reduce((a, r) => a + r.unparsed, 0);
         const parts = [
             el('div', { cls: 'status-line ok', text: `✔ Attached ${d.filename}` }),
-            el('div', { text: `Controller ${d.controller ?? '?'} · revision ${d.revision ?? '?'} · export type ${d.target ?? '?'}` }),
+            el('div', { text: `${d.target ?? '?'} export · controller ${d.controller ?? '?'} · version ${d.revision ?? '?'}` }),
             el('div', { text: `${d.tags} tags · ${d.udts.length} UDTs · ${d.aois.length} AOIs · ${d.routines.length} routines` }),
-            table(['Program', 'Routine', 'Type', 'Rungs', 'Unparsed'],
+            table(['Program', 'Routine', 'Type', 'Rungs', 'Did not parse'],
                 d.routines.map((r) => [r.program, r.name, r.type, String(r.rungs), r.unparsed ? String(r.unparsed) : ''])),
         ];
-        if (unparsed) parts.push(el('div', { cls: 'warn', text: `⚠ ${unparsed} rung(s) could not be parsed — run 'validate' to see them.` }));
+        if (unparsed) parts.push(el('div', { cls: 'warn', text: `⚠ ${unparsed} rung(s) could not be read: Validate lists them.` }));
         const v36 = (d.revision_major ?? 0) >= 36;
-        parts.push(el('div', { cls: 'rung-comment', text: `New LogicSpec is now checked against this project's tags and AOIs, and written with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
+        parts.push(el('div', { cls: 'rung-comment', text: `New logic now uses this project's tags and AOIs, with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
         const row = el('div', { cls: 'btn-row' });
-        row.appendChild(button('Decompile all rungs', () => send('decompile')));
+        row.appendChild(button('Explain all rungs', () => send('decompile')));
         row.appendChild(button('Validate', () => send('validate')));
         parts.push(row);
         return addBot(...parts);
     },
 
     decompiled(d) {
-        const parts = [el('div', { cls: 'status-line', text: `${d.ok}/${d.total} rungs convertible to LogicSpec` })];
+        const form = settings.rung_format;
+        const parts = [el('div', { cls: 'status-line', text: `${d.ok} of ${d.total} rungs explained` })];
         const det = el('details');
         det.open = d.total <= 40;
-        det.appendChild(el('summary', { text: 'Show all rungs' }));
-        det.appendChild(table(['Where', 'Rung', 'LogicSpec / reason'],
-            d.rows.map((r) => [r.where, r.text, r.logicspec ?? `✖ ${r.why}`]), [1, 2]));
+        det.appendChild(el('summary', { text: 'Show every rung' }));
+        det.appendChild(table(['Where', `Rung (${fmtName(form)})`, 'What it does'],
+            d.rows.map((r) => [r.where, (form === 'ascii' && r.ascii) ? r.ascii : r.text,
+                r.english ? r.english.join(' ') : `✖ ${r.why}`]), [1]));
         parts.push(det);
-        const specs = d.rows.filter((r) => r.logicspec).map((r) => `// ${r.where}\n${r.logicspec}`).join('\n');
+        const text = d.rows.map((r) => `${r.where}\n  ${r.english ? r.english.join('\n  ') : 'not explained: ' + r.why}`).join('\n');
         const row = el('div', { cls: 'btn-row' });
-        if (specs) {
-            row.appendChild(copyButton(() => specs));
-            row.appendChild(button('Download .spec', () => download('decompiled.spec', specs)));
-        }
+        row.appendChild(copyButton(() => text, 'Copy explanations'));
+        row.appendChild(button('Download .txt', () => download('Explained.txt', text)));
         parts.push(row);
         return addBot(...parts);
     },
 
     validated(d) {
-        const errs = d.rows.filter((r) => r.level === 'error').length;
-        const warns = d.rows.length - errs;
-        return addBot(
-            el('div', { cls: 'status-line ' + (errs ? 'err' : 'ok'), text: `${errs} error(s), ${warns} warning(s)` }),
-            issuesBlock(d.rows),
-        );
+        const imp = d.import || [];
+        const errs = imp.filter((r) => r.level === 'error').length;
+        const L = d.lint;
+        const c = L.counts;
+        const parts = [
+            title('Import checks: will Studio 5000 accept it'),
+            el('div', { cls: 'status-line ' + (errs ? 'err' : 'ok'), text: errs || imp.length
+                ? `${errs} error(s), ${imp.length - errs} warning(s)` : '✔ No problems' }),
+        ];
+        const ib = checksBlock(imp, [], []);
+        if (ib) parts.push(ib);
+        parts.push(title('Rules: is it good'));
+        const summary = el('div', { cls: 'sev-summary' });
+        [['critical', 'Critical'], ['error', 'Error'], ['warning', 'Warning'], ['info', 'Info']].forEach(([k, label]) =>
+            summary.appendChild(el('span', { cls: `code ${k}`, text: `${c[k]} ${label}` })));
+        parts.push(summary);
+        const order = ['critical', 'error', 'warning', 'info'];
+        for (const sev of order) {
+            const list = L.findings.filter((f) => f.severity === sev);
+            if (!list.length) continue;
+            const byCode = new Map();
+            list.forEach((f) => { if (!byCode.has(f.code)) byCode.set(f.code, []); byCode.get(f.code).push(f); });
+            for (const [codeName, fs] of byCode) {
+                const det = el('details', { cls: 'rule-findings' });
+                det.open = sev === 'critical' || (sev === 'error' && fs.length <= 5);
+                det.appendChild(el('summary', {}, el('span', { cls: `code ${sev}`, text: codeName }),
+                    el('span', { text: ` ${fs[0].title} (${fs.length})` })));
+                fs.forEach((f) => det.appendChild(el('div', { cls: 'finding' },
+                    el('span', { cls: 'finding-where', text: f.location }), el('span', { text: f.message }))));
+                parts.push(det);
+            }
+        }
+        (L.not_verified || []).forEach((n) => parts.push(el('div', { cls: 'warn', text: `? not verified ${n}` })));
+        (L.errors || []).forEach((n) => parts.push(el('div', { cls: 'err', text: `✖ a rule crashed: ${n}` })));
+        (L.notes || []).forEach((n) => parts.push(el('div', { cls: 'rung-comment', text: n })));
+        const extra = [];
+        if (L.suppressed.length) extra.push(`${L.suppressed.length} finding(s) accepted with lint:disable`);
+        if (L.disabled.length) extra.push(`${L.disabled.length} rule(s) switched off`);
+        const row = el('div', { cls: 'btn-row' });
+        if (extra.length) row.appendChild(el('span', { cls: 'muted', text: extra.join(' · ') }));
+        const a = el('a', { cls: 'save-btn', text: 'Rules page' }); a.href = '/rules';
+        row.appendChild(a);
+        const report = [`Validation of ${d.filename}`, '', 'Import checks:',
+            ...imp.map((i) => `  [${i.level}] ${i.where}: ${i.message}`), '',
+            `Rules: ${c.critical} critical, ${c.error} error, ${c.warning} warning, ${c.info} info`,
+            ...L.findings.map((f) => `  ${f.code} ${f.location}: ${f.message}`),
+            ...(L.not_verified || []).map((n) => `  not verified ${n}`), ...(L.notes || []).map((n) => `  note: ${n}`)].join('\n');
+        row.appendChild(button('Download report', () => download('Validation.txt', report)));
+        parts.push(row);
+        return addBot(...parts);
     },
 
     xref(d) {
@@ -424,19 +301,20 @@ const render = {
     },
 };
 
-function show(d) { (render[d.kind] || render.error)(d.kind in render ? d : { message: 'Unexpected reply from server.' }); }
+function show(d) { (render[d.kind] || render.error)(d.kind in render ? d : { message: 'Unexpected reply from the server.' }); }
 
 // ---------------------------------------------------------------- sending
 async function send(text) {
+    settings = loadSettings();
+    if (/^\s*(help|\?)\s*$/i.test(text)) { openHelp(); return; }
     addUser(text);
-    const english = !/:=|;|^\s*(help|summary|decompile|validate|xref)\b/i.test(text) && !/^\s*\w+\s*\(/.test(text)
+    const english = !/:=|;|^\s*(summary|decompile|validate|xref)\b/i.test(text) && !/^\s*\w+\s*\(/.test(text)
         && !/^\s*(XIC|XIO|SOR|BST)\b/i.test(text);
-    const wait = loading(english ? `Asking ${settings.model} (can take a minute on CPU)` : 'Working');
+    const who = settings.backend === 'llamacpp' ? 'the model' : (settings.model || 'the model');
+    const wait = loading(english ? `Asking ${who} (can take a minute on a CPU)` : 'Working');
     try {
         const res = await fetch('/api/process', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text, settings }),
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, settings }),
         });
         wait.remove();
         show(await res.json());
@@ -461,42 +339,39 @@ function submit() {
 }
 document.querySelectorAll('.chip').forEach((c) => {
     c.onclick = () => {
-        const t = c.dataset.text;
-        if (t === 'help' || t === 'decompile' || t === 'validate') send(t);
-        else { inputBox.value = t; onInput(); inputBox.focus(); }
+        if (c.dataset.send) send(c.dataset.send);
+        else { inputBox.value = c.dataset.text; onInput(); inputBox.focus(); }
     };
 });
 
 // ---------------------------------------------------------------- project attach / detach
-function setProject(name, programs) {
+function setProject(name, programs, preferred) {
     $('projectBadge').hidden = !name;
     $('projectName').textContent = name ? `📁 ${name}` : '';
     document.querySelectorAll('.project-only').forEach((c) => (c.hidden = !name));
-    const dl = $('programList');
-    dl.replaceChildren(...(programs || []).map((p) => { const o = el('option'); o.value = p; return o; }));
-    if (programs && programs.length && !programs.includes(settings.program)) {
-        settings.program = programs[0];
-        store.set('llm4l5x.settings', settings);
+    if (programs && programs.length) {
+        settings = loadSettings();
+        if (!programs.includes(settings.program)) { settings.program = preferred || programs[0]; saveSettings(settings); }
     }
 }
 
 async function upload(file) {
     addUser(`📎 ${file.name}`);
-    const wait = loading('Reading L5X');
+    const wait = loading('Reading the L5X');
     const fd = new FormData();
     fd.append('file', file);
     try {
         const res = await fetch('/api/project', { method: 'POST', body: fd });
         wait.remove();
-        if (res.status === 413) return render.error({ message: 'File is larger than the 50 MB limit.' });
+        if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
         show(await res.json());
     } catch (e) {
         wait.remove();
         render.error({ message: `Upload failed: ${e.message}` });
     }
 }
-attachButton.onclick = () => fileInput.click();
-fileInput.onchange = () => { if (fileInput.files.length) upload(fileInput.files[0]); fileInput.value = ''; };
+$('attachButton').onclick = () => $('fileInput').click();
+$('fileInput').onchange = () => { const f = $('fileInput'); if (f.files.length) upload(f.files[0]); f.value = ''; };
 $('detachButton').onclick = async () => {
     const res = await fetch('/api/project', { method: 'DELETE' });
     setProject(null, []);
@@ -510,13 +385,11 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
 (async () => {
     try {
         const s = await (await fetch('/api/status')).json();
-        setProject(s.project, s.programs);
+        setProject(s.project, s.programs, s.default_program);
     } catch { /* server not ready */ }
-    if (!settings.backend) settings.backend = 'ollama';
-    if (!settings.llm_url && settings.ollama) settings.llm_url = settings.ollama;  // older saved settings
     updateBadge();
     addBot(
-        el('div', { text: 'LLM4L5X — describe ladder logic in plain English, get checked Studio 5000 rungs. Everything runs on this PC.' }),
-        el('div', { cls: 'rung-comment', text: "Try a chip below or type 'help'. Attach your .L5X so the model uses your real tag names." }),
+        el('div', { text: 'Describe ladder logic in plain English, or paste rungs, and get checked Studio 5000 rungs. Everything runs on this PC.' }),
+        el('div', { cls: 'rung-comment', text: 'Press ? for what it can do, ⓘ in the input box for examples. Attach your .L5X so the logic uses your real tag names.' }),
     );
 })();

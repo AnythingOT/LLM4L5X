@@ -29,16 +29,16 @@ def test_index_page(client):
 
 
 def test_compile_logicspec(client):
-    d = post(client, "Pump := (Start_PB OR Pump) AND NOT Stop_PB;")
+    d = post(client, "Pump := (Start_PB OR Pump) AND NOT Stop_PB;", output="rungs")
     assert d["kind"] == "compiled"
     assert d["rungs"][0]["text"] == "[XIC(Start_PB) ,XIC(Pump) ]XIO(Stop_PB)OTE(Pump);"
     assert d["readback"][0].startswith("Pump is on while")
-    assert d["l5x"].startswith('<?xml version="1.0"') and d["filename"].endswith("_Rungs.L5X")
+    assert d["l5x"].startswith('<?xml version="1.0"') and d["filename"] == "Rung.L5X"
 
 
 def test_routine_output_setting(client):
     d = post(client, "X := A;", output="routine", routine="My Routine")
-    assert 'TargetType="Routine"' in d["l5x"] and d["filename"] == "My_Routine_Routine.L5X"
+    assert 'TargetType="Routine"' in d["l5x"] and d["filename"] == "Routine.L5X"
 
 
 def test_spec_error_message(client):
@@ -69,7 +69,9 @@ def test_attach_project_then_check_against_it(client):
     assert post(client, "Pump := HighTmr;")["kind"] == "error"
     assert post(client, "decompile")["ok"] == 3
     assert post(client, "xref Pump")["refs"]
-    assert any("parse error" in r["message"] for r in post(client, "validate")["rows"])
+    v = post(client, "validate")
+    assert any("does not parse" in r["message"] for r in v["import"])
+    assert v["lint"]["counts"] and isinstance(v["lint"]["findings"], list)
     assert client.get("/api/status").get_json()["project"] == "plant.L5X"
     assert client.delete("/api/project").get_json()["kind"] == "info"
     assert client.get("/api/status").get_json()["project"] is None
@@ -98,8 +100,8 @@ def test_compiled_includes_ascii(client):
 
 
 def test_pasted_rungs_download_with_inferred_tags(client):
-    d = post(client, "XIC Start BST XIC Run NXB XIO Stop BND OTE Motor\nGRT Level 5 TON T1 ? ?")
-    assert d["kind"] == "rungs" and d["l5x"] and d["filename"].endswith("_Rungs.L5X")
+    d = post(client, "XIC Start BST XIC Run NXB XIO Stop BND OTE Motor\nGRT Level 5 TON T1 ? ?", output="rungs")
+    assert d["kind"] == "rungs" and d["l5x"] and d["filename"] == "Rung.L5X"
     types = {t["name"]: t["type"] for t in d["tags"]}
     assert types == {"Start": "BOOL", "Run": "BOOL", "Stop": "BOOL", "Motor": "BOOL", "Level": "DINT", "T1": "TIMER"}
     assert any("preset of new timer T1 is unknown" in w for w in d["warnings"])
@@ -154,3 +156,25 @@ def test_english_through_llamacpp_backend_uses_grammar(client, monkeypatch):
     monkeypatch.setattr(llm.OpenAICompatClient, "chat", chat)
     d = post(client, "Turn on Pump_Run while Start_PB is on.", backend="llamacpp", model="")
     assert d["kind"] == "generated" and d["grammar"] is True and "Pump_Run" in seen["grammar"]
+
+
+def test_validate_runs_the_rules_with_disabled_ones_skipped(client):
+    from pathlib import Path
+    fx = Path(__file__).parent / "fixtures" / "lint_project.L5X"
+    r = client.post("/api/project", data={"file": (fx.open("rb"), "line.L5X")}, content_type="multipart/form-data")
+    assert r.get_json()["kind"] == "project"
+    d = client.post("/api/process", json={"text": "validate", "settings": {"disabled_rules": ["ERR001", "bogus"]}}).get_json()
+    codes = {f["code"] for f in d["lint"]["findings"]}
+    assert "ERR002" in codes and "ERR001" not in codes and d["lint"]["disabled"] == ["ERR001"]
+
+
+def test_generated_and_pasted_rungs_carry_rung_rule_findings(client):
+    d = post(client, "XIC(a)OTE(b);\nXIC(c)OTE(b);")
+    assert d["kind"] == "rungs" and any(f["code"] == "ERR001" for f in d["lint"])
+
+
+def test_pages_and_rule_list(client):
+    for page in ("/", "/settings", "/rules"):
+        assert client.get(page).status_code == 200
+    rules = client.get("/api/rules").get_json()["rules"]
+    assert len(rules) == 49 and {"code", "title", "description", "severity", "scope", "group"} <= set(rules[0])

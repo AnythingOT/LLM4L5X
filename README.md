@@ -27,7 +27,7 @@ python app.py
 
 ## Plain English (needs a local model)
 
-Pick where the model runs in ⚙️ Settings (or click the model badge in the header). The model list is read from the server.
+Pick where the model runs on the ⚙️ Settings page (or click the model badge in the header). The model list is read from the server.
 
 | Runs on | Start it | Answers |
 |---|---|---|
@@ -35,11 +35,11 @@ Pick where the model runs in ⚙️ Settings (or click the model badge in the he
 | **llama.cpp server**, direct GGUF | `llama-server -m model.gguf --port 8080` (Windows CPU build from llama.cpp's GitHub releases, GGUF from Hugging Face) | **grammar-constrained**: every answer is valid LogicSpec using only allowed tag names |
 | OpenAI-compatible (LM Studio, Jan, vLLM) | start its local server | free text, as Ollama |
 
-**llama.cpp is the recommended choice for accuracy.** The grammar removes the whole class of syntax errors. In the first phi4-mini run, those were 65 of 98 failures.
+**Measured:** Qwen3.6-35B-A3B (UD-Q4_K_M) on llama.cpp, CPU only: 238/240 on a fresh suite seed, about 12 s per request. With that model the grammar made no measurable difference (it is insurance); for a small model such as phi4-mini, malformed answers were 65 of its 98 failures. Thinking is always off on llama.cpp: forced think tags break the grammar.
 
 1. Start a model server (above).
 2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
-3. You get the **LogicSpec the model understood**, a plain-English read-back, the rungs and a Download button. Check the read-back: it tells you what the logic will actually do.
+3. You get a plain-English read-back of what the rungs do, the rungs, the tags, the checks, **Copy** and **Download**. Check the read-back first: it says what the logic will actually do.
 
 **Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*).
 
@@ -65,14 +65,29 @@ python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a 
 
 ## GUI
 
-A chat-style page, same look as LLM4L5XGen:
+Three pages, AnythingOT look, light and dark. Press **?** on the chat page for the help popup; **ⓘ** in the input box shows examples and project commands.
 
-- **Describe logic in plain English** (needs Ollama), or type LogicSpec directly for testing. You get a read-back to check, the rungs, new tags, checks and a **Download L5X** button.
-- **Paste existing rungs** in either text form Studio 5000 uses. You get the other form, LogicSpec and English back:
-  - neutral text `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);`, which is what L5X files contain
-  - ASCII text `XIC a BST XIC b NXB XIO c BND OTE d`, the editor's ASCII mode (one rung per line; `SOR … EOR` accepted)
-- **Attach an `.L5X` export** (button or drag-and-drop). New logic is then checked against your real tags and AOIs. Project commands: `summary`, `decompile`, `validate`, `xref TagName`.
-- **⚙️ Settings:** rungs vs. new routine, routine/program/controller names, software revision, tag scope, timer operand style, auto-tag prefix, rung comments.
+- **Chat** (`/`)
+  - **Plain English → ladder** (needs a model). Read-back, rungs, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
+  - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the other form, what each rung does in English, the checks, **Copy** (the other form) and **Download**.
+  - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `xref TagName`.
+  - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
+- **Settings** (`/settings`): model (backend, address, model, thinking), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
+- **Rules** (`/rules`): the 49 validation rules, grouped, with search and severity filter; switch each on or off.
+
+## Validate: import checks and rules
+
+`validate` (GUI, or `python cli.py validate plant.L5X`) runs two layers:
+
+1. **Import checks** (`core/validator.py`): will Studio 5000 accept it. Syntax, operand count and types, tags that exist, instruction names for the target version (GRT before v36, GT from v36).
+2. **Rules** (`lint/`): 49 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Rules page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
+   - 19 *rung* rules (duplicate OTE, reused timer or one-shot, unguarded division, unchecked array index, writes to status bits ...) also check every generated or pasted rung. Two of them, a reused timer and a reused one-shot, send the model back for another attempt.
+   - 30 *project* rules (fault handlers, task watchdogs and names, uncalled routines, unscheduled programs, I/O mapping and comments, aliases, electronic keying, module lifecycle, UDT padding and order, descriptions ...) need a full controller export; on a partial export only the rung rules run, and the report says so.
+   - Accept one case by writing `lint:disable=ERR010` (or `lint:disable` for all rules) in that rung's comment or that tag's or AOI's description. Suppressed findings are listed separately, never dropped.
+   - Rules that an export cannot answer (no MajorFaultProgram attribute, say) are reported as *not verified*, not as passed. A rule that crashes is reported too.
+   - Module lifecycle uses `lint/lifecycle.json`: seed data from public Rockwell discontinuation notices, dated in its `_meta`. Check it against Rockwell's PCDC before buying anything, and edit the file to add your modules.
+
+`python cli.py validate --rules` lists the rules. The rules are a rewrite, for this repo's parser and data model, of the checklist in [L5X_Lint](https://github.com/AnythingOT/L5X_Lint), with the same codes.
 
 The server listens on `127.0.0.1` only, so nothing leaves your PC.
 
@@ -107,7 +122,8 @@ python cli.py compile examples\pump_station.spec -o pump.L5X
 python cli.py compile spec.txt --routine Generated --project plant.L5X --program MainProgram -o r.L5X
 python cli.py inspect plant.L5X --decompile
 python cli.py inspect plant.L5X --xref Pump
-python cli.py validate plant.L5X
+python cli.py validate plant.L5X --disable INF003,INF004
+python cli.py validate --rules
 python cli.py survey folder_of_exports
 python cli.py ask "run the pump from start, stop with stop" --project plant.L5X --model phi4-mini -o pump.L5X
 python cli.py eval --model qwen3.6:35b-a3b --no-think
@@ -124,12 +140,15 @@ cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
+lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, paths.py,
+                    udt_layout.py, lifecycle.json
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             llm.py (Ollama, English -> LogicSpec), examples.yaml (few-shot), gbnf.py
 eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
                     instruction suite), rung_compare.py (behavioural oracle), mutation.py
-gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (197 tests); fixtures/ is hand-written, not a real export
+gui/                templates/ (base, index, settings, rules), static/ (style.css, common.js,
+                    app.js, settings.js, rules.js, favicon.ico)
+tests/              pytest (267 tests); fixtures/ are hand-written, not real exports
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

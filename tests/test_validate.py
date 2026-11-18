@@ -25,11 +25,14 @@ def test_write_to_literal_and_placeholder():
     assert "writes to a literal 5" in m and "is '?'" in m
 
 
-def test_ons_reuse_and_duplicate_coil_and_timer_reuse():
-    m = " ".join(msgs("XIC(a)ONS(s)OTE(b);", "XIC(c)ONS(s)OTE(b);", "XIC(a)TON(t,?,?);", "XIC(b)TON(t,?,?);"))
-    assert "ONS storage bit s already used" in m
-    assert "duplicate destructive coil" in m
-    assert "timer t driven by more than one" in m
+def test_programming_rules_are_lint_not_import_checks():
+    """Reuse and duplicate coils import fine; lint reports them (ERR015, ERR001, ERR014)."""
+    from lint import check_rungs
+    rungs = [parse_rung(t) for t in ("XIC(a)ONS(s)OTE(b);", "XIC(c)ONS(s)OTE(b);", "XIC(a)TON(t,?,?);",
+                                     "XIC(b)TON(t,?,?);", "XIC(a)OTE(T1.DN);", "XIC(a)[,XIC(b) ]OTE(c);")]
+    assert validate(rungs) == []
+    codes = {f.code for f in check_rungs(rungs, {"T1": "TIMER"})}  # .DN alone could be a MESSAGE bit
+    assert {"ERR015", "ERR001", "ERR014", "ERR005", "WAR007"} <= codes
 
 
 def test_types_and_unknown_tags():
@@ -42,12 +45,8 @@ def test_types_and_unknown_tags():
 
 
 def test_levels():
-    issues = validate([parse_rung("XIC(a)[,XIC(b) ]OTE(c);")])
-    assert issues and not errors(issues)
-
-
-def test_writing_timer_status_bit_warned():
-    assert any("status bit" in m for m in msgs("XIC(a)OTE(T1.DN);"))
+    issues = validate([parse_rung("XIC(a)OTE(1);"), parse_rung("XIC(1)OTE(b);")])
+    assert [i.level for i in issues] == ["error", "warning"]
 
 
 def test_mnemonics_checked_against_target_version():
@@ -106,6 +105,7 @@ def test_repeated_problem_reported_once_per_rung():
 
 
 def test_real_findings_still_reported():
-    m = found("XIC(a)OTE(N.3);", "XIC(Flag)OTE(N.3);", "XIC(a)OTL(T.DN);")
-    assert any("duplicate destructive coil" in x for x in m)
-    assert any("status bit" in x for x in m)
+    from lint import check_rungs
+    rungs = [parse_rung(r) for r in ("XIC(a)OTE(N.3);", "XIC(Flag)OTE(N.3);", "XIC(a)OTL(T.DN);")]
+    codes = {f.code for f in check_rungs(rungs, TAGS)}
+    assert {"ERR001", "ERR005"} <= codes

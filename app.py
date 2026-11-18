@@ -19,12 +19,13 @@ from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_a
 from core.compiler import CompileError, Compiler, infer_tags
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import RungSyntaxError, format_rung, parse_rung
-from core.validator import errors, validate
+from core.validator import errors, validate, validate_project
 from explain.decompiler import try_decompile
 from explain.describe import describe_statement
 from l5x.reader import Project, read_l5x
 from l5x.writer import write_routine, write_rungs
 from l5x.xref import cross_reference
+import lint
 
 app = Flask(__name__, template_folder="gui/templates", static_folder="gui/static")
 app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB L5X upload limit
@@ -32,7 +33,7 @@ app.config["MAX_CONTENT_LENGTH"] = 50 * 1024 * 1024  # 50 MB L5X upload limit
 STATE: dict = {"project": None, "filename": None}
 
 DEFAULTS = {
-    "output": "rungs",          # rungs | routine
+    "output": "routine",        # routine (Routine.L5X) | rungs (Rung.L5X)
     "routine": "GeneratedRoutine",
     "program": "MainProgram",
     "controller": "LLM4L5X",
@@ -44,7 +45,9 @@ DEFAULTS = {
     "backend": "ollama",        # ollama | llamacpp | openai
     "llm_url": "",              # empty = the backend's usual local address
     "model": "phi4-mini",
-    "think": "default",         # default | off (Ollama)
+    "think": "default",         # default | off
+    "rung_format": "neutral",   # neutral | ascii: how rungs are shown and copied
+    "disabled_rules": [],       # lint rule codes switched off on the Rules page
 }
 
 
@@ -54,7 +57,7 @@ def _settings(raw: dict | None) -> dict:
         if k in s and v not in (None, ""):
             s[k] = v
     if s["output"] not in ("rungs", "routine"):
-        s["output"] = "rungs"
+        s["output"] = "routine"
     if s["scope"] not in ("controller", "program"):
         s["scope"] = "controller"
     if s["display"] not in ("placeholder", "values"):
@@ -64,6 +67,11 @@ def _settings(raw: dict | None) -> dict:
         s["think"] = "default"
     if s["backend"] not in ("ollama", "llamacpp", "openai"):
         s["backend"] = "ollama"
+    if s["rung_format"] not in ("neutral", "ascii"):
+        s["rung_format"] = "neutral"
+    raw_rules = (raw or {}).get("disabled_rules") or []
+    s["disabled_rules"] = sorted({str(c).upper() for c in raw_rules if str(c).upper() in lint.BY_CODE}) \
+        if isinstance(raw_rules, list) else []
     if not s["llm_url"] and (raw or {}).get("ollama") and s["backend"] == "ollama":
         s["llm_url"] = raw["ollama"]  # settings saved by the previous version
     return s
@@ -83,12 +91,44 @@ def _issues_json(issues):
     return [{"level": i.level, "rung": i.rung, "message": i.message} for i in issues]
 
 
+def _lint_json(rungs, types, catalog, s: dict) -> list[dict]:
+    """Rung rules on new or pasted rungs (the project rules need the whole project)."""
+    return [f.to_dict() for f in lint.check_rungs(rungs, types, catalog, disabled=s["disabled_rules"])]
+
+
+def _l5x(out: dict, rungs, tags, s: dict) -> None:
+    """Attach the download: a routine or rung export, as chosen in Settings."""
+    kw = dict(controller=s["controller"], program=s["program"], revision=s["revision"], scope=s["scope"])
+    if s["output"] == "routine":
+        out["l5x"] = write_routine(rungs, tags, routine=s["routine"], **kw)
+        out["filename"] = "Routine.L5X"
+    else:
+        out["l5x"] = write_rungs(rungs, tags, **kw)
+        out["filename"] = "Rung.L5X"
+
+
 # ---------------------------------------------------------------- pages
 
 
 @app.get("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", page="chat")
+
+
+@app.get("/settings")
+def settings_page():
+    return render_template("settings.html", page="settings")
+
+
+@app.get("/rules")
+def rules_page():
+    return render_template("rules.html", page="rules")
+
+
+@app.get("/api/rules")
+def rules_list():
+    return jsonify(rules=[{"code": r.code, "title": r.title, "description": r.description, "severity": r.severity,
+                           "scope": r.scope, "group": r.group} for r in lint.RULES])
 
 
 # ---------------------------------------------------------------- chat input
@@ -111,7 +151,7 @@ def process():
     elif head == "xref":
         out = _xref(cmd[1].strip() if len(cmd) > 1 else "")
     elif head in ("decompile", "validate", "summary") and len(cmd) == 1:
-        out = _project_action(head)
+        out = _project_action(head, s)
     else:
         out = _logicspec_or_rung(text, s)
     out["seconds"] = round(time.perf_counter() - t0, 3)
@@ -161,17 +201,12 @@ def _compile(stmts, s: dict) -> dict:
                   "auto": t.allocated} for t in res.tags.values()],
         "warnings": res.warnings,
         "issues": _issues_json(issues),
+        "lint": _lint_json(res.rungs, types, catalog, s),
         "used_project": STATE["filename"],
         "l5x": None,
     }
     if not errors(issues):
-        kw = dict(controller=s["controller"], program=program, revision=s["revision"], scope=s["scope"])
-        if s["output"] == "routine":
-            out["l5x"] = write_routine(res.rungs, res.tags.values(), routine=s["routine"], **kw)
-            out["filename"] = f"{_safe(s['routine'])}_Routine.L5X"
-        else:
-            out["l5x"] = write_rungs(res.rungs, res.tags.values(), **kw)
-            out["filename"] = f"{_safe(s['routine'])}_Rungs.L5X"
+        _l5x(out, res.rungs, res.tags.values(), s)
     return out
 
 
@@ -242,6 +277,7 @@ def _explain_rungs(parsed, source: str, s: dict) -> dict:
     issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None,
                       string_types=proj.string_types if proj else None)
     out = {"kind": "rungs", "source": source, "rungs": rungs, "issues": _issues_json(issues),
+           "lint": _lint_json(parsed, all_tags, catalog, s),
            "tags": [], "warnings": [], "l5x": None, "used_project": STATE["filename"]}
     known = proj.tag_types(s["program"]) if proj else None
     try:
@@ -252,13 +288,7 @@ def _explain_rungs(parsed, source: str, s: dict) -> dict:
     out["tags"] = [{"name": t.name, "type": t.datatype, "preset": t.preset, "auto": False} for t in tags.values()]
     out["warnings"] = warns
     if not errors(issues):
-        kw = dict(controller=s["controller"], program=s["program"], revision=s["revision"], scope=s["scope"])
-        if s["output"] == "routine":
-            out["l5x"] = write_routine(parsed, tags.values(), routine=s["routine"], **kw)
-            out["filename"] = f"{_safe(s['routine'])}_Routine.L5X"
-        else:
-            out["l5x"] = write_rungs(parsed, tags.values(), **kw)
-            out["filename"] = f"{_safe(s['routine'])}_Rungs.L5X"
+        _l5x(out, parsed, tags.values(), s)
     return out
 
 
@@ -273,6 +303,10 @@ def _summary(p: Project) -> dict:
     routines = [{"program": r.program, "name": r.name, "type": r.type, "rungs": len(r.rungs),
                  "unparsed": sum(1 for x in r.rungs if x.rung is None)} for r in p.routines]
     programs = sorted({r.program for r in p.routines})
+    # the program new logic most likely belongs in: MainProgram, else one in a continuous task
+    continuous = [n for t in p.tasks if t.type == "CONTINUOUS" for n in t.programs]
+    default = "MainProgram" if "MainProgram" in programs else next(
+        (n for n in continuous if n in programs), programs[0] if programs else None)
     return {
         "kind": "project",
         "filename": STATE["filename"],
@@ -283,6 +317,7 @@ def _summary(p: Project) -> dict:
         "udts": sorted(p.udts),
         "aois": sorted(p.aois),
         "programs": programs,
+        "default_program": default,
         "routines": routines,
         "revision_major": major_version(p.software_revision),
     }
@@ -309,7 +344,7 @@ def detach_project():
     return jsonify(kind="info", message="Project detached. New tags will no longer be checked against it.")
 
 
-def _project_action(action: str) -> dict:
+def _project_action(action: str, s: dict) -> dict:
     p = _project()
     if p is None:
         return {"kind": "error", "message": f"'{action}' needs an attached L5X. Use Attach first."}
@@ -320,7 +355,8 @@ def _project_action(action: str) -> dict:
         rows, ok = [], 0
         for rt in p.routines:
             for x in rt.rungs:
-                row = {"where": f"{rt.program}/{rt.name} rung {x.number}", "text": x.text}
+                row = {"where": f"{rt.program} / {rt.name} / Rung {x.number}", "text": x.text,
+                       "ascii": format_ascii(x.rung) if x.rung is not None else None}
                 if x.rung is None:
                     row["why"] = f"parse error: {x.parse_error}"
                 else:
@@ -328,24 +364,17 @@ def _project_action(action: str) -> dict:
                     if stmts:
                         ok += 1
                         row["logicspec"] = format_spec(stmts)
+                        row["english"] = [describe_statement(st) for st in stmts]
                     else:
                         row["why"] = why
                 rows.append(row)
-        return {"kind": "decompiled", "rows": rows, "ok": ok, "total": len(rows)}
-    # validate
-    cat = p.catalog()
-    rows = []
-    for rt in p.routines:
-        good = []
-        for x in rt.rungs:
-            if x.rung is None:
-                rows.append({"where": f"{rt.program}/{rt.name} rung {x.number}", "level": "error",
-                             "message": f"parse error: {x.parse_error}"})
-            else:
-                good.append(x.rung)
-        for i in validate(good, p.tag_types(rt.program), catalog=cat, revision=p.software_revision, string_types=p.string_types):
-            rows.append({"where": f"{rt.program}/{rt.name} rung {i.rung}", "level": i.level, "message": i.message})
-    return {"kind": "validated", "rows": rows}
+        return {"kind": "decompiled", "rows": rows, "ok": ok, "total": len(rows),
+                "filename": STATE["filename"], "target": p.target_type}
+    # validate: will Studio 5000 accept it (import checks), is it good (the rules)
+    rep = lint.run(p, disabled=s["disabled_rules"])
+    return {"kind": "validated", "target": p.target_type, "filename": STATE["filename"],
+            "import": [{"where": i.where, "level": i.level, "message": i.message} for i in validate_project(p)],
+            "lint": rep.to_dict()}
 
 
 def _xref(tag: str) -> dict:
@@ -356,7 +385,7 @@ def _xref(tag: str) -> dict:
         return {"kind": "error", "message": "Usage: xref TagName"}
     refs = cross_reference(p).get(tag, [])
     return {"kind": "xref", "tag": tag, "refs": [
-        {"where": f"{r.program}/{r.routine} rung {r.rung}", "instruction": r.instruction,
+        {"where": f"{r.program} / {r.routine} / Rung {r.rung}", "instruction": r.instruction,
          "operand": r.operand, "role": r.role} for r in refs]}
 
 
@@ -377,7 +406,8 @@ def llm_models():
 @app.get("/api/status")
 def status():
     p = _project()
-    return jsonify(project=STATE["filename"], programs=sorted({r.program for r in p.routines}) if p else [])
+    return jsonify(project=STATE["filename"], programs=sorted({r.program for r in p.routines}) if p else [],
+                   default_program=_summary(p)["default_program"] if p else None)
 
 
 if __name__ == "__main__":

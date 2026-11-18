@@ -25,6 +25,11 @@ from core.catalog import Catalog
 from core.compiler import CompileError, CompileResult, Compiler
 from core.logicspec import SpecError, format_spec, format_statement, parse_spec
 from core.validator import errors, validate
+from lint import check_rungs
+
+# lint findings on generated rungs that send the model back for another attempt:
+# a timer or one-shot shared between rungs cannot work as written
+RETRY_CODES = {"ERR014", "ERR015"}
 
 EXAMPLES_FILE = Path(__file__).parent / "examples.yaml"
 
@@ -177,6 +182,8 @@ def make_client(backend: str = "ollama", url: str | None = None, model: str = ""
     url = url or BACKENDS[backend]["url"]
     if backend == "ollama":
         return OllamaClient(model=model or "phi4-mini", url=url, think=think)
+    if backend == "llamacpp" and think is None:
+        think = False  # the grammar allows no thinking text, and forced think tags break it
     return OpenAICompatClient(model=model, url=url, grammar=(backend == "llamacpp"), think=think)
 
 
@@ -406,6 +413,8 @@ class Generator:
                     types.update({t.name: t.datatype for t in compiled.tags.values()})
                     bad = errors(validate(compiled.rungs, types if known_tags else None, catalog=catalog,
                                           revision=(compiler_kw or {}).get("revision"), string_types=string_types))
+                    # logic that cannot work as written: worth another attempt (other lint findings are shown)
+                    bad += [f for f in check_rungs(compiled.rungs, types, catalog) if f.code in RETRY_CODES]
                     if bad:
                         error = "; ".join(i.message for i in bad[:3])
                     else:

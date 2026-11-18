@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Rules{% endblock %}
+{% block bodyclass %}page{% endblock %}
+{% block body %}
+<main class="page-main">
+    <div class="page-head">
+        <h1>Validation rules</h1>
+        <span class="muted"><span id="ruleCount"></span> Saved in this browser; used by <b>validate</b> and by the checks on generated rungs. <span id="savedNote" class="saved-note"></span></span>
+        <div class="page-actions">
+            <button id="enableAll" class="btn">All on</button>
+            <button id="disableAll" class="btn">All off</button>
+            <a class="btn primary" href="/">Back to chat</a>
+        </div>
+    </div>
+    <div class="rule-filters">
+        <input id="ruleSearch" type="search" placeholder="Search code, title or text" spellcheck="false" />
+        <div class="sev-filter" id="sevFilter">
+            <button class="sev-btn active" data-sev="">All</button>
+            <button class="sev-btn critical" data-sev="critical">Critical</button>
+            <button class="sev-btn error" data-sev="error">Error</button>
+            <button class="sev-btn warning" data-sev="warning">Warning</button>
+            <button class="sev-btn info" data-sev="info">Info</button>
+        </div>
+    </div>
+    <p class="muted rules-note">The code fixes the severity, so a code means the same thing in every report: you can switch a rule off, not soften it.
+        To accept one case, write <code>lint:disable=CODE</code> in that rung's comment or that tag's description.
+        <span class="badge rung">rung</span> rules also check new and pasted rungs; <span class="badge project">project</span> rules need a full controller export.</p>
+    <div id="ruleGroups"></div>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='rules.js') }}"></script>{% endblock %}

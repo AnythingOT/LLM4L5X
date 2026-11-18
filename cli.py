@@ -140,21 +140,34 @@ def cmd_inspect(a) -> int:
 
 
 def cmd_validate(a) -> int:
+    """Import checks (will Studio 5000 accept it) plus the lint rules (is it good)."""
+    import lint
+    from core.validator import validate_project
+    if a.rules:
+        for r in lint.RULES:
+            print(f"{r.code}  {r.severity:8s} {r.scope:7s} {r.title}")
+        return 0
+    if not a.file:
+        print("validate: give an .L5X file (or --rules)", file=sys.stderr)
+        return 2
     p = read_l5x(Path(a.file))
-    cat = p.catalog()
-    bad = 0
-    for rt in p.routines:
-        rungs = []
-        for x in rt.rungs:
-            if x.rung is None:
-                print(f"{rt.program}/{rt.name} rung {x.number}: parse error: {x.parse_error}")
-                bad += 1
-            else:
-                rungs.append(x.rung)
-        for i in validate(rungs, p.tag_types(rt.program), catalog=cat, revision=p.software_revision, string_types=p.string_types):
-            print(f"{rt.program}/{rt.name} {i}")
-            bad += i.level == "error"
-    return 1 if bad else 0
+    issues = validate_project(p)
+    print(f"Import checks: {sum(i.level == 'error' for i in issues)} error(s), "
+          f"{sum(i.level == 'warning' for i in issues)} warning(s)")
+    for i in issues:
+        print(f"  [{i.level}] {i.where}: {i.message}")
+    rep = lint.run(p, disabled=[c.strip() for c in (a.disable or "").split(",") if c.strip()])
+    c = rep.counts()
+    print(f"\nRules: {c['critical']} critical, {c['error']} error, {c['warning']} warning, {c['info']} info"
+          + (f" ({len(rep.suppressed)} suppressed by lint:disable)" if rep.suppressed else ""))
+    for f in rep.findings:
+        print(f"  {f.code} {f.location}: {f.message}")
+    for code, why in sorted(rep.not_verified.items()):
+        print(f"  not verified {code}: {why}")
+    for note in rep.notes + [f"rule crashed: {e}" for e in rep.errors]:
+        print(f"  note: {note}")
+    blocking = any(i.level == "error" for i in issues) or c["critical"] or c["error"] or rep.errors
+    return 1 if blocking else 0
 
 
 def _client(a):
@@ -321,8 +334,10 @@ def main(argv: list[str] | None = None) -> int:
     i.add_argument("--decompile", action="store_true", help="convert rungs to LogicSpec")
     i.set_defaults(fn=cmd_inspect)
 
-    v = sub.add_parser("validate", help="check every ladder rung in an L5X file")
-    v.add_argument("file")
+    v = sub.add_parser("validate", help="import checks and the programming rules (CRT/ERR/WAR/INF) on an L5X file")
+    v.add_argument("file", nargs="?")
+    v.add_argument("--disable", help="rule codes to skip, comma separated (e.g. INF004,INF003)")
+    v.add_argument("--rules", action="store_true", help="list the rules and exit")
     v.set_defaults(fn=cmd_validate)
 
     def llm_args(p):
