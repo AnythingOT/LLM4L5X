@@ -128,6 +128,7 @@ class OpenAICompatClient:
     url: str = "http://127.0.0.1:8080"
     timeout: float = 300.0
     grammar: bool = False
+    think: bool | None = None  # False: ask the chat template not to think (Qwen3 & co.)
 
     @property
     def supports_grammar(self) -> bool:
@@ -143,6 +144,10 @@ class OpenAICompatClient:
             body["model"] = self.model
         if grammar and self.grammar:
             body["grammar"] = grammar
+        if self.think is False:
+            # Qwen-style templates: skip the <think> block in the prompt itself, so the
+            # server does not have to force-close it (forced tokens and grammars clash)
+            body["chat_template_kwargs"] = {"enable_thinking": False}
         req = urllib.request.Request(f"{self.url.rstrip('/')}/v1/chat/completions", data=json.dumps(body).encode(),
                                      headers={"Content-Type": "application/json"})
         try:
@@ -164,7 +169,7 @@ def make_client(backend: str = "ollama", url: str | None = None, model: str = ""
     url = url or BACKENDS[backend]["url"]
     if backend == "ollama":
         return OllamaClient(model=model or "phi4-mini", url=url, think=think)
-    return OpenAICompatClient(model=model, url=url, grammar=(backend == "llamacpp"))
+    return OpenAICompatClient(model=model, url=url, grammar=(backend == "llamacpp"), think=think)
 
 
 # ---------------------------------------------------------------- prompt pieces

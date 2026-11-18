@@ -46,7 +46,7 @@ def test_comparator_catches_mutations():
 class Oracle:
     """Fake model: answers with the expected LogicSpec, or a wrong one every Nth time."""
     def __init__(self, cases, wrong_every=0):
-        self.spec = {c.english: c.spec for c in cases}
+        self.spec = {c.english: c.answer for c in cases}
         self.wrong_every, self.n = wrong_every, 0
 
     def chat(self, messages):
@@ -57,6 +57,23 @@ class Oracle:
         if self.wrong_every and self.n % self.wrong_every == 0:
             return spec.replace(" AND ", " OR ", 1) if " AND " in spec else spec.replace("NOT ", "", 1) or spec
         return spec
+
+
+def test_context_timer_is_offered_not_expected():
+    """A request about an existing timer offers it as a TIMER tag; the model isn't asked to start it."""
+    cases = [c for c in generate(per_combo=2, seed=1, instructions=["TON"]) if c.context]
+    assert cases
+    for c in cases:
+        for rung in c.context:
+            timer = rung.split("TON(")[1].split(",")[0]
+            assert c.tags.get(timer) == "TIMER", (c.id, timer)
+            assert timer + ".DN" in c.answer and f"START_TIMER({timer}," not in c.answer
+
+
+def test_multi_action_english_puts_condition_first():
+    for c in generate(per_combo=3, seed=1):
+        if c.structure == "multi_output":
+            assert c.english.startswith("When "), c.english
 
 
 def test_model_run_and_excel(tmp_path):

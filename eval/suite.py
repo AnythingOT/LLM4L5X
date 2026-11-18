@@ -67,6 +67,13 @@ class Case:
     rungs: list[str]  # expected neutral text (reference builder)
     presets: dict[str, int] = field(default_factory=dict)
     tags: dict[str, str] = field(default_factory=dict)  # project tags offered to the model
+    context: list[str] = field(default_factory=list)  # rungs already in the "project" (helper timers)
+    context_spec: list[str] = field(default_factory=list)  # the same, as LogicSpec
+
+    @property
+    def answer(self) -> str:
+        """What a model should write: the spec without the project's existing logic."""
+        return "\n".join(x for x in self.spec.splitlines() if x not in self.context_spec)
 
 
 # ---------------------------------------------------------------- atoms
@@ -127,7 +134,7 @@ class Builder:
                     f"RISE({t})", [Instr("XIC", (t,)), Instr("ONS", (f"REF_ONS_{self.n_ref}",))])
         if kind == "DN_TMR":  # timer done, the timer started by a helper rung
             src = self.bool_in()
-            t = self.pick(TIMERS, "")
+            t = self.pick(TIMERS, "TIMER")  # an existing timer the model may reference
             ms = r.choice([2, 3, 5, 10, 30]) * 1000
             self.presets[t] = ms
             self.pre_rungs.append(Rung(Series((Instr("XIC", (src,)), Instr("TON", (t, "?", "?"))))))
@@ -309,7 +316,8 @@ def make_case(rng: random.Random, feature: str, structure: str, n: int, version:
     # English
     act_eng = [a[0] for a in acts]
     act_text = act_eng[0] if len(act_eng) == 1 else ", ".join(act_eng[:-1]) + " and " + act_eng[-1]
-    if rng.random() < 0.5:
+    # several actions: condition first, else "A and B if C" is ambiguous about what C covers
+    if rng.random() < 0.5 or len(act_eng) > 1:
         english = f"When {cond[0]}, {act_text}."
     else:
         english = f"{act_text[0].upper()}{act_text[1:]} if {cond[0]}."
@@ -327,7 +335,8 @@ def make_case(rng: random.Random, feature: str, structure: str, n: int, version:
     rungs = b.pre_rungs + [Rung(Series(tuple(cond[2] + tail)))]
     offered = {k: v for k, v in b.tags.items() if v}
     return Case(f"{feature}-{structure}-{n:03d}", feature, structure, english, "\n".join(specs),
-                [format_rung(r) for r in rungs], dict(b.presets), offered)
+                [format_rung(r) for r in rungs], dict(b.presets), offered,
+                [format_rung(r) for r in b.pre_rungs], list(b.pre_specs))
 
 
 def generate(per_combo: int = 3, seed: int = 1, version: int = 35,

@@ -207,6 +207,50 @@ def cmd_eval(a) -> int:
     return 0
 
 
+def cmd_probe(a) -> int:
+    """Find out which part breaks grammar-constrained answers on a llama-server."""
+    import urllib.error
+    import urllib.request
+    from inputs.gbnf import build_gbnf
+    url = (a.url or "http://127.0.0.1:8080").rstrip("/") + "/v1/chat/completions"
+    ask = [{"role": "user", "content": "Write LogicSpec: turn on Motor_Run while Start_PB is on."}]
+    spec_grammar = build_gbnf({"Motor_Run": "BOOL", "Start_PB": "BOOL"}, allow_new_tags=False)
+    off = {"chat_template_kwargs": {"enable_thinking": False}}
+    tests = [
+        ("1 no grammar", {}),
+        ("2 tiny grammar", {"grammar": 'root ::= "OK"'}),
+        ("3 tiny grammar, thinking off", {"grammar": 'root ::= "OK"', **off}),
+        ("4 LogicSpec grammar, thinking off", {"grammar": spec_grammar, **off}),
+        ("5 LogicSpec grammar", {"grammar": spec_grammar}),
+    ]
+    for name, extra in tests:
+        body = {"messages": ask, "temperature": 0, "max_tokens": 60, "stream": False, **extra}
+        req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+        try:
+            with urllib.request.urlopen(req, timeout=600) as r:
+                msg = json.loads(r.read().decode("utf-8"))["choices"][0]["message"]
+            text = (msg.get("content") or "").strip().replace("\n", " ")
+            think = " (+reasoning text)" if msg.get("reasoning_content") else ""
+            print(f"{name:36s} OK    {text[:70]!r}{think}")
+        except urllib.error.HTTPError as e:
+            print(f"{name:36s} ERROR {e.code}: {e.read().decode('utf-8', 'replace')[:160]}")
+        except (urllib.error.URLError, OSError) as e:
+            print(f"{name:36s} cannot reach {url}: {e}")
+            return 1
+    return 0
+
+
+def _model_label(a, client) -> str:
+    """What actually answered: llama-server ignores --model, so ask the server."""
+    name = a.model
+    if a.backend != "ollama":
+        try:
+            name = ", ".join(client.list_models()) or "?"
+        except Exception:  # noqa: BLE001 - a label must never break a finished run
+            name = "?"
+    return f"{name} via {a.backend}" + (" (no-think)" if a.no_think else "")
+
+
 def cmd_suite(a) -> int:
     from eval.suite import generate
     from eval.suite_run import model_run, self_test, summary, write_excel
@@ -214,13 +258,15 @@ def cmd_suite(a) -> int:
                      instructions=a.only.split(",") if a.only else None)
     def progress(n, total, o):
         if a.model or n % 50 == 0 or not o.ok:
-            print(f"[{n}/{total}] {'ok ' if o.ok else 'BAD'} {o.case.id}", file=sys.stderr)
+            flag = "  [grammar rejected, free text]" if getattr(o, "grammar", "") == "rejected" else ""
+            print(f"[{n}/{total}] {'ok ' if o.ok else 'BAD'} {o.case.id}{flag}", file=sys.stderr)
     if a.self_test:
         out = self_test(cases, a.version, progress)
         title = f"SELF-TEST (compiler vs reference), {len(cases)} cases, v{a.version}, seed {a.seed}"
     else:
-        out = model_run(cases, _client(a), a.version, progress)
-        title = f"MODEL {a.model}, {len(cases)} cases, v{a.version}, seed {a.seed}"
+        client = _client(a)
+        out = model_run(cases, client, a.version, progress)
+        title = f"MODEL {_model_label(a, client)}, {len(cases)} cases, v{a.version}, seed {a.seed}"
     print(summary(out, title))
     if a.excel:
         write_excel(out, a.excel, title)
@@ -302,6 +348,10 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--limit", type=int)
     llm_args(ev)
     ev.set_defaults(fn=cmd_eval)
+
+    pr = sub.add_parser("probe", help="check grammar-constrained answers on a llama-server (5 short requests)")
+    pr.add_argument("--url", help="default http://127.0.0.1:8080")
+    pr.set_defaults(fn=cmd_probe)
 
     su = sub.add_parser("suite", help="instruction suite (series/parallel/nested): --self-test or --model")
     su.add_argument("--self-test", action="store_true", help="compiler vs reference rungs, no model")

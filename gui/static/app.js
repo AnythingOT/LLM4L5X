@@ -67,7 +67,6 @@ function updateBackendUi() {
     const info = BACKEND_INFO[b];
     $('backendHelp').textContent = info.help;
     $('setLlmUrl').placeholder = info.url;
-    document.querySelectorAll('.think-row').forEach((e) => (e.hidden = b !== 'ollama'));
 }
 $('setBackend').onchange = () => {
     // a default address of another backend would be wrong here

@@ -170,6 +170,21 @@ def test_llamacpp_client_sends_grammar_and_lists_models(monkeypatch):
     assert '"Motor_Run"' in body["grammar"] and body["temperature"] == 0
 
 
+def test_no_think_asks_the_template_to_skip_thinking(monkeypatch):
+    import urllib.request
+    from inputs.llm import make_client
+    seen = []
+
+    def fake(req, timeout=None):
+        seen.append(json.loads(req.data))
+        return Resp({"choices": [{"message": {"content": "Motor_Run := Start_PB;"}}]})
+    monkeypatch.setattr(urllib.request, "urlopen", fake)
+    make_client("llamacpp", think=False).chat([{"role": "user", "content": "x"}])
+    make_client("llamacpp").chat([{"role": "user", "content": "x"}])
+    assert seen[0]["chat_template_kwargs"] == {"enable_thinking": False}
+    assert "chat_template_kwargs" not in seen[1]
+
+
 def test_openai_compatible_client_has_no_grammar(monkeypatch):
     import urllib.request
     from inputs.llm import make_client
