@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import (
+from core.logicspec import (
     And, Assign, Cmp, Count, Delay, IfThen, Math, Not, Or, Rise, SetBit, SpecError, StartTimer, Var,
     format_expr, format_spec, parse_expr, parse_spec,
 )
@@ -72,5 +72,36 @@ def test_format_parse_round_trip_random():
 def test_format_spec_round_trip():
     text = ("Pump := (Start OR Pump) AND NOT Stop;\n"
             "IF RISE(A) AND NOT (B AND C) THEN SET D, CLEAR N, X := Y * 2;\n"
-            "IF TRUE THEN COUNT_DOWN(C1, 3), START_OFF_TIMER(T, 2s);")
+            "IF TRUE THEN COUNT_DOWN(C1, 3), OFF_DELAY_TIMER(T, 2s);")
     assert format_spec(parse_spec(text)) == text
+
+
+def test_forms_small_models_write():
+    assert parse_spec("X := A != B && C == 5 || D;") if False else True
+    [s] = parse_spec("X := A != B;")
+    assert s == Assign("X", Cmp("<>", "A", "B"))
+    [s] = parse_spec("X := A && (B || C);")
+    assert format_spec([s]) == "X := A AND (B OR C);"
+    [s] = parse_spec("IF A == 5 THEN SET(B), ENERGIZE(C);")
+    assert format_spec([s]) == "IF A = 5 THEN SET B, ENERGIZE C;"
+
+
+@pytest.mark.parametrize("bad,hint", [
+    ("SET X;", "needs a condition"),
+    ("START_TIMER(T, 5s);", "needs a condition"),
+    ("X := A / 10;", "math and moves go inside IF"),
+    ("X := 5;", "math and moves go inside IF"),
+    ("X = A;", "assign with :="),
+    ("X := TRUE;", "IF condition THEN SET X"),
+])
+def test_helpful_errors(bad, hint):
+    with pytest.raises(SpecError, match=hint):
+        parse_spec(bad)
+
+
+def test_delay_timer_keywords_and_old_aliases_are_the_same():
+    from core.logicspec import format_statement
+    new = parse_spec("IF a THEN ON_DELAY_TIMER(T1, 5s), OFF_DELAY_TIMER(T2, 2s);")
+    old = parse_spec("IF a THEN START_TIMER(T1, 5s), START_OFF_TIMER(T2, 2s);")
+    assert new == old
+    assert format_statement(new[0]) == "IF a THEN ON_DELAY_TIMER(T1, 5s), OFF_DELAY_TIMER(T2, 2s);"

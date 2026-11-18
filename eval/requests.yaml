@@ -1,0 +1,73 @@
+# Evaluation set: plain-English requests and the LogicSpec an engineer expects.
+# Scored by meaning (truth tables), not text, so any equivalent answer passes.
+#   python cli.py eval eval/requests.yaml --model phi4-mini
+# Add requests in your own plant's wording; 30-50 gives a useful comparison.
+# Optional "tags" gives the model existing project tags to use: {name: type}.
+# These requests deliberately differ from inputs/examples.yaml so they test
+# generalisation, not copying.
+
+- request: Run the agitator when the start button is pressed and keep it running until the stop button is pressed.
+  expect: Agitator_Run := (Start_PB OR Agitator_Run) AND NOT Stop_PB;
+  tags: {Start_PB: BOOL, Stop_PB: BOOL, Agitator_Run: BOOL}
+
+- request: Turn the beacon on when the machine is faulted or the e-stop is pressed.
+  expect: Beacon := Machine_Fault OR EStop_Pressed;
+  tags: {Beacon: BOOL, Machine_Fault: BOOL, EStop_Pressed: BOOL}
+
+- request: The heater may only be on when heat is requested, the tank is not empty and there is no over-temperature.
+  expect: Heater_On := Heat_Request AND NOT Tank_Empty AND NOT Over_Temp;
+  tags: {Heater_On: BOOL, Heat_Request: BOOL, Tank_Empty: BOOL, Over_Temp: BOOL}
+
+- request: Give a low pressure alarm if pressure has been below 2 for 10 seconds.
+  expect: Low_Pressure_Alarm := DELAY(Pressure < 2, 10s);
+  tags: {Low_Pressure_Alarm: BOOL, Pressure: REAL}
+
+- request: Keep the exhaust fan running for 2 minutes after the oven turns off.
+  expect: Exhaust_Fan := OFFDELAY(Oven_On, 2min);
+  tags: {Exhaust_Fan: BOOL, Oven_On: BOOL}
+
+- request: Latch the jam alarm when the jam sensor comes on. Reset it with the reset button.
+  expect: |-
+    IF Jam_Sensor THEN SET Jam_Alarm;
+    IF Reset_PB THEN RESET Jam_Alarm;
+  tags: {Jam_Sensor: BOOL, Jam_Alarm: BOOL, Reset_PB: BOOL}
+
+- request: Count bottles on the bottle sensor up to 24. When the count is reached, turn on Case_Full.
+  expect: |-
+    IF Bottle_Sensor THEN COUNT_UP(Bottle_Count, 24);
+    Case_Full := Bottle_Count.DN;
+  tags: {Bottle_Sensor: BOOL, Case_Full: BOOL, Bottle_Count: COUNTER}
+
+- request: Start the pump in auto when level is above 70, or in manual when the hand switch is on.
+  expect: Pump_Run := (Auto_Mode AND Level > 70) OR (Manual_Mode AND Hand_Switch);
+  tags: {Pump_Run: BOOL, Auto_Mode: BOOL, Manual_Mode: BOOL, Hand_Switch: BOOL, Level: REAL}
+
+- request: Each time a part is rejected, add one to the reject total.
+  expect: IF RISE(Part_Rejected) THEN Reject_Total := Reject_Total + 1;
+  tags: {Part_Rejected: BOOL, Reject_Total: DINT}
+
+- request: When the batch starts, copy the recipe temperature into the temperature setpoint.
+  expect: IF RISE(Batch_Start) THEN Temp_SP := Recipe_Temp;
+  tags: {Batch_Start: BOOL, Temp_SP: REAL, Recipe_Temp: REAL}
+
+- request: Open the drain valve when the level is at least 95, close it when the level drops below 50.
+  expect: |-
+    IF Level >= 95 THEN SET Drain_Valve;
+    IF Level < 50 THEN RESET Drain_Valve;
+  tags: {Level: REAL, Drain_Valve: BOOL}
+
+- request: The ready light is on when the machine is not running and there are no faults.
+  expect: Ready_Light := NOT Machine_Running AND NOT Any_Fault;
+  tags: {Ready_Light: BOOL, Machine_Running: BOOL, Any_Fault: BOOL}
+
+- request: Turn the motor off if the overload trips, otherwise run it when commanded.
+  expect: Motor_Run := Motor_Cmd AND NOT Overload;
+  tags: {Motor_Run: BOOL, Motor_Cmd: BOOL, Overload: BOOL}
+
+- request: Clear the shift production count at the start of each shift.
+  expect: IF RISE(Shift_Start) THEN CLEAR Shift_Count;
+  tags: {Shift_Start: BOOL, Shift_Count: DINT}
+
+- request: Flag a stuck valve if it is commanded open for 8 seconds and the open limit switch is still off.
+  expect: Valve_Stuck := DELAY(Valve_Open_Cmd AND NOT Valve_Open_LS, 8s);
+  tags: {Valve_Stuck: BOOL, Valve_Open_Cmd: BOOL, Valve_Open_LS: BOOL}

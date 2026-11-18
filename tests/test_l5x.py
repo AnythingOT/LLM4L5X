@@ -3,10 +3,12 @@ from pathlib import Path
 
 from lxml import etree
 
-from llm4l5x.l5x import cross_reference, read_l5x, write_routine, write_rungs
-from llm4l5x.logicspec.compiler import compile_spec
-from llm4l5x.logicspec.decompiler import try_decompile
-from llm4l5x.validate import errors, validate
+from l5x.reader import read_l5x
+from l5x.writer import write_routine, write_rungs
+from l5x.xref import cross_reference
+from core.compiler import compile_spec
+from explain.decompiler import try_decompile
+from core.validator import errors, validate
 
 FIX = Path(__file__).parent / "fixtures" / "sample_project.L5X"
 SPEC = """Pump := (Start_PB OR Pump) AND NOT Stop_PB;
@@ -88,3 +90,29 @@ def test_decompile_fixture_with_presets():
     main = next(r for r in p.routines if r.name == "MainRoutine")
     out = [try_decompile(r.rung, p.presets())[0] for r in main.rungs[:3]]
     assert all(out)
+
+
+def test_survey_on_fixture_folder(tmp_path):
+    import shutil
+    from explain.survey import survey
+    shutil.copy(FIX, tmp_path / FIX.name)
+    s = survey(tmp_path)
+    assert s.files == 1 and s.rungs == 5 and s.parsed == 4
+    assert s.exact_round_trip == 4 and s.convertible == 3
+    assert "exact round trip" in s.report()
+
+
+def test_string_types_and_protected_aoi_from_l5x():
+    xml = FIX.read_text().replace(
+        "<DataTypes>",
+        '<DataTypes>\n<DataType Name="STR_20" Family="StringFamily" Class="User"><Members/></DataType>', 1,
+    ).replace(
+        "</AddOnInstructionDefinitions>",
+        '<EncodedData EncryptionConfig="3" Type="AddOnInstructionDefinition" Name="Locked_AOI">x</EncodedData>\n'
+        "</AddOnInstructionDefinitions>", 1,
+    )
+    p = read_l5x(xml)
+    assert p.string_types == {"STRING", "STR_20"}
+    assert p.protected_aois == {"Locked_AOI"}
+    spec = p.catalog().get("Locked_AOI")
+    assert spec.variadic and spec.arity_ok(1) and spec.arity_ok(5)

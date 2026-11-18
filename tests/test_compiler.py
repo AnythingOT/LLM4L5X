@@ -2,11 +2,11 @@ import random
 
 import pytest
 
-from llm4l5x.logicspec import Assign, parse_spec
-from llm4l5x.logicspec.compiler import CompileError, Compiler, compile_spec, tag_name_problem
-from llm4l5x.rung import format_rung
-from llm4l5x.sim import Simulator, preset_state
-from llm4l5x.validate import errors, validate
+from core.logicspec import Assign, parse_spec
+from core.compiler import CompileError, Compiler, compile_spec, tag_name_problem
+from core.rung import format_rung
+from core.simulator import Simulator, preset_state
+from core.validator import errors, validate
 from helpers import environments, evaluate, random_expr
 
 
@@ -23,7 +23,7 @@ def test_seal_in():
 
 
 def test_de_morgan_and_comparison_complement():
-    assert texts("Lamp := NOT (A AND (B OR C > 5));") == ["[XIO(A) ,XIO(B)LEQ(C,5) ]OTE(Lamp);"]
+    assert texts("Lamp := NOT (A AND (B OR C > 5));") == ["[XIO(A) ,XIO(B) LEQ(C,5) ]OTE(Lamp);"]
 
 
 def test_nested_or_flattened():
@@ -31,7 +31,7 @@ def test_nested_or_flattened():
 
 
 def test_nested_branch():
-    assert texts("X := (A AND (B OR C)) OR D;") == ["[XIC(A)[XIC(B) ,XIC(C) ] ,XIC(D) ]OTE(X);"]
+    assert texts("X := (A AND (B OR C)) OR D;") == ["[XIC(A) [XIC(B) ,XIC(C) ] ,XIC(D) ]OTE(X);"]
 
 
 def test_comparisons_map_to_logix_mnemonics():
@@ -172,3 +172,36 @@ def test_counter_semantics():
 def test_comments_are_read_back():
     res = compile_spec("Pump := Start OR Pump;")
     assert res.rungs[0].comment.startswith("Pump is on while either Start is on OR Pump is on")
+
+
+def test_v36_mnemonics():
+    spec = "X := A = 1 AND B <> 2 AND C > 3 AND D < 4 AND E >= 5 AND F <= 6; IF G THEN N := 3;"
+    assert texts(spec, revision="36.00") == [
+        "EQ(A,1)NE(B,2)GT(C,3)LT(D,4)GE(E,5)LE(F,6)OTE(X);", "XIC(G)MOVE(3,N);"]
+    assert texts(spec, revision="35.01")[0].startswith("EQU(A,1)NEQ(B,2)GRT(C,3)")
+    assert texts(spec)[1] == "XIC(G)MOV(3,N);"  # unknown version: pre-v36 names
+
+
+def test_v36_rungs_simulate_and_decompile():
+    from explain.decompiler import decompile_rung
+    from core.logicspec import format_spec
+    res = compile_spec("X := N > 5 AND NOT (M = 2);", comments=False, revision="36")
+    assert res.texts == ["GT(N,5)NE(M,2)OTE(X);"]
+    assert Simulator(res.rungs, {"N": 6, "M": 1}).scan()["X"] is True
+    assert format_spec(decompile_rung(res.rungs[0])) == "X := N > 5 AND M <> 2;"
+
+
+def test_simulator_add_with_zero_does_not_evaluate_division():
+    # regression: all four results used to be computed up front, so ADD(x,0,z) raised
+    from core.rung import parse_rung
+    sim = Simulator([parse_rung("ADD(A,B,C);")], {"A": 3, "B": 0})
+    assert sim.scan()["C"] == 3
+
+
+def test_reset_only_counter_or_timer_is_created_with_a_warning():
+    from core.compiler import compile_spec
+    r = compile_spec("IF a THEN RESET_ACC Part_CTR, RESET_ACC Fill_TMR;", comments=False)
+    assert r.tags["Part_CTR"].datatype == "COUNTER" and r.tags["Fill_TMR"].datatype == "TIMER"
+    assert any("Part_CTR is new and only reset here" in w for w in r.warnings)
+    r = compile_spec("IF r THEN RESET_ACC Box;\nIF b THEN COUNT_UP(Box, 12);", comments=False)
+    assert r.tags["Box"].preset == 12 and not r.warnings

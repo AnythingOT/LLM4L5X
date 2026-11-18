@@ -1,109 +1,230 @@
 # LLM4L5X
 
-Plain English → ladder logic for Rockwell Studio 5000, importable as L5X, built for **small local LLMs** (under ~14B, no fine-tuning). It also reads L5X exports back into structured data.
+Plain English → ladder logic for Rockwell Studio 5000, importable as L5X, and back again. Everything runs on your PC with a **small local model** via Ollama. No cloud, no fine-tuning.
 
-The model never writes rung text or XML. It writes **LogicSpec**, a tiny boolean language. Deterministic code compiles that into rungs (branches included), validates them and writes the L5X.
-
-```
-English ──(local LLM, grammar-constrained)──> LogicSpec ──(compiler)──> rung AST ──> validator ──> L5X
-                                                  ▲                                     │
-                        few-shot examples <── decompiler <── rungs from your exports <──┘
-```
-
-**Status:** the deterministic core is done and tested (108 tests). The LLM layer is not built yet. Nothing has been import-tested in Studio 5000 yet; see [Unverified](#unverified). Full design and roadmap: [HANDOFF.md](HANDOFF.md).
-
-## Why a boolean language instead of rung text
-
-In ladder logic, series is AND and parallel is OR. Logix rungs can't express bridge circuits, so the condition side of every rung is exactly an AND/OR tree. Small models have seen huge amounts of boolean expressions and very little bracketed rung text, so they write the expression and the compiler builds the branches:
+The model only writes **LogicSpec**, a tiny boolean language. Deterministic code compiles that into rungs (branches included), checks them and writes the L5X. If the model's answer fails a check, the exact error goes back to it for another try. Nothing the model writes reaches an L5X unchecked.
 
 ```
-Pump := (Start_PB OR Pump) AND NOT Stop_PB AND NOT Fault;
-→ [XIC(Start_PB) ,XIC(Pump) ]XIO(Stop_PB)XIO(Fault)OTE(Pump);
-
-Lamp := NOT (A AND (B OR C > 5));          # NOT pushed down with De Morgan
-→ [XIO(A) ,XIO(B)LEQ(C,5) ]OTE(Lamp);
+English ─> local model ─> LogicSpec ─> compiler ─> rungs ─> validator ─> L5X
+                 ▲ retry with the error  │
+                                     ▲
+       existing L5X ─> reader ─> decompiler ─> LogicSpec + plain English
 ```
 
-The compiler is checked by truth-table equivalence. For random expressions, the compiled rung run through a scan simulator must match the expression for every input combination.
+## Quick start (Windows)
 
-## Install and use
+1. Install **Python 3.10+** from python.org and tick **"Add python.exe to PATH"**.
+2. Download or clone this repo.
+3. Double-click **`start.bat`**. The first run installs everything into `.venv`; after that it just opens the GUI at http://127.0.0.1:5000.
 
-```bash
-pip install -e .[test]      # needs lxml, PyYAML; pytest for tests
-pytest
+Manual alternative from the repo folder (Linux/macOS: `./start.sh`):
+```
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+python app.py
 ```
 
-```bash
-# LogicSpec -> rungs (+ L5X). Read-back of each statement goes to stderr.
-llm4l5x compile "Pump := (Start_PB OR Pump) AND NOT Stop_PB;" -o pump.L5X
-llm4l5x compile spec.txt --routine Generated -o routine.L5X          # whole routine
-llm4l5x compile spec.txt --project plant.L5X --program MainProgram  # use real tag types
+## Plain English (needs a local model)
 
-# Existing code -> information
-llm4l5x inspect plant.L5X                 # summary
-llm4l5x inspect plant.L5X --decompile     # every rung as LogicSpec, or why not
-llm4l5x inspect plant.L5X --xref Pump     # who reads/writes Pump
-llm4l5x validate plant.L5X
-llm4l5x rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+Pick where the model runs on the ⚙️ Settings page (or click the model badge in the header). The model list is read from the server.
 
-# llama.cpp grammar restricted to a project's real tags (experimental)
-llm4l5x grammar --project plant.L5X --program MainProgram > logicspec.gbnf
+| Runs on | Start it | Answers |
+|---|---|---|
+| **Ollama** (default) | install from ollama.com, `ollama pull phi4-mini` | free text; syntax mistakes are sent back to the model to fix |
+| **llama.cpp server**, direct GGUF | `llama-server -m model.gguf --port 8080` (Windows CPU build from llama.cpp's GitHub releases, GGUF from Hugging Face) | **grammar-constrained**: every answer is valid LogicSpec using only allowed tag names |
+| OpenAI-compatible (LM Studio, Jan, vLLM) | start its local server | free text, as Ollama |
+
+### The setup that worked for us
+
+**Qwen3.6-35B-A3B, `UD-Q4_K_M` GGUF ([unsloth/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF), about 22 GB) on llama.cpp's `llama-server`, CPU only, 64 GB RAM, no GPU.**
+
+- 238/240 on a fresh instruction-suite seed (226/240 and 114/120 on earlier seeds, before suite fixes), about 12 s per request.
+- With this model the grammar made no measurable difference (113 vs 114 of 120 on the same seed): it is insurance against unparseable answers. For a small model it matters: with phi4-mini, malformed answers were 65 of its 98 failures.
+
+Start the server in its own terminal and keep it open while you use the app:
+
+```
+llama-server -m "C:\path\to\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf" --alias Qwen3.6-35B-A3B --host 127.0.0.1 --port 8080 -c 16384 --jinja
 ```
 
-## LogicSpec reference
+- `--jinja` is required: the app switches thinking off through the model's chat template.
+- Do **not** add `--reasoning-budget 0`: it breaks the grammar ("Unexpected empty grammar stack"). The app turns thinking off per request instead.
+- `--host 127.0.0.1` keeps the server reachable from this PC only; llama-server has no password.
+- `-c 16384` covers the prompt, your project's tags and the answer; raise it for very large projects.
+- `--alias` only sets the model name shown in the app.
+
+Then start the app (`start.bat`) and choose **llama.cpp** in ⚙️ Settings; `http://127.0.0.1:8080` is the default address. Settings only says where the server is; it does not start it.
+
+Ollama's `qwen3.6:35b-a3b` is the same model but untested here. If you use it, set **Thinking: off** in Settings (Ollama's default for Qwen3.6 is on, which is much slower on a CPU), and note that Ollama accepts no GBNF grammar.
+
+1. Start a model server (above).
+2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
+3. You get a plain-English read-back of what the rungs do, the rungs, the tags, the checks, **Copy** and **Download**. Check the read-back first: it says what the logic will actually do.
+
+**Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*).
+
+Improve results without fine-tuning by adding examples in your plant's wording to `inputs/examples.yaml`. The most similar ones are shown to the model for each request.
+
+**Compare models by measurement:** `python cli.py eval --model phi4-mini` scores a model on `eval/requests.yaml` by meaning (truth tables), not text. Add your own requests there.
+
+## Instruction test suite (series, parallel, nested)
+
+`eval/suite.py` generates English requests with expected rungs for 24 instructions (XIC XIO OTE OTL OTU ONS, EQ NE GT LT GE LE, ADD SUB MUL DIV, MOVE COP CLR, TON TOF CTU CTD RES) in five structures: single, series, parallel, nested and multi-output. Example:
+
+> *When either both Door_Open is not active and Manual_Mode is on, or Scaled_Value is not equal to 10, set Ready_Light and keep it set.*
+> → `[XIO(Door_Open) XIC(Manual_Mode) ,NEQ(Scaled_Value,10) ]OTL(Ready_Light);`
+
+Answers are scored by **behaviour, not text**. Expected and produced rungs run in the scan simulator on the same random input sequences, over time for timers, and every output is compared. The comparator catches about 99% of deliberately broken rungs, and the old Excel `EXACT` would wrongly fail about 9% of correct answers.
+
+```
+python cli.py suite --self-test --per 10                                  # compiler vs reference, no model
+python cli.py suite --model phi4-mini --per 2 --excel suite_phi4.xlsx      # your model, Excel report
+python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a subset
+```
+`--version 36` uses the v36 names (EQ, GT, MOVE …). On CPU, a model run costs roughly (cases × seconds per request). `--per 1` is 120 cases.
+
+## GUI
+
+Three pages, AnythingOT look, light and dark. Press **?** on the chat page for the help popup; **ⓘ** in the input box shows examples and project commands.
+
+- **Chat** (`/`)
+  - **Plain English → ladder** (needs a model). Read-back, rungs, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
+  - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the other form, what each rung does in English, the checks, **Copy** (the other form) and **Download**.
+  - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `xref TagName`.
+  - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
+  - **Logic | UDT** switch in the input box. In UDT mode you create data types (below).
+- **Settings** (`/settings`): model (backend, address, model, thinking), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
+- **Rules** (`/rules`): the 49 validation rules, grouped, with search and severity filter; switch each on or off.
+
+## UDTs: create and optimize
+
+Switch the input box to **UDT**.
+
+| Input | Uses the model | Output |
+|---|---|---|
+| Plain English: *"a motor with running and faulted bits, speed in rpm and 32 alarm bits"* | yes | `Name.L5X`, or `UDTs.zip` for several |
+| The UDT text form (`UDT Name "desc";` then `Member TYPE[n] "desc";` lines) | no | same |
+| An Excel sheet (`.xlsx`, template under ⓘ: one row per member, blank UDT cell = same UDT as above) | no | same |
+| An attached UDT export, or a program, then **optimize UDTs** | no | `Name_opt.L5X`, a zip of them, or the whole program |
+
+- New UDTs are checked (names, types, BOOL arrays in multiples of 32, nesting loops, names already in the attached project) and written in the order that wastes no memory: BOOLs packed into hidden SINT hosts the way Studio 5000 names them, then members by alignment. The model writes only the UDT text form, under a grammar on llama.cpp; a failed check goes back to it, as for rungs.
+- **Optimize** reorders members only. Every member's XML (descriptions, radix, external access, CDATA) is kept byte for byte; only BIT positions change. It shows per UDT the bytes now → after, instances (nested ones included) and the total saved, and flags what depends on byte offsets: COP/CPS, MSG local elements, produced/consumed tags. Only UDTs that save bytes and have no such risk are ticked.
+- The **whole-program** file also has to move tag values: each tag value is stored twice, by member name (Decorated) and by position (L5K). For affected tags the L5K copy is removed and the Decorated copy kept. UDTs used inside an AOI, or with a tag that has only L5K values, are left out, and the download says so. **Not yet confirmed by an import test: test it on a copy before you rely on it.**
+- Sizes are computed from the layout rules, not read from Studio 5000. A UDT can only be changed offline.
+
+This replaces two archived repos: [LLM4UDT](https://github.com/AnythingOT/LLM4UDT) (UDTs from English, L5X and CSV/Excel) and [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer). The optimizer here gives the same orders and sizes as L5X_UDTOptimizer on its samples.
+
+## Validate: import checks and rules
+
+`validate` (GUI, or `python cli.py validate plant.L5X`) runs two layers:
+
+1. **Import checks** (`core/validator.py`): will Studio 5000 accept it. Syntax, operand count and types, tags that exist, instruction names for the target version (GRT before v36, GT from v36).
+2. **Rules** (`lint/`): 49 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Rules page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
+   - 19 *rung* rules (duplicate OTE, reused timer or one-shot, unguarded division, unchecked array index, writes to status bits ...) also check every generated or pasted rung. Two of them, a reused timer and a reused one-shot, send the model back for another attempt.
+   - 30 *project* rules (fault handlers, task watchdogs and names, uncalled routines, unscheduled programs, I/O mapping and comments, aliases, electronic keying, module lifecycle, UDT padding and order, descriptions ...) need a full controller export; on a partial export only the rung rules run, and the report says so.
+   - Accept one case by writing `lint:disable=ERR010` (or `lint:disable` for all rules) in that rung's comment or that tag's or AOI's description. Suppressed findings are listed separately, never dropped.
+   - Rules that an export cannot answer (no MajorFaultProgram attribute, say) are reported as *not verified*, not as passed. A rule that crashes is reported too.
+   - Module lifecycle uses `lint/lifecycle.json`: seed data from public Rockwell discontinuation notices, dated in its `_meta`. Check it against Rockwell's PCDC before buying anything, and edit the file to add your modules.
+
+`python cli.py validate --rules` lists the rules. The rules are a rewrite, for this repo's parser and data model, of the checklist in [L5X_Lint](https://github.com/AnythingOT/L5X_Lint), with the same codes.
+
+The server listens on `127.0.0.1` only, so nothing leaves your PC.
+
+## LogicSpec in one minute
 
 | LogicSpec | Ladder |
 |---|---|
 | `X := expr;` | conditions then `OTE(X)` |
-| `IF expr THEN action, action;` | conditions then the action, or an output branch for several |
+| `IF expr THEN action, action;` | conditions then the action(s); several become an output branch |
 | `IF TRUE THEN action;` | unconditional |
 | `A` / `NOT A` | `XIC(A)` / `XIO(A)` |
-| `a AND b` | series |
-| `a OR b` | branch |
-| `N = 5`, `<>`, `>`, `<`, `>=`, `<=` | `EQU NEQ GRT LES GEQ LEQ` |
-| `RISE(expr)` | `ONS` with an auto storage bit (helper rung if not first on the rung) |
-| `DELAY(expr, 5s [, Timer])` | helper rung `expr TON(T,?,?)`, then `XIC(T.DN)` |
-| `OFFDELAY(expr, 2s [, Timer])` | same with `TOF` |
+| `a AND b` / `a OR b` | series / branch |
+| `N = 5` `<>` `>` `<` `>=` `<=` | `EQU NEQ GRT LES GEQ LEQ`, or `EQ NE GT LT GE LE` for v36+ |
+| `RISE(expr)` | `ONS` with an auto storage bit |
+| `DELAY(expr, 5s [, Timer])` | helper rung `expr TON(T,?,?)`, then `XIC(T.DN)` (`OFFDELAY` → `TOF`) |
 
-Actions: `SET X`, `RESET X`, `CLEAR N`, `RESET_ACC T`, `COUNT_UP(C, 10)`, `COUNT_DOWN(C, 10)`, `START_TIMER(T, 5s)`, `START_OFF_TIMER(T, 5s)`, `N := A`, `N := A + B` (`-`, `*`, `/`).
+Actions: `SET X`, `RESET X`, `CLEAR N`, `RESET_ACC T`, `COUNT_UP(C, 10)`, `COUNT_DOWN(C, 10)`, `ON_DELAY_TIMER(T, 5s)`, `OFF_DELAY_TIMER(T, 5s)` (older `START_TIMER`/`START_OFF_TIMER` still accepted), `N := A`, `N := A + B` (`-` `*` `/`).
 
 Rules:
-- **AND and OR can't be mixed at one level without parentheses.** `A AND B OR C` is rejected, so precedence mistakes can't happen.
-- At statement level `:=` is always a boolean output. Inside `IF ... THEN` it's a move or arithmetic.
-- Durations: `ms`, `s`, `min` (or `m`), `h`. Keywords are case-insensitive and reserved.
-- **Tag types are inferred** from use: contacts and coils are BOOL, comparisons and math are DINT (REAL if a decimal literal is involved), plus TIMER and COUNTER. Pass `--project` to use the real types and avoid creating tags that already exist.
-- Compiler-made tags are named `L4X_ONS_n`, `L4X_EDGE_n`, `L4X_TMR_n` (`--prefix` changes it).
-- **Each rung gets an English comment** generated from the LogicSpec. Use it to check intent before importing.
+- **AND and OR can't be mixed without parentheses**, so precedence mistakes are impossible.
+- `:=` at statement level is a coil; inside `IF … THEN` it's a move or math.
+- Tag types are inferred from use. Attach your project so existing tags are reused instead of created.
+- **Instruction names follow your Logix Designer version.** v36 renamed `GRT`→`GT`, `EQU`→`EQ`, `MOV`→`MOVE` and others. Set ⚙️ *Logix Designer version*; attaching a project sets it automatically.
 
-## Layout
+Full reference and design: [docs/DESIGN.md](docs/DESIGN.md).
+
+## Command line
+
+Run from the repo folder with `.venv` active:
+```
+python cli.py compile examples\pump_station.spec -o pump.L5X
+python cli.py compile spec.txt --routine Generated --project plant.L5X --program MainProgram -o r.L5X
+python cli.py inspect plant.L5X --decompile
+python cli.py inspect plant.L5X --xref Pump
+python cli.py validate plant.L5X --disable INF003,INF004
+python cli.py validate --rules
+python cli.py survey folder_of_exports
+python cli.py ask "run the pump from start, stop with stop" --project plant.L5X --model phi4-mini -o pump.L5X
+python cli.py eval --model qwen3.6:35b-a3b --no-think
+python cli.py suite --backend llamacpp --per 1 --excel suite_llamacpp.xlsx   # grammar-constrained
+python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
+```
+
+## Repo layout
 
 ```
-src/llm4l5x/
-  catalog/      instructions.yaml (single source of truth) + loader; AOIs extend it
-  rung/         neutral-text AST, parser, printer (lossless round trip)
-  logicspec/    parser, compiler, decompiler, English describer, GBNF builder
-  sim/          scan simulator (bits, compares, ONS, TON/TOF/RTO, CTU/CTD, math)
-  validate/     operand counts/types/roles, ONS reuse, duplicate coils, timer reuse, unknown tags
-  l5x/          reader (secure lxml), writer (Rung and Routine targets), cross-reference
-  cli.py
-tests/          108 tests incl. truth-table property tests; fixtures/ is hand-written, not a real export
+app.py              GUI server (python app.py)
+cli.py              command line (python cli.py ...)
+core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
+                    compiler.py, validator.py, simulator.py
+l5x/                reader.py, writer.py, xref.py
+lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, paths.py, lifecycle.json
+udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
+                    writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
+                    an existing export, byte-preserving)
+explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
+inputs/             llm.py (Ollama/llama.cpp, English -> LogicSpec), examples.yaml (few-shot), gbnf.py,
+                    udt_llm.py (English -> UDT text form)
+eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
+                    instruction suite), rung_compare.py (behavioural oracle), mutation.py
+gui/                templates/ (base, index, settings, rules), static/ (style.css, common.js,
+                    app.js, settings.js, rules.js, favicon.ico)
+tests/              pytest (299 tests); fixtures/ are hand-written, except studio_single_udt.L5X (the public L5X_UDTOptimizer sample)
+examples/  docs/
+requirements.txt  start.bat  start.sh
 ```
 
-## Unverified
+Run the tests with `pytest` from the repo folder.
 
-These details come from memory, not from real exports, and need confirming by importing into Studio 5000 (HANDOFF.md section 9):
+## Neutral text vs ASCII text
 
-- **Timer/counter operands:** written as `TON(T,?,?)` with the preset in tag data. If import rejects this, use `--display values` to get `TON(T,5000,0)`.
-- **TIMER/COUNTER L5K data layout** `[0,PRE,0]`.
-- **Exact export whitespace inside branches.** The parser accepts any whitespace; the printer emits `[A ,B ]`.
-- **AOI call operands:** assumed to be the instance tag plus required parameters, in definition order.
-- **Rung-export element layout** (`Use` attributes, where tags go).
+| | Neutral | ASCII |
+|---|---|---|
+| Example | `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` | `XIC a BST XIC b NXB XIO c BND OTE d` |
+| Branches | `[` `,` `]` | `BST` `NXB` `BND` |
+| In L5X files | **yes, always** | never |
 
-**Real L5X exports are the next thing needed.** Run `llm4l5x inspect your.L5X --decompile` and `validate` on them and fix whatever disagrees.
+LLM4L5X always writes neutral text into L5X. Generated rungs are also shown as ASCII, so you can paste a single rung into the editor's ASCII mode. Reading ASCII needs each instruction's operand count, so Add-On Instructions are only understood when the project defining them is attached. An operand containing spaces (e.g. a `CPT` expression) is written in double quotes; whether the editor expects exactly that is **unverified**.
+
+## Checked against real exports
+
+The parser was checked against 179 public L5X exports (3,160 rungs, including Rockwell's own samples):
+**100% parse, 99.9% print back byte-for-byte, 99.9% survive neutral → ASCII → neutral**, and the timer format `TON(T,?,?)`, the timer
+data layout and the AOI call format are all confirmed. Details are in docs/DESIGN.md section 9.
+Run the same check on your own exports:
+
+```
+python cli.py survey C:\path\to\your\exports
+```
+
+**Import verified:** generated Rung and Routine L5X files import cleanly into Studio 5000.
+Still to confirm: a timer import keeps its preset.
 
 ## Safety
 
-Generated code is a draft for an engineer to review. Read the rung comments, verify offline, and never auto-download to a running controller. Keep safety routines out of scope.
+Generated code is a draft for an engineer. Read the English read-back, verify offline, and never download straight to a running controller. Keep safety routines out of scope.
 
 ## License
 

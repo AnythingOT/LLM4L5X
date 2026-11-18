@@ -1,18 +1,21 @@
 import pytest
 
-from llm4l5x.rung import Branch, Instr, RungSyntaxError, base_tag, format_rung, is_literal, normalize, parse_rung
+from core.rung import Branch, Instr, RungSyntaxError, base_tag, format_rung, is_literal, normalize, parse_rung
 
 ROUND_TRIP = [
     "XIC(a)OTE(b);",
     "XIC(Start)[XIC(Run) ,XIO(Stop) ]OTE(Motor);",
     "[XIC(a) ,XIC(b) ,XIC(c) ]OTE(d);",
-    "[XIC(a)[XIC(b) ,XIC(c) ] ,XIO(d) ]OTE(e);",
+    "[XIC(a) [XIC(b) ,XIC(c) ] ,XIO(d) ]OTE(e);",
     "XIC(a)[OTE(b) ,OTL(c) ,MOV(5,d) ];",
     "XIC(Local:1:I.Data.0)XIC(Arr[3].Member.2)OTE(Out[Idx+1]);",
     "TON(T1,?,?);",
     "CPT(Dest,(A + B) * 2.5);",
     "NOP();",
-    "XIC(a)[ ,XIC(b) ]OTE(c);",
+    "XIC(a)[,XIC(b) ]OTE(c);",
+    "XIC(a)[XIC(b) ,]OTE(c);",
+    # verbatim from Rockwell's public ra-logix-cicd sample export
+    "XIC(I_ToggleEnable_LocalTag)[XIC(I_ToggleSINT_LocalTag) MOVE(127,O_SINT_LocalTag) ,XIO(I_ToggleSINT_LocalTag) MOVE(-128,O_SINT_LocalTag) ];",
     "MOV(16#FF,x);",
 ]
 
@@ -23,7 +26,7 @@ def test_round_trip_exact(text):
 
 
 def test_whitespace_tolerant():
-    assert normalize("  XIC( a )  [ XIC(b),XIO(c) ]  OTE(d) ; ") == "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
+    assert normalize("  XIC( a )  [ XIC(b)XIO(e),XIO(c) ]  OTE(d) ; ") == "XIC(a)[XIC(b) XIO(e) ,XIO(c) ]OTE(d);"
 
 
 def test_structure():

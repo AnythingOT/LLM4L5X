@@ -1,0 +1,1026 @@
+# Instruction catalog: the single source of truth for the parser, validator,
+# compiler, simulator and prompt snippets.
+#
+# Core set hand-checked; operand counts of everything below were confirmed
+# against 3,160 rungs from public Studio 5000 exports (2026-11-17), except
+# entries marked 'not seen in samples'. Semantics come from Rockwell docs.
+#
+# kind:
+#   input   - a condition instruction; passes rung power only when true
+#   output  - acts on rung power and passes it through unchanged
+# operand fields:
+#   name    - operand name
+#   type    - BOOL | NUMERIC | TIMER | COUNTER | ANY | ROUTINE | EXPR
+#             | NAME (an object/class/attribute name or keyword such as ALL, not a tag)
+#             | COMPARABLE (numeric or string: compare instructions accept strings)
+#   optional - operand may be blank or '?' (e.g. GSV/SSV instance for classes without instances)
+#   display operands of file/FIFO/sequencer instructions show CONTROL.LEN / .POS and export as '?'
+#   role    - read | write | struct (control structure, read and written)
+#             | display (shown on the instruction, really a tag member;
+#               exported as "?" -- confirmed, see docs/DESIGN.md section 9)
+#   member  - for display operands: the member of the struct operand it shows
+# version fields (Logix Designer major version):
+#   max_version / renamed_to - mnemonic replaced in v36 (Rockwell "Updated
+#     instruction mnemonics": EQU->EQ, NEQ->NE, GRT->GT, LES->LT, GEQ->GE,
+#     LEQ->LE, LIM->LIMIT, MOV->MOVE, SQR->SQRT, ...)
+#   min_version - mnemonic introduced in that version
+
+XIC:
+  kind: input
+  description: Examine if closed. True when the bit is 1.
+  operands:
+    - {name: data_bit, type: BOOL, role: read}
+
+XIO:
+  kind: input
+  description: Examine if open. True when the bit is 0.
+  operands:
+    - {name: data_bit, type: BOOL, role: read}
+
+OTE:
+  kind: output
+  description: Output energize. Writes rung condition to the bit every scan.
+  operands:
+    - {name: output_bit, type: BOOL, role: write}
+
+OTL:
+  kind: output
+  description: Output latch. Sets the bit when the rung is true; never clears it.
+  operands:
+    - {name: output_bit, type: BOOL, role: write}
+
+OTU:
+  kind: output
+  description: Output unlatch. Clears the bit when the rung is true.
+  operands:
+    - {name: output_bit, type: BOOL, role: write}
+
+ONS:
+  kind: input
+  description: One shot. True for one scan when rung-condition-in goes false to true. Needs a unique storage bit per instance.
+  operands:
+    - {name: storage_bit, type: BOOL, role: struct}
+
+TON:
+  kind: output
+  description: Timer on delay. DN sets after the rung has been true for PRE milliseconds.
+  operands:
+    - {name: timer, type: TIMER, role: struct}
+    - {name: preset, type: NUMERIC, role: display, member: PRE}
+    - {name: accum, type: NUMERIC, role: display, member: ACC}
+
+TOF:
+  kind: output
+  description: Timer off delay. DN clears PRE milliseconds after the rung goes false.
+  operands:
+    - {name: timer, type: TIMER, role: struct}
+    - {name: preset, type: NUMERIC, role: display, member: PRE}
+    - {name: accum, type: NUMERIC, role: display, member: ACC}
+
+RTO:
+  kind: output
+  description: Retentive timer on. Accumulates while true, keeps ACC when false. Reset with RES.
+  operands:
+    - {name: timer, type: TIMER, role: struct}
+    - {name: preset, type: NUMERIC, role: display, member: PRE}
+    - {name: accum, type: NUMERIC, role: display, member: ACC}
+
+CTU:
+  kind: output
+  description: Count up. ACC increments on each false-to-true rung transition.
+  operands:
+    - {name: counter, type: COUNTER, role: struct}
+    - {name: preset, type: NUMERIC, role: display, member: PRE}
+    - {name: accum, type: NUMERIC, role: display, member: ACC}
+
+CTD:
+  kind: output
+  description: Count down. ACC decrements on each false-to-true rung transition.
+  operands:
+    - {name: counter, type: COUNTER, role: struct}
+    - {name: preset, type: NUMERIC, role: display, member: PRE}
+    - {name: accum, type: NUMERIC, role: display, member: ACC}
+
+RES:
+  kind: output
+  description: Reset a timer or counter structure.
+  operands:
+    - {name: structure, type: ANY, role: struct}
+
+EQU:
+  kind: input
+  max_version: 35
+  renamed_to: EQ
+  description: Equal. True when A = B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+NEQ:
+  kind: input
+  max_version: 35
+  renamed_to: NE
+  description: Not equal. True when A <> B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+GRT:
+  kind: input
+  max_version: 35
+  renamed_to: GT
+  description: Greater than. True when A > B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LES:
+  kind: input
+  max_version: 35
+  renamed_to: LT
+  description: Less than. True when A < B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+GEQ:
+  kind: input
+  max_version: 35
+  renamed_to: GE
+  description: Greater than or equal. True when A >= B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LEQ:
+  kind: input
+  max_version: 35
+  renamed_to: LE
+  description: Less than or equal. True when A <= B.
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LIM:
+  kind: input
+  max_version: 35
+  renamed_to: LIMIT
+  description: Limit test. True when Test is between Low and High.
+  operands:
+    - {name: low_limit, type: NUMERIC, role: read}
+    - {name: test, type: NUMERIC, role: read}
+    - {name: high_limit, type: NUMERIC, role: read}
+
+MOV:
+  kind: output
+  max_version: 35
+  renamed_to: MOVE
+  description: Move. Dest = Source.
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+ADD:
+  kind: output
+  description: Add. Dest = A + B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+SUB:
+  kind: output
+  description: Subtract. Dest = A - B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+MUL:
+  kind: output
+  description: Multiply. Dest = A * B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+DIV:
+  kind: output
+  description: Divide. Dest = A / B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+CLR:
+  kind: output
+  description: Clear. Dest = 0.
+  operands:
+    - {name: dest, type: NUMERIC, role: write}
+
+COP:
+  kind: output
+  description: Copy file. Copies Length elements from Source to Dest.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+    - {name: length, type: NUMERIC, role: read}
+
+CPT:
+  kind: output
+  description: Compute. Dest = expression.
+  operands:
+    - {name: dest, type: NUMERIC, role: write}
+    - {name: expression, type: EXPR, role: read}
+
+NOP:
+  kind: output
+  description: No operation.
+  operands: []
+
+AFI:
+  kind: input
+  description: Always false. Used to disable a rung.
+  operands: []
+
+JSR:
+  kind: output
+  description: Jump to subroutine. Further operands are input/return parameters.
+  variadic: true
+  operands:
+    - {name: routine_name, type: ROUTINE, role: read}
+    - {name: input_count, type: NUMERIC, role: read}
+
+OSR:
+  kind: output
+  description: One shot rising with output. Output bit is true for one scan when the rung goes true.
+  operands:
+    - {name: storage_bit, type: BOOL, role: struct}
+    - {name: output_bit, type: BOOL, role: write}
+
+OSF:
+  kind: output
+  description: One shot falling with output (not seen in samples).
+  operands:
+    - {name: storage_bit, type: BOOL, role: struct}
+    - {name: output_bit, type: BOOL, role: write}
+
+MOVE:
+  kind: output
+  min_version: 36
+  description: Move (v36+ name of MOV; also moves strings). Seen in Rockwell's v36 sample exports.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+
+CMP:
+  kind: input
+  description: Compare. True when the expression is true.
+  operands:
+    - {name: expression, type: EXPR, role: read}
+
+MOD:
+  kind: output
+  description: Modulo. Dest = A MOD B.
+  operands:
+    - {name: source_a, type: NUMERIC, role: read}
+    - {name: source_b, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+NEG:
+  kind: output
+  description: Negate. Dest = -Source (not seen in samples).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+ABS:
+  kind: output
+  description: Absolute value (not seen in samples).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+FLL:
+  kind: output
+  description: File fill. Fills Length elements of Dest with Source.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+    - {name: length, type: NUMERIC, role: read}
+
+MVM:
+  kind: output
+  description: Masked move. Dest = (Source AND Mask) OR (Dest AND NOT Mask).
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: mask, type: NUMERIC, role: read}
+    - {name: dest, type: NUMERIC, role: write}
+
+CONCAT:
+  kind: output
+  description: String concatenate. Dest = A + B.
+  operands:
+    - {name: source_a, type: ANY, role: read}
+    - {name: source_b, type: ANY, role: read}
+    - {name: dest, type: ANY, role: write}
+
+RTOS:
+  kind: output
+  description: Real to string.
+  operands:
+    - {name: source, type: NUMERIC, role: read}
+    - {name: dest, type: ANY, role: write}
+
+GSV:
+  kind: output
+  description: Get system value.
+  operands:
+    - {name: class_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read, optional: true}
+    - {name: attribute_name, type: NAME, role: read}
+    - {name: dest, type: ANY, role: write}
+
+SSV:
+  kind: output
+  description: Set system value.
+  operands:
+    - {name: class_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read, optional: true}
+    - {name: attribute_name, type: NAME, role: read}
+    - {name: source, type: ANY, role: read}
+
+EVENT:
+  kind: output
+  description: Trigger an event task.
+  operands:
+    - {name: task, type: NAME, role: read}
+
+PID:
+  kind: output
+  description: PID loop. Operand names from Rockwell's neutral-text table.
+  operands:
+    - {name: pid, type: ANY, role: struct}
+    - {name: process_variable, type: ANY, role: read}
+    - {name: tieback, type: ANY, role: read}
+    - {name: control_variable, type: ANY, role: write}
+    - {name: pid_master_loop, type: ANY, role: read}
+    - {name: inhold_bit, type: ANY, role: read}
+    - {name: inhold_value, type: ANY, role: read}
+
+# ---- v36+ mnemonics (IEC 61131-3 / PLCopen names) ----
+
+EQ:
+  min_version: 36
+  kind: input
+  description: Equal. True when A = B. (v36+ name of EQU)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+NE:
+  min_version: 36
+  kind: input
+  description: Not equal. True when A <> B. (v36+ name of NEQ)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+GT:
+  min_version: 36
+  kind: input
+  description: Greater than. True when A > B. (v36+ name of GRT)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LT:
+  min_version: 36
+  kind: input
+  description: Less than. True when A < B. (v36+ name of LES)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+GE:
+  min_version: 36
+  kind: input
+  description: Greater than or equal. True when A >= B. (v36+ name of GEQ)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LE:
+  min_version: 36
+  kind: input
+  description: Less than or equal. True when A <= B. (v36+ name of LEQ)
+  operands:
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
+
+LIMIT:
+  min_version: 36
+  kind: input
+  description: Limit test. True when Test is between Low and High. (v36+ name of LIM)
+  operands:
+    - {name: low_limit, type: NUMERIC, role: read}
+    - {name: test, type: NUMERIC, role: read}
+    - {name: high_limit, type: NUMERIC, role: read}
+
+# ---- From Rockwell's 'Neutral text for ladder instructions' table (FactoryTalk Design
+# ---- Studio docs, fetched 2026-11-17): operand lists as published; kinds and roles
+# ---- assigned by us. Types are ANY (no type check) unless obvious.
+
+ACOS:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+AND:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ASIN:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ATAN:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+AVE:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+BRK:
+  kind: output
+  operands: []
+
+
+BSL:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+
+
+BSR:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+
+
+BTD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: source_bit, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: destination_bit, type: ANY, role: read}
+    - {name: length, type: ANY, role: read}
+
+
+COS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+CPS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: length, type: ANY, role: read}
+
+
+DEG:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DELETE:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: quantity, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DTOS:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+DTR:
+  kind: input
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: reference, type: ANY, role: struct}
+
+
+EOT:
+  kind: output
+  operands:
+    - {name: data_bit, type: BOOL, role: read}
+
+
+ESTOP:
+  kind: output
+  operands:
+    - {name: estop_tag, type: ANY, role: struct}
+    - {name: reset_type, type: ANY, role: read}
+    - {name: channel_A, type: ANY, role: read}
+    - {name: channel_B, type: ANY, role: read}
+    - {name: circuit_reset, type: ANY, role: read}
+    - {name: fault_reset, type: ANY, role: read}
+
+
+FAL:
+  kind: output
+  operands:
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+    - {name: mode, type: NAME, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: expression, type: EXPR, role: read}
+
+
+FBC:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: reference, type: ANY, role: struct}
+    - {name: result, type: ANY, role: write}
+    - {name: cmp_control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+    - {name: result_control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+FFL:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: FIFO, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+FFU:
+  kind: output
+  operands:
+    - {name: FIFO, type: ANY, role: struct}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+FIND:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: search, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: result, type: ANY, role: write}
+
+
+FOR:
+  kind: output
+  operands:
+    - {name: routine_name, type: ROUTINE, role: read}
+    - {name: index, type: ANY, role: struct}
+    - {name: initial_value, type: ANY, role: read}
+    - {name: terminal_value, type: ANY, role: read}
+    - {name: step_size, type: ANY, role: read}
+
+
+BCD_TO:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+FSC:
+  kind: output
+  operands:
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+    - {name: mode, type: NAME, role: read}
+    - {name: expression, type: EXPR, role: read}
+
+
+INSERT:
+  kind: output
+  operands:
+    - {name: sourceA, type: ANY, role: read}
+    - {name: sourceB, type: ANY, role: read}
+    - {name: start, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+IOT:
+  kind: output
+  operands:
+    - {name: output_tag, type: ANY, role: read}
+
+
+JMP:
+  kind: output
+  operands:
+    - {name: label_name, type: NAME, role: read}
+
+
+LBL:
+  kind: input
+  operands:
+    - {name: label_name, type: NAME, role: read}
+
+
+LFL:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: LIFO, type: ANY, role: struct}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+LFU:
+  kind: output
+  operands:
+    - {name: LIFO, type: ANY, role: struct}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+LN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+LOG:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+LOWER:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+NOT:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+OR:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+RAD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SIN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SIZE:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: dimension_to_vary, type: ANY, role: read}
+    - {name: size, type: ANY, role: write}
+
+
+SQI:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: source, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+SQL:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: write}
+    - {name: source, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+SQO:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+SQRT:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SRT:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: struct}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+STD:
+  kind: output
+  operands:
+    - {name: array, type: ANY, role: read}
+    - {name: dim_to_vary, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+    - {name: control, type: ANY, role: struct}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+
+
+STOD:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+STOR:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SWPB:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: order_mode, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TAN:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TND:
+  kind: output
+  operands: []
+
+
+TO_BCD:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TRUNC:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+UID:
+  kind: output
+  operands: []
+
+
+UIE:
+  kind: output
+  operands: []
+
+
+UPPER:
+  kind: output
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+XOR:
+  kind: output
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+EXPT:
+  kind: output
+  min_version: 36
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ACS:
+  kind: output
+  max_version: 35
+  renamed_to: ACOS
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ASN:
+  kind: output
+  max_version: 35
+  renamed_to: ASIN
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+ATN:
+  kind: output
+  max_version: 35
+  renamed_to: ATAN
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+SQR:
+  kind: output
+  max_version: 35
+  renamed_to: SQRT
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TRN:
+  kind: output
+  max_version: 35
+  renamed_to: TRUNC
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+XPY:
+  kind: output
+  max_version: 35
+  renamed_to: EXPT
+  operands:
+    - {name: source_A, type: ANY, role: read}
+    - {name: source_B, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+TOD:
+  kind: output
+  max_version: 35
+  renamed_to: TO_BCD
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+FRD:
+  kind: output
+  max_version: 35
+  renamed_to: BCD_TO
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: destination, type: ANY, role: write}
+
+
+MEQ:
+  kind: input
+  description: Masked equal. True when (Source AND Mask) = (Compare AND Mask).
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: mask, type: ANY, role: read}
+    - {name: compare, type: ANY, role: read}
+
+MSG:
+  kind: output
+  description: Message (send/receive data over a network).
+  operands:
+    - {name: message_control, type: ANY, role: struct}
+
+MCR:
+  kind: output
+  description: Master control reset.
+  operands: []
+
+SBR:
+  kind: input
+  description: Subroutine parameters (first instruction of a subroutine); receives the JSR inputs.
+  variadic: true
+  operands: []
+
+RET:
+  kind: output
+  description: Return from subroutine with optional return parameters.
+  variadic: true
+  operands: []
+
+MID:
+  kind: output
+  description: Middle string. Copies Qty characters of Source starting at Start into Dest.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: quantity, type: NUMERIC, role: read}
+    - {name: start, type: NUMERIC, role: read}
+    - {name: destination, type: ANY, role: write}
+
+AHL:
+  kind: output
+  description: ASCII handshake lines (serial port).
+  operands:
+    - {name: channel, type: ANY, role: read}
+    - {name: and_mask, type: ANY, role: read}
+    - {name: or_mask, type: ANY, role: read}
+    - {name: serial_port_control, type: ANY, role: struct}
+    - {name: channel_status, type: ANY, role: write}

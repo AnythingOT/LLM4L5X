@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{% block title %}LLM4L5X{% endblock %} · AnythingOT</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
+</head>
+<body class="{% block bodyclass %}{% endblock %}">
+    <header class="header">
+        <a class="brand" href="/" title="Back to the chat">
+            <span class="logo"><span class="logo-anything">Anything</span><span class="logo-ot">OT</span></span>
+            <span class="app-name">LLM4L5X</span>
+        </a>
+        {% block header_middle %}{% endblock %}
+        <nav class="header-right">
+            {% block header_right %}{% endblock %}
+            <a class="icon-btn {% if page == 'rules' %}active{% endif %}" href="/rules" title="Validation rules: switch rules on or off">Rules</a>
+            <a class="icon-btn {% if page == 'settings' %}active{% endif %}" href="/settings" title="Settings">⚙️</a>
+            <button id="toggleTheme" class="icon-btn" title="Dark / light">🌓</button>
+        </nav>
+    </header>
+    {% block body %}{% endblock %}
+    <footer>LLM4L5X · AnythingOT · runs on this PC · review every rung before importing</footer>
+    <script src="{{ url_for('static', filename='common.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
