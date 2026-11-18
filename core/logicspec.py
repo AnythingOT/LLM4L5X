@@ -140,7 +140,7 @@ CMP_COMPLEMENT = {"=": "<>", "<>": "=", ">": "<=", "<=": ">", "<": ">=", ">=": "
 KEYWORDS = {
     "AND", "OR", "NOT", "IF", "THEN", "TRUE", "SET", "RESET", "CLEAR", "RISE",
     "DELAY", "OFFDELAY", "COUNT_UP", "COUNT_DOWN", "START_TIMER",
-    "START_OFF_TIMER", "RESET_ACC", "COPY", "ENERGIZE",
+    "START_OFF_TIMER", "ON_DELAY_TIMER", "OFF_DELAY_TIMER", "RESET_ACC", "COPY", "ENERGIZE",
 }
 
 # ---------------------------------------------------------------- lexer
@@ -181,7 +181,7 @@ def _dur_ms(text: str) -> int:
 
 _OP_ALIAS = {"!=": ("OP", "<>"), "==": ("OP", "="), "&&": ("KW", "AND"), "||": ("KW", "OR")}
 _ACTION_KW = {"SET", "RESET", "CLEAR", "RESET_ACC", "ENERGIZE", "COUNT_UP", "COUNT_DOWN", "START_TIMER",
-              "START_OFF_TIMER", "COPY"}
+              "START_OFF_TIMER", "ON_DELAY_TIMER", "OFF_DELAY_TIMER", "COPY"}
 
 
 def tokenize(text: str) -> list[Tok]:
@@ -355,7 +355,9 @@ class _P:
                     self.err("counter preset must be a whole number")
                 self.expect("OP", ")")
                 return Count(tag, int(n), down)
-        for kw, off in (("START_TIMER", False), ("START_OFF_TIMER", True)):
+        # ON_/OFF_DELAY_TIMER mirror the English "on-delay"/"off-delay"; START_* are older aliases
+        for kw, off in (("ON_DELAY_TIMER", False), ("OFF_DELAY_TIMER", True),
+                        ("START_TIMER", False), ("START_OFF_TIMER", True)):
             if self.accept("KW", kw):
                 self.expect("OP", "(")
                 tag = self.expect("TAG", what="a timer tag").value
@@ -446,7 +448,7 @@ def format_action(a: Action) -> str:
     if isinstance(a, Count):
         return f"{'COUNT_DOWN' if a.down else 'COUNT_UP'}({a.tag}, {a.preset})"
     if isinstance(a, StartTimer):
-        return f"{'START_OFF_TIMER' if a.off else 'START_TIMER'}({a.tag}, {fmt_ms(a.ms)})"
+        return f"{'OFF_DELAY_TIMER' if a.off else 'ON_DELAY_TIMER'}({a.tag}, {fmt_ms(a.ms)})"
     if isinstance(a, Copy):
         return f"COPY({a.source}, {a.dest}, {a.length})"
     if isinstance(a, Math):

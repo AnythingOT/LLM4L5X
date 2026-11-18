@@ -248,7 +248,7 @@ const render = {
                 'X := RISE(PB) AND Ready;                         // one-shot',
                 'Alarm := DELAY(Level > 80.0, 5s [, TimerTag]);   // on-delay (OFFDELAY too)',
                 'IF RISE(P) THEN COUNT_UP(C, 10);                 // counter (COUNT_DOWN too)',
-                'Actions: SET RESET CLEAR RESET_ACC START_TIMER(T,5s) START_OFF_TIMER(T,5s) N := A [+-*/ B]',
+                'Actions: SET RESET CLEAR RESET_ACC ON_DELAY_TIMER(T,5s) OFF_DELAY_TIMER(T,5s) N := A [+-*/ B]',
                 'Compare: =  <>  >  <  >=  <=        AND/OR mixed? parentheses are required',
             ].join('\n')),
             title('Paste existing rungs (either form)'),

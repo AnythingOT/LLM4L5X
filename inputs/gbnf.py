@@ -87,7 +87,7 @@ def build_gbnf(tags: dict[str, str], allow_new_tags: bool = False) -> str:
     if has["counter-ref"]:
         actions.append('("COUNT_UP" | "COUNT_DOWN") "(" ws counter-ref ws "," ws [0-9]+ ws ")"')
     if has["timer-ref"]:
-        actions.append('("START_TIMER" | "START_OFF_TIMER") "(" ws timer-ref ws "," ws duration ws ")"')
+        actions.append('("ON_DELAY_TIMER" | "OFF_DELAY_TIMER") "(" ws timer-ref ws "," ws duration ws ")"')
     if has["data-ref"]:
         actions.append('"COPY(" ws data-ref ws "," ws data-ref ws "," ws operand ws ")"')
     statements = (["assign"] if has["bool-out"] else []) + (["ifthen"] if actions else [])

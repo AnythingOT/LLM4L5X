@@ -67,7 +67,7 @@ def test_context_timer_is_offered_not_expected():
         for rung in c.context:
             timer = rung.split("TON(")[1].split(",")[0]
             assert c.tags.get(timer) == "TIMER", (c.id, timer)
-            assert timer + ".DN" in c.answer and f"START_TIMER({timer}," not in c.answer
+            assert timer + ".DN" in c.answer and f"ON_DELAY_TIMER({timer}," not in c.answer
 
 
 def test_multi_action_english_puts_condition_first():

@@ -17,7 +17,7 @@ def dec(text, presets=None):
 def test_basic_shapes():
     assert dec("[XIC(Start) ,XIC(Pump) ]XIO(Stop)OTE(Pump);") == "Pump := (Start OR Pump) AND NOT Stop;"
     assert dec("XIC(A)ONS(S)XIC(B)[OTL(C) ,CLR(N) ];") == "IF RISE(A) AND B THEN SET C, CLEAR N;"
-    assert dec("GRT(L,80)TON(T1,?,?);", {"T1": 5000}) == "IF L > 80 THEN START_TIMER(T1, 5s);"
+    assert dec("GRT(L,80)TON(T1,?,?);", {"T1": 5000}) == "IF L > 80 THEN ON_DELAY_TIMER(T1, 5s);"
     assert dec("MOV(3,X);") == "IF TRUE THEN X := 3;"
 
 

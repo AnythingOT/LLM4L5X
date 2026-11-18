@@ -89,7 +89,7 @@ The server listens on `127.0.0.1` only, so nothing leaves your PC.
 | `RISE(expr)` | `ONS` with an auto storage bit |
 | `DELAY(expr, 5s [, Timer])` | helper rung `expr TON(T,?,?)`, then `XIC(T.DN)` (`OFFDELAY` → `TOF`) |
 
-Actions: `SET X`, `RESET X`, `CLEAR N`, `RESET_ACC T`, `COUNT_UP(C, 10)`, `COUNT_DOWN(C, 10)`, `START_TIMER(T, 5s)`, `START_OFF_TIMER(T, 5s)`, `N := A`, `N := A + B` (`-` `*` `/`).
+Actions: `SET X`, `RESET X`, `CLEAR N`, `RESET_ACC T`, `COUNT_UP(C, 10)`, `COUNT_DOWN(C, 10)`, `ON_DELAY_TIMER(T, 5s)`, `OFF_DELAY_TIMER(T, 5s)` (older `START_TIMER`/`START_OFF_TIMER` still accepted), `N := A`, `N := A + B` (`-` `*` `/`).
 
 Rules:
 - **AND and OR can't be mixed without parentheses**, so precedence mistakes are impossible.

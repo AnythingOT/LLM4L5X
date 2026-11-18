@@ -41,18 +41,22 @@ Conditions: Tag, NOT Tag, AND, OR, comparisons (= <> > < >= <=),
   OFFDELAY(condition, 5s) = condition is true or went false less than 5 s ago.
 Actions: ENERGIZE X (on while the condition is true; a coil); SET X (latch); RESET X (unlatch);
   CLEAR N; N := value; N := A + B (also - * /);
-  COUNT_UP(C, 10); COUNT_DOWN(C, 10); RESET_ACC C; START_TIMER(T, 5s);
+  COUNT_UP(C, 10); COUNT_DOWN(C, 10); RESET_ACC C;
+  ON_DELAY_TIMER(T, 5s) (TON); OFF_DELAY_TIMER(T, 5s) (TOF);
   COPY(Source, Dest, 10) copies 10 array elements.
 Rules:
   - Never mix AND and OR without parentheses: write (A AND B) OR C.
   - "keeps running until", "stays on until" = seal-in: X := (Start OR X) AND NOT Stop;
   - "turn on"/"energize" with other actions = ENERGIZE; "latch"/"keep it set" = SET; "unlatch" = RESET.
-  - "on-delay timer T, 5 second preset" = START_TIMER(T, 5s); "off-delay timer" = START_OFF_TIMER(T, 5s).
+  - "turn on"/"switch on X if C" with no other action = X := C; SET only for "latch"/"keep on"/"stays on".
+  - "on-delay timer" = ON_DELAY_TIMER; "off-delay timer" = OFF_DELAY_TIMER. Match the words.
+  - "either A or B, and C" = (A OR B) AND C: the part after ", and" still applies.
+  - "subtract/divide/... and store the result in C" changes ONLY C: C := B - A; never B := ...
+  - RISE(X) only when the request says so: "rising edge", "the moment", "each time", "once".
   - "move A to B", "copy A into B", "store A in B" = B := A; (the destination is on the left).
   - Several actions under one condition: ONE IF with commas, IF c THEN a, b, c; (';' ends the IF).
   - COUNT_UP and COUNT_DOWN already count once per rising edge: do not wrap their condition in RISE.
   - "reset the counter/timer C" = RESET_ACC C.
-  - "at the moment X turns on", "on the rising edge of X" = RISE(X).
   - Copy tag names EXACTLY as written in the request (same spelling, case and underscores).
   - Times need units: 500ms, 5s, 2min, 1h."""
 

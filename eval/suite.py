@@ -138,7 +138,7 @@ class Builder:
             ms = r.choice([2, 3, 5, 10, 30]) * 1000
             self.presets[t] = ms
             self.pre_rungs.append(Rung(Series((Instr("XIC", (src,)), Instr("TON", (t, "?", "?"))))))
-            self.pre_specs.append(f"IF {src} THEN START_TIMER({t}, {ms // 1000}s);")
+            self.pre_specs.append(f"IF {src} THEN ON_DELAY_TIMER({t}, {ms // 1000}s);")
             return (f"{t} is done", f"{t}.DN", [Instr("XIC", (f"{t}.DN",))])
         raise ValueError(kind)
 
@@ -270,7 +270,7 @@ def action(b: Builder, kind: str):
         b.presets[t] = s * 1000
         eng = (f"run the on-delay timer {t} with a {s} second preset" if kind == "TON"
                else f"run the off-delay timer {t} with a {s} second preset")
-        kw = "START_TIMER" if kind == "TON" else "START_OFF_TIMER"
+        kw = "ON_DELAY_TIMER" if kind == "TON" else "OFF_DELAY_TIMER"
         return (eng, f"{kw}({t}, {s}s)", Instr(kind, (t, "?", "?")), None)
     if kind in ("CTU", "CTD"):
         c = b.pick(COUNTERS, "")

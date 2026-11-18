@@ -17,7 +17,7 @@ def g():
 @pytest.mark.parametrize("ok", [
     "OUT := (A OR OUT) AND NOT B;",
     "IF RISE(A) THEN SET OUT, COUNT_UP(C1, 5), N1 := N1 + 1;",
-    "IF TRUE THEN START_TIMER(T1, 5s);",
+    "IF TRUE THEN ON_DELAY_TIMER(T1, 5s);",
     "OUT := T1.DN AND C1.ACC >= 3;",
     "OUT := DELAY(N1 > 5, 500ms);",
     "IF A THEN ENERGIZE OUT, COPY(Buf, Dst, 10), RESET_ACC C1;",

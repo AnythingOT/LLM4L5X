@@ -72,7 +72,7 @@ def test_format_parse_round_trip_random():
 def test_format_spec_round_trip():
     text = ("Pump := (Start OR Pump) AND NOT Stop;\n"
             "IF RISE(A) AND NOT (B AND C) THEN SET D, CLEAR N, X := Y * 2;\n"
-            "IF TRUE THEN COUNT_DOWN(C1, 3), START_OFF_TIMER(T, 2s);")
+            "IF TRUE THEN COUNT_DOWN(C1, 3), OFF_DELAY_TIMER(T, 2s);")
     assert format_spec(parse_spec(text)) == text
 
 
@@ -97,3 +97,11 @@ def test_forms_small_models_write():
 def test_helpful_errors(bad, hint):
     with pytest.raises(SpecError, match=hint):
         parse_spec(bad)
+
+
+def test_delay_timer_keywords_and_old_aliases_are_the_same():
+    from core.logicspec import format_statement
+    new = parse_spec("IF a THEN ON_DELAY_TIMER(T1, 5s), OFF_DELAY_TIMER(T2, 2s);")
+    old = parse_spec("IF a THEN START_TIMER(T1, 5s), START_OFF_TIMER(T2, 2s);")
+    assert new == old
+    assert format_statement(new[0]) == "IF a THEN ON_DELAY_TIMER(T1, 5s), OFF_DELAY_TIMER(T2, 2s);"

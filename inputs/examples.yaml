@@ -63,11 +63,11 @@
 
 - english: While the oven door is closed and heating is requested, run the warm-up timer Warmup_TMR for 20 seconds; the oven is ready when it is done.
   spec: |-
-    IF Oven_Door_Closed AND Heat_Request THEN START_TIMER(Warmup_TMR, 20s);
+    IF Oven_Door_Closed AND Heat_Request THEN ON_DELAY_TIMER(Warmup_TMR, 20s);
     Oven_Ready := Warmup_TMR.DN;
 
 - english: Keep the off-delay timer Fan_TMR (45 seconds) running from the burner signal.
-  spec: IF Burner_On THEN START_OFF_TIMER(Fan_TMR, 45s);
+  spec: IF Burner_On THEN OFF_DELAY_TIMER(Fan_TMR, 45s);
 
 - english: Clear the reject counter Reject_CTR when the shift reset button is pressed.
   spec: IF Shift_Reset_PB THEN RESET_ACC Reject_CTR;
