@@ -40,7 +40,8 @@ Conditions: Tag, NOT Tag, AND, OR, comparisons (= <> > < >= <=),
   DELAY(condition, 5s) = condition has been true for 5 s,
   OFFDELAY(condition, 5s) = condition is true or went false less than 5 s ago.
 Actions: SET X; RESET X; CLEAR N; N := value; N := A + B (also - * /);
-  COUNT_UP(C, 10); COUNT_DOWN(C, 10); RESET_ACC C; START_TIMER(T, 5s).
+  COUNT_UP(C, 10); COUNT_DOWN(C, 10); RESET_ACC C; START_TIMER(T, 5s);
+  COPY(Source, Dest, 10) copies 10 array elements.
 Rules:
   - Never mix AND and OR without parentheses: write (A AND B) OR C.
   - "keeps running until", "stays on until" = seal-in: X := (Start OR X) AND NOT Stop;

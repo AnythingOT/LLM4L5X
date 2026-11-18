@@ -217,6 +217,19 @@ with a catalog-generated grammar. Lower reliability; build last.
 
 ## 8. Evaluation
 
+**Instruction suite (2026-11-18).** Replaces the owner's earlier generator (ILinSeries_23InsSet,
+LLM_Training_Datasets_V005). That generator covered series only, scored with Excel `EXACT`, used
+`var1..var300` names and single-instruction sentences, wrote `TON(T,5000,0)` and `ONS(signal)` (no
+storage bit), and repeated a handful of templates thousands of times (22,650 rows per compare
+instruction). The new suite covers 24 instructions × {single, series, parallel, nested,
+multi-output}, with realistic tags and whole requirements. Expected rungs come from a reference
+builder independent of the compiler. Scoring runs both sides in the simulator (80 sequences × 10
+scans, random time steps, random initial outputs). Mutation check: 98.8–99.6% of single
+meaning-changing edits caught. Compiler self-test: 2,400/2,400 (v35 and v36). EXACT would reject
+about 9% of those correct answers. The model accuracy is unmeasured until run on the owner's PC.
+
+
+
 Hold out part of the corpus. Report, per model and per prompt variant:
 
 - Validator pass rate.

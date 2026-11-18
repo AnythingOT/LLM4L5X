@@ -9,7 +9,7 @@ able to spot a wrong AND/OR at a glance.
 from __future__ import annotations
 
 from core.logicspec import (
-    And, Assign, Clear, Cmp, Count, Delay, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit,
+    And, Assign, Clear, Cmp, Copy, Count, Delay, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit,
     Rise, SetBit, StartTimer, Statement, Var, fmt_ms,
 )
 
@@ -58,6 +58,8 @@ def describe_action(a) -> str:
     if isinstance(a, StartTimer):
         kind = "off-delay" if a.off else "on-delay"
         return f"run {kind} timer {a.tag} ({fmt_ms(a.ms)})"
+    if isinstance(a, Copy):
+        return f"copy {a.length} element(s) from {a.source} to {a.dest}"
     if isinstance(a, Math):
         if a.op is None:
             return f"copy {a.a} into {a.dest}"

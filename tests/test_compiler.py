@@ -189,3 +189,10 @@ def test_v36_rungs_simulate_and_decompile():
     assert res.texts == ["GT(N,5)NE(M,2)OTE(X);"]
     assert Simulator(res.rungs, {"N": 6, "M": 1}).scan()["X"] is True
     assert format_spec(decompile_rung(res.rungs[0])) == "X := N > 5 AND M <> 2;"
+
+
+def test_simulator_add_with_zero_does_not_evaluate_division():
+    # regression: all four results used to be computed up front, so ADD(x,0,z) raised
+    from core.rung import parse_rung
+    sim = Simulator([parse_rung("ADD(A,B,C);")], {"A": 3, "B": 0})
+    assert sim.scan()["C"] == 3

@@ -57,3 +57,6 @@
 
 - english: Warn when the pump has been commanded on for 10 seconds but there is still no flow.
   spec: No_Flow_Warning := DELAY(Pump_Run AND NOT Flow_Switch, 10s);
+
+- english: When the recipe is loaded, copy 10 values from the recipe buffer into the active recipe.
+  spec: IF RISE(Recipe_Loaded) THEN COPY(Recipe_Buffer, Active_Recipe, 10);

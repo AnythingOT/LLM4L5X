@@ -11,14 +11,14 @@ from dataclasses import dataclass
 
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, walk
 from core.logicspec import (
-    And, Assign, Clear, Cmp, Count, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit, Rise,
+    And, Assign, Clear, Cmp, Copy, Count, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit, Rise,
     SetBit, StartTimer, Statement, Var,
 )
 
 INSTR_CMP = {"EQU": "=", "NEQ": "<>", "GRT": ">", "LES": "<", "GEQ": ">=", "LEQ": "<=",
              "EQ": "=", "NE": "<>", "GT": ">", "LT": "<", "GE": ">=", "LE": "<="}  # v35 and v36+ names
 INSTR_MATH = {"ADD": "+", "SUB": "-", "MUL": "*", "DIV": "/"}
-_OUTPUTS = {"OTE", "OTL", "OTU", "CLR", "RES", "MOV", "MOVE", "ADD", "SUB", "MUL", "DIV",
+_OUTPUTS = {"OTE", "OTL", "OTU", "CLR", "RES", "MOV", "MOVE", "COP", "ADD", "SUB", "MUL", "DIV",
             "TON", "TOF", "CTU", "CTD"}
 
 
@@ -85,6 +85,8 @@ def _action(i: Instr, presets: dict[str, int]):
         return ResetAcc(a[0])
     if n in ("MOV", "MOVE"):
         return Math(a[1], a[0])
+    if n == "COP":
+        return Copy(a[0], a[1], a[2])
     if n in INSTR_MATH:
         return Math(a[2], a[0], INSTR_MATH[n], a[1])
     if n in ("CTU", "CTD"):

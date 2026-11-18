@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from core.catalog import Catalog, default_catalog, major_version
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_plain_tag, walk
 from core.logicspec import (
-    And, Assign, Clear, Cmp, CMP_COMPLEMENT, Count, Delay, Expr, IfThen, Math, Not, Or,
+    And, Assign, Clear, Cmp, CMP_COMPLEMENT, Copy, Count, Delay, Expr, IfThen, Math, Not, Or,
     ResetAcc, ResetBit, Rise, SetBit, SpecError, StartTimer, Statement, Var, format_statement,
     parse_spec,
 )
@@ -205,6 +205,8 @@ class Compiler:
         if isinstance(a, StartTimer):
             self._struct_tag(a.tag, "TIMER", a.ms)
             return Instr("TOF" if a.off else "TON", (a.tag, *self._display(a.ms)))
+        if isinstance(a, Copy):
+            return Instr("COP", (a.source, a.dest, a.length))
         if isinstance(a, Math):
             if is_literal(a.dest):
                 raise CompileError(f"cannot write to a number: {a.dest}")

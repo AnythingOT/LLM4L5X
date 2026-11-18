@@ -37,6 +37,22 @@ Improve results without fine-tuning by adding examples in your plant's wording t
 
 **Compare models by measurement:** `python cli.py eval --model phi4-mini` scores a model on `eval/requests.yaml` by meaning (truth tables), not text. Add your own requests there.
 
+## Instruction test suite (series, parallel, nested)
+
+`eval/suite.py` generates English requests with expected rungs for 24 instructions (XIC XIO OTE OTL OTU ONS, EQ NE GT LT GE LE, ADD SUB MUL DIV, MOVE COP CLR, TON TOF CTU CTD RES) in five structures: single, series, parallel, nested and multi-output. Example:
+
+> *When either both Door_Open is not active and Manual_Mode is on, or Scaled_Value is not equal to 10, set Ready_Light and keep it set.*
+> → `[XIO(Door_Open) XIC(Manual_Mode) ,NEQ(Scaled_Value,10) ]OTL(Ready_Light);`
+
+Answers are scored by **behaviour, not text**. Expected and produced rungs run in the scan simulator on the same random input sequences, over time for timers, and every output is compared. The comparator catches about 99% of deliberately broken rungs, and the old Excel `EXACT` would wrongly fail about 9% of correct answers.
+
+```
+python cli.py suite --self-test --per 10                                  # compiler vs reference, no model
+python cli.py suite --model phi4-mini --per 2 --excel suite_phi4.xlsx      # your model, Excel report
+python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a subset
+```
+`--version 36` uses the v36 names (EQ, GT, MOVE …). On CPU, a model run costs roughly (cases × seconds per request). `--per 1` is 120 cases.
+
 ## GUI
 
 A chat-style page, same look as LLM4L5XGen:
@@ -99,9 +115,10 @@ core/               catalog.py + instructions.yaml (124 instructions), rung.py, 
 l5x/                reader.py, writer.py, xref.py
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             llm.py (Ollama, English -> LogicSpec), examples.yaml (few-shot), gbnf.py
-eval/               requests.yaml (English + expected LogicSpec), run.py (scoring)
+eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
+                    instruction suite), rung_compare.py (behavioural oracle), mutation.py
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (170 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (180 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

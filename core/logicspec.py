@@ -99,6 +99,13 @@ class StartTimer:
 
 
 @dataclass(frozen=True)
+class Copy:
+    source: str
+    dest: str
+    length: str  # number of elements (number or tag)
+
+
+@dataclass(frozen=True)
 class Math:
     dest: str
     a: str
@@ -106,7 +113,7 @@ class Math:
     b: str | None = None
 
 
-Action = Union[SetBit, ResetBit, Clear, ResetAcc, Count, StartTimer, Math]
+Action = Union[SetBit, ResetBit, Clear, ResetAcc, Count, StartTimer, Copy, Math]
 
 
 @dataclass(frozen=True)
@@ -128,7 +135,7 @@ CMP_COMPLEMENT = {"=": "<>", "<>": "=", ">": "<=", "<=": ">", "<": ">=", ">=": "
 KEYWORDS = {
     "AND", "OR", "NOT", "IF", "THEN", "TRUE", "SET", "RESET", "CLEAR", "RISE",
     "DELAY", "OFFDELAY", "COUNT_UP", "COUNT_DOWN", "START_TIMER",
-    "START_OFF_TIMER", "RESET_ACC",
+    "START_OFF_TIMER", "RESET_ACC", "COPY",
 }
 
 # ---------------------------------------------------------------- lexer
@@ -327,6 +334,15 @@ class _P:
                 ms = self.expect("DUR", what="a duration like 5s").ms
                 self.expect("OP", ")")
                 return StartTimer(tag, ms, off)
+        if self.accept("KW", "COPY"):
+            self.expect("OP", "(")
+            src = self.expect("TAG", what="a source tag").value
+            self.expect("OP", ",")
+            dst = self.expect("TAG", what="a destination tag").value
+            self.expect("OP", ",")
+            n = self.operand(what="a length")
+            self.expect("OP", ")")
+            return Copy(src, dst, n)
         dest = self.expect("TAG", what="an action").value
         self.expect("OP", ":=")
         a = self.operand()
@@ -400,6 +416,8 @@ def format_action(a: Action) -> str:
         return f"{'COUNT_DOWN' if a.down else 'COUNT_UP'}({a.tag}, {a.preset})"
     if isinstance(a, StartTimer):
         return f"{'START_OFF_TIMER' if a.off else 'START_TIMER'}({a.tag}, {fmt_ms(a.ms)})"
+    if isinstance(a, Copy):
+        return f"COPY({a.source}, {a.dest}, {a.length})"
     if isinstance(a, Math):
         return f"{a.dest} := {a.a}" + (f" {a.op} {a.b}" if a.op else "")
     raise TypeError(a)

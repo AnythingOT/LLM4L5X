@@ -207,6 +207,27 @@ def cmd_eval(a) -> int:
     return 0
 
 
+def cmd_suite(a) -> int:
+    from eval.suite import generate
+    from eval.suite_run import model_run, self_test, summary, write_excel
+    cases = generate(per_combo=a.per, seed=a.seed, version=a.version,
+                     instructions=a.only.split(",") if a.only else None)
+    def progress(n, total, o):
+        if a.model or n % 50 == 0 or not o.ok:
+            print(f"[{n}/{total}] {'ok ' if o.ok else 'BAD'} {o.case.id}", file=sys.stderr)
+    if a.self_test:
+        out = self_test(cases, a.version, progress)
+        title = f"SELF-TEST (compiler vs reference), {len(cases)} cases, v{a.version}, seed {a.seed}"
+    else:
+        out = model_run(cases, _client(a), a.version, progress)
+        title = f"MODEL {a.model}, {len(cases)} cases, v{a.version}, seed {a.seed}"
+    print(summary(out, title))
+    if a.excel:
+        write_excel(out, a.excel, title)
+        print(f"wrote {a.excel}", file=sys.stderr)
+    return 0 if all(o.ok for o in out) or not a.self_test else 1
+
+
 def cmd_survey(a) -> int:
     from explain.survey import survey
     print(survey(a.folder).report())
@@ -279,6 +300,16 @@ def main(argv: list[str] | None = None) -> int:
     ev.add_argument("--limit", type=int)
     llm_args(ev)
     ev.set_defaults(fn=cmd_eval)
+
+    su = sub.add_parser("suite", help="instruction suite (series/parallel/nested): --self-test or --model")
+    su.add_argument("--self-test", action="store_true", help="compiler vs reference rungs, no model")
+    su.add_argument("--per", type=int, default=3, help="cases per instruction x structure (default 3)")
+    su.add_argument("--seed", type=int, default=1)
+    su.add_argument("--version", type=int, default=35, help="35: EQU/GRT/MOV names, 36: EQ/GT/MOVE")
+    su.add_argument("--only", help="comma-separated instructions, e.g. ONS,TON,GT")
+    su.add_argument("--excel", help="write results to an .xlsx (like the old TestData sheet)")
+    llm_args(su)
+    su.set_defaults(fn=cmd_suite)
 
     sv = sub.add_parser("survey", help="check parser/catalog/decompiler against a folder of L5X exports")
     sv.add_argument("folder")

@@ -122,16 +122,33 @@ class Simulator:
         elif n == "MOV":
             if p:
                 self.put(a[1], self.get(a[0]))
+        elif n == "COP":
+            if p:
+                count = int(self.get(a[2]))
+                src, dst = a[0].strip(), a[1].strip()
+                if count <= 1 and "[" not in src:
+                    self.put(dst, self.get(src))
+                else:  # element-wise; src/dst may name an array or its first element
+                    sb, si = _array_start(src)
+                    db, di = _array_start(dst)
+                    for k in range(count):
+                        self.state[f"{db}[{di + k}]"] = self.state.get(f"{sb}[{si + k}]", 0)
         elif n == "CLR":
             if p:
                 self.put(a[0], 0)
         elif n in ("ADD", "SUB", "MUL", "DIV"):
             if p:
                 x, y = self.get(a[0]), self.get(a[1])
-                if n == "DIV" and y == 0:
+                if n == "ADD":
+                    r = x + y
+                elif n == "SUB":
+                    r = x - y
+                elif n == "MUL":
+                    r = x * y
+                elif y == 0:  # Logix sets a minor fault and the destination; good enough to flag
                     raise SimError("divide by zero")
-                r = {"ADD": x + y, "SUB": x - y, "MUL": x * y,
-                     "DIV": (x / y) if isinstance(x, float) or isinstance(y, float) else int(x / y)}[n]
+                else:
+                    r = (x / y) if isinstance(x, float) or isinstance(y, float) else int(x / y)
                 self.put(a[2], r)
         elif n == "NOP":
             pass
@@ -184,6 +201,11 @@ class Simulator:
             self._sm(c, "ACC", self._m(c, "ACC") + (1 if up else -1))
         self._sm(c, flag, int(p))
         self._sm(c, "DN", int(self._m(c, "ACC") >= self._m(c, "PRE")))
+
+
+def _array_start(ref: str) -> tuple[str, int]:
+    m = re.fullmatch(r"(.+)\[(\d+)\]", ref)
+    return (m.group(1), int(m.group(2))) if m else (ref, 0)
 
 
 def preset_state(tags) -> dict:
