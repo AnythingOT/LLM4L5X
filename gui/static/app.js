@@ -62,7 +62,7 @@ function el(tag, opts = {}, ...children) {
     for (const c of children) if (c) e.appendChild(c);
     return e;
 }
-function scrollDown() { chatWindow.scrollTop = chatWindow.scrollHeight; }
+function scrollDown() { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
 function addUser(text) { chatWindow.appendChild(el('div', { cls: 'chat-message user', text })); scrollDown(); }
 function addBot(...children) {
     const m = el('div', { cls: 'chat-message bot' }, ...children);

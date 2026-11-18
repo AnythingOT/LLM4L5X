@@ -11,7 +11,10 @@
 # operand fields:
 #   name    - operand name
 #   type    - BOOL | NUMERIC | TIMER | COUNTER | ANY | ROUTINE | EXPR
-#             | NAME (an object/class/attribute name, not a tag)
+#             | NAME (an object/class/attribute name or keyword such as ALL, not a tag)
+#             | COMPARABLE (numeric or string: compare instructions accept strings)
+#   optional - operand may be blank or '?' (e.g. GSV/SSV instance for classes without instances)
+#   display operands of file/FIFO/sequencer instructions show CONTROL.LEN / .POS and export as '?'
 #   role    - read | write | struct (control structure, read and written)
 #             | display (shown on the instruction, really a tag member;
 #               exported as "?" -- confirmed, see docs/DESIGN.md section 9)
@@ -110,8 +113,8 @@ EQU:
   renamed_to: EQ
   description: Equal. True when A = B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 NEQ:
   kind: input
@@ -119,8 +122,8 @@ NEQ:
   renamed_to: NE
   description: Not equal. True when A <> B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 GRT:
   kind: input
@@ -128,8 +131,8 @@ GRT:
   renamed_to: GT
   description: Greater than. True when A > B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LES:
   kind: input
@@ -137,8 +140,8 @@ LES:
   renamed_to: LT
   description: Less than. True when A < B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 GEQ:
   kind: input
@@ -146,8 +149,8 @@ GEQ:
   renamed_to: GE
   description: Greater than or equal. True when A >= B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LEQ:
   kind: input
@@ -155,8 +158,8 @@ LEQ:
   renamed_to: LE
   description: Less than or equal. True when A <= B.
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LIM:
   kind: input
@@ -334,7 +337,7 @@ GSV:
   description: Get system value.
   operands:
     - {name: class_name, type: NAME, role: read}
-    - {name: instance_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read, optional: true}
     - {name: attribute_name, type: NAME, role: read}
     - {name: dest, type: ANY, role: write}
 
@@ -343,7 +346,7 @@ SSV:
   description: Set system value.
   operands:
     - {name: class_name, type: NAME, role: read}
-    - {name: instance_name, type: NAME, role: read}
+    - {name: instance_name, type: NAME, role: read, optional: true}
     - {name: attribute_name, type: NAME, role: read}
     - {name: source, type: ANY, role: read}
 
@@ -372,48 +375,48 @@ EQ:
   kind: input
   description: Equal. True when A = B. (v36+ name of EQU)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 NE:
   min_version: 36
   kind: input
   description: Not equal. True when A <> B. (v36+ name of NEQ)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 GT:
   min_version: 36
   kind: input
   description: Greater than. True when A > B. (v36+ name of GRT)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LT:
   min_version: 36
   kind: input
   description: Less than. True when A < B. (v36+ name of LES)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 GE:
   min_version: 36
   kind: input
   description: Greater than or equal. True when A >= B. (v36+ name of GEQ)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LE:
   min_version: 36
   kind: input
   description: Less than or equal. True when A <= B. (v36+ name of LEQ)
   operands:
-    - {name: source_a, type: NUMERIC, role: read}
-    - {name: source_b, type: NUMERIC, role: read}
+    - {name: source_a, type: COMPARABLE, role: read}
+    - {name: source_b, type: COMPARABLE, role: read}
 
 LIMIT:
   min_version: 36
@@ -467,8 +470,8 @@ AVE:
     - {name: dim_to_vary, type: ANY, role: read}
     - {name: destination, type: ANY, role: write}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 BRK:
@@ -482,7 +485,7 @@ BSL:
     - {name: array, type: ANY, role: struct}
     - {name: control, type: ANY, role: struct}
     - {name: source_bit, type: ANY, role: read}
-    - {name: length, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
 
 
 BSR:
@@ -491,7 +494,7 @@ BSR:
     - {name: array, type: ANY, role: struct}
     - {name: control, type: ANY, role: struct}
     - {name: source_bit, type: ANY, role: read}
-    - {name: length, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
 
 
 BTD:
@@ -571,9 +574,9 @@ FAL:
   kind: output
   operands:
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
-    - {name: mode, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+    - {name: mode, type: NAME, role: read}
     - {name: destination, type: ANY, role: write}
     - {name: expression, type: EXPR, role: read}
 
@@ -585,11 +588,11 @@ FBC:
     - {name: reference, type: ANY, role: struct}
     - {name: result, type: ANY, role: write}
     - {name: cmp_control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
     - {name: result_control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 FFL:
@@ -598,8 +601,8 @@ FFL:
     - {name: source, type: ANY, role: read}
     - {name: FIFO, type: ANY, role: struct}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 FFU:
@@ -608,8 +611,8 @@ FFU:
     - {name: FIFO, type: ANY, role: struct}
     - {name: destination, type: ANY, role: write}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 FIND:
@@ -643,9 +646,9 @@ FSC:
   kind: output
   operands:
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
-    - {name: mode, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
+    - {name: mode, type: NAME, role: read}
     - {name: expression, type: EXPR, role: read}
 
 
@@ -682,8 +685,8 @@ LFL:
     - {name: source, type: ANY, role: read}
     - {name: LIFO, type: ANY, role: struct}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 LFU:
@@ -692,8 +695,8 @@ LFU:
     - {name: LIFO, type: ANY, role: struct}
     - {name: destination, type: ANY, role: write}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 LN:
@@ -761,8 +764,8 @@ SQI:
     - {name: mask, type: ANY, role: read}
     - {name: source, type: ANY, role: read}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 SQL:
@@ -771,8 +774,8 @@ SQL:
     - {name: array, type: ANY, role: write}
     - {name: source, type: ANY, role: read}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 SQO:
@@ -782,8 +785,8 @@ SQO:
     - {name: mask, type: ANY, role: read}
     - {name: destination, type: ANY, role: write}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 SQRT:
@@ -800,8 +803,8 @@ SRT:
     - {name: array, type: ANY, role: struct}
     - {name: dim_to_vary, type: ANY, role: read}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 STD:
@@ -811,8 +814,8 @@ STD:
     - {name: dim_to_vary, type: ANY, role: read}
     - {name: destination, type: ANY, role: write}
     - {name: control, type: ANY, role: struct}
-    - {name: length, type: ANY, role: read}
-    - {name: position, type: ANY, role: read}
+    - {name: length, type: NUMERIC, role: display, member: LEN}
+    - {name: position, type: NUMERIC, role: display, member: POS}
 
 
 STOD:
@@ -1002,3 +1005,22 @@ RET:
   description: Return from subroutine with optional return parameters.
   variadic: true
   operands: []
+
+MID:
+  kind: output
+  description: Middle string. Copies Qty characters of Source starting at Start into Dest.
+  operands:
+    - {name: source, type: ANY, role: read}
+    - {name: quantity, type: NUMERIC, role: read}
+    - {name: start, type: NUMERIC, role: read}
+    - {name: destination, type: ANY, role: write}
+
+AHL:
+  kind: output
+  description: ASCII handshake lines (serial port).
+  operands:
+    - {name: channel, type: ANY, role: read}
+    - {name: and_mask, type: ANY, role: read}
+    - {name: or_mask, type: ANY, role: read}
+    - {name: serial_port_control, type: ANY, role: struct}
+    - {name: channel_status, type: ANY, role: write}

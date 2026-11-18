@@ -115,6 +115,7 @@ def survey(folder: str | Path) -> Survey:
                     s.convertible += 1
                 else:
                     s.not_convertible[re.sub(r"\b[A-Z][A-Za-z_0-9]*(?= (is|has|in|with|inside))", "<instr>", why)] += 1
-            for i in validate(good, p.tag_types(rt.program), catalog=cat):
+            for i in validate(good, p.tag_types(rt.program), catalog=cat, revision=p.software_revision,
+                              string_types=p.string_types):
                 s.issues[(i.level, _generic(i.message))] += 1
     return s

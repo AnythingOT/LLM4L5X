@@ -48,7 +48,8 @@ def cmd_compile(a) -> int:
     all_types = dict(known or {})
     all_types.update({t.name: t.datatype for t in res.tags.values()})
     issues = validate(res.rungs, all_types if project else None,
-                      catalog=project.catalog() if project else None, revision=revision)
+                      catalog=project.catalog() if project else None, revision=revision,
+                      string_types=project.string_types if project else None)
     for s in res.statements:
         print("#", describe_statement(s), file=sys.stderr)
     for r in res.rungs:
@@ -148,7 +149,7 @@ def cmd_validate(a) -> int:
                 bad += 1
             else:
                 rungs.append(x.rung)
-        for i in validate(rungs, p.tag_types(rt.program), catalog=cat, revision=p.software_revision):
+        for i in validate(rungs, p.tag_types(rt.program), catalog=cat, revision=p.software_revision, string_types=p.string_types):
             print(f"{rt.program}/{rt.name} {i}")
             bad += i.level == "error"
     return 1 if bad else 0

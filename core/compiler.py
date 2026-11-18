@@ -266,7 +266,7 @@ class Compiler:
                         member_refs.add(base_tag(arg) or arg)
                         continue
                     t = {"BOOL": "BOOL", "TIMER": "TIMER", "COUNTER": "COUNTER"}.get(op.type)
-                    if t is None and op.type == "NUMERIC":
+                    if t is None and op.type in ("NUMERIC", "COMPARABLE"):
                         t = "REAL" if floats else "DINT"
                     if t:
                         want.setdefault(arg, set()).add(t)
@@ -281,7 +281,9 @@ class Compiler:
             if name in self.known:
                 kt = self.known[name]
                 numeric = {"SINT", "INT", "DINT", "LINT", "REAL", "LREAL", "USINT", "UINT", "UDINT", "ULINT"}
-                if t == kt or (t in ("DINT", "REAL") and kt in numeric):
+                if t == kt or (t in ("DINT", "REAL") and kt in numeric) or (
+                        t in ("DINT", "REAL") and kt not in ("BOOL", "TIMER", "COUNTER")):
+                    # an existing STRING/UDT in a comparison or move is the project's business
                     continue
                 raise CompileError(f"{name} is a {kt} in the project but is used as {t}")
             if name in self.tags:

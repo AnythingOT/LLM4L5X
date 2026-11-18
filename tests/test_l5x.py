@@ -98,3 +98,19 @@ def test_survey_on_fixture_folder():
     assert s.files == 1 and s.rungs == 5 and s.parsed == 4
     assert s.exact_round_trip == 4 and s.convertible == 3
     assert "exact round trip" in s.report()
+
+
+def test_string_types_and_protected_aoi_from_l5x():
+    xml = FIX.read_text().replace(
+        "<DataTypes>",
+        '<DataTypes>\n<DataType Name="STR_20" Family="StringFamily" Class="User"><Members/></DataType>', 1,
+    ).replace(
+        "</AddOnInstructionDefinitions>",
+        '<EncodedData EncryptionConfig="3" Type="AddOnInstructionDefinition" Name="Locked_AOI">x</EncodedData>\n'
+        "</AddOnInstructionDefinitions>", 1,
+    )
+    p = read_l5x(xml)
+    assert p.string_types == {"STRING", "STR_20"}
+    assert p.protected_aois == {"Locked_AOI"}
+    spec = p.catalog().get("Locked_AOI")
+    assert spec.variadic and spec.arity_ok(1) and spec.arity_ok(5)

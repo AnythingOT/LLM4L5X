@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 ROLES = {"read", "write", "struct", "display"}
-TYPES = {"BOOL", "NUMERIC", "TIMER", "COUNTER", "ANY", "ROUTINE", "EXPR", "NAME"}
+TYPES = {"BOOL", "NUMERIC", "COMPARABLE", "TIMER", "COUNTER", "ANY", "ROUTINE", "EXPR", "NAME"}
 KINDS = {"input", "output"}
 
 
@@ -19,6 +19,7 @@ class Operand:
     type: str
     role: str
     member: str | None = None
+    optional: bool = False  # may be blank or '?'
 
 
 @dataclass(frozen=True)
@@ -82,7 +83,7 @@ def _validate_entry(name: str, raw: dict) -> Instruction:
             raise ValueError(f"{name}.{o['name']}: bad role {o['role']!r}")
         if o["type"] not in TYPES:
             raise ValueError(f"{name}.{o['name']}: bad type {o['type']!r}")
-        ops.append(Operand(o["name"], o["type"], o["role"], o.get("member")))
+        ops.append(Operand(o["name"], o["type"], o["role"], o.get("member"), bool(o.get("optional", False))))
     return Instruction(
         name=name.upper(),
         kind=kind,

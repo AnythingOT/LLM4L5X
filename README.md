@@ -79,13 +79,13 @@ python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
 app.py              GUI server (python app.py)
 cli.py              command line (python cli.py ...)
-core/               catalog.py + instructions.yaml (122 instructions), rung.py, ascii.py, logicspec.py,
+core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
 inputs/             front ends that produce LogicSpec: gbnf.py now; Excel C&E and LLM later
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (144 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (151 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```

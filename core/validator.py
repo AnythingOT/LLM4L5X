@@ -54,11 +54,14 @@ def validate(
     tag_types: dict[str, str] | None = None,
     catalog: Catalog | None = None,
     revision: str | None = None,
+    string_types: set[str] | None = None,
 ) -> list[Issue]:
     """tag_types: {tag: datatype} for the project plus any new tags. Unknown tags are
-    reported only when tag_types is given."""
+    reported only when tag_types is given. string_types: data types that are strings
+    (STRING plus the project's custom string types)."""
     cat = catalog or default_catalog()
     major = major_version(revision)
+    strings = {s.upper() for s in (string_types or set())} | {"STRING"}
     types = {k: v.upper() for k, v in (tag_types or {}).items()}
     issues: list[Issue] = []
     ons_bits: dict[str, int] = {}
@@ -72,7 +75,14 @@ def validate(
         for ins in walk(r.body):
             spec = cat.get(ins.name)
             if spec is None:
-                issues.append(Issue("error", n, f"unknown instruction {ins.name}"))
+                inst = types.get(base_tag(ins.args[0]) or "") if ins.args else None
+                if inst and inst.upper() == ins.name.upper():
+                    # the instance tag's type is the instruction name: an Add-On Instruction
+                    # whose definition is not in this export (or is source-protected)
+                    issues.append(Issue("warning", n, f"{ins.name} is an Add-On Instruction whose definition is "
+                                        "not in this export; its operands cannot be checked"))
+                else:
+                    issues.append(Issue("error", n, f"unknown instruction {ins.name}"))
                 continue
             if not spec.available_in(major):
                 if spec.min_version and major < spec.min_version:
@@ -87,6 +97,8 @@ def validate(
                 continue
             for op, arg in zip(spec.operands, ins.args):
                 where = f"{ins.name} operand {op.name}"
+                if op.optional and (arg == "" or is_placeholder(arg)):
+                    continue
                 if arg == "":
                     issues.append(Issue("error", n, f"{where} is empty"))
                     continue
@@ -117,6 +129,9 @@ def validate(
                         issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs BOOL"))
                     elif op.type in ("TIMER", "COUNTER") and t != op.type:
                         issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs {op.type}"))
+                    elif op.type == "COMPARABLE" and t not in NUMERIC_TYPES and t.upper() not in strings:
+                        level = "error" if t in ("BOOL", "TIMER", "COUNTER") else "warning"
+                        issues.append(Issue(level, n, f"{where}: {arg} is {t}, expected a number or string"))
                     elif op.type == "NUMERIC" and t not in NUMERIC_TYPES:
                         # BOOL/TIMER/COUNTER in a numeric slot is wrong; strings and UDTs are
                         # accepted by some instructions on some firmware, so only warn
@@ -132,6 +147,14 @@ def validate(
                 ote_targets[ins.args[0]].append(n)
             if name in ("TON", "TOF", "RTO") and ins.args:
                 timer_users[ins.args[0]].append(n)
+
+    # one message per rung is enough when the same problem repeats inside it
+    seen, unique = set(), []
+    for i in issues:
+        if (i.level, i.rung, i.message) not in seen:
+            seen.add((i.level, i.rung, i.message))
+            unique.append(i)
+    issues[:] = unique
 
     for tag, where in ote_targets.items():
         if len(where) > 1:

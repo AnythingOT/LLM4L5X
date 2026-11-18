@@ -86,6 +86,8 @@ class Project:
     routines: list[RoutineInfo]
     udts: dict[str, list[tuple[str, str]]]  # name -> [(member, datatype)]
     aois: dict[str, AOIInfo]
+    string_types: set[str] = field(default_factory=lambda: {"STRING"})  # STRING + custom string types
+    protected_aois: set[str] = field(default_factory=set)  # source-protected: parameters unknown
 
     def tag_types(self, program: str | None = None) -> dict[str, str]:
         """Visible tags from a program's point of view: controller tags plus that program's."""
@@ -100,6 +102,10 @@ class Project:
     def catalog(self, base: Catalog | None = None) -> Catalog:
         """Builtin catalog extended with this project's AOIs."""
         cat = (base or default_catalog()).copy()
+        for name in self.protected_aois:
+            if name not in self.aois:  # operands unknown: accept any number after the instance
+                cat.add(Instruction(name, "output", (Operand("instance", name, "struct"),),
+                                    "Source-protected Add-On Instruction", variadic=True, source="aoi"))
         for a in self.aois.values():
             ops = [Operand("instance", a.name, "struct")]
             for p in a.call_operands():
@@ -156,10 +162,14 @@ def read_l5x(source: str | bytes | Path) -> Project:
     routines: list[RoutineInfo] = []
     udts: dict[str, list[tuple[str, str]]] = {}
     aois: dict[str, AOIInfo] = {}
+    string_types: set[str] = {"STRING"}
+    protected: set[str] = set()
     if ctrl is not None:
         for t in _tags(ctrl.find("Tags"), "controller"):
             tags[t.name] = t
         for dt in ctrl.findall("DataTypes/DataType"):
+            if dt.get("Family") == "StringFamily":
+                string_types.add(dt.get("Name"))
             udts[dt.get("Name")] = [
                 (m.get("Name"), m.get("DataType")) for m in dt.findall("Members/Member")
                 if m.get("Hidden") != "true"
@@ -173,6 +183,9 @@ def read_l5x(source: str | bytes | Path) -> Project:
                 for p in a.findall("Parameters/Parameter")
             ]
             aois[a.get("Name")] = AOIInfo(a.get("Name"), _desc(a), params)
+        for enc in ctrl.findall("AddOnInstructionDefinitions/EncodedData"):
+            if enc.get("Type") == "AddOnInstructionDefinition" and enc.get("Name"):
+                protected.add(enc.get("Name"))
         for prog in ctrl.findall("Programs/Program"):
             pname = prog.get("Name")
             for t in _tags(prog.find("Tags"), pname):
@@ -196,4 +209,6 @@ def read_l5x(source: str | bytes | Path) -> Project:
         routines=routines,
         udts=udts,
         aois=aois,
+        string_types=string_types,
+        protected_aois=protected,
     )

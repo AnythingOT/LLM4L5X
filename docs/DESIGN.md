@@ -258,6 +258,21 @@ Confirmed:
   3,157 of 3,160 corpus rungs survive neutral → ASCII → neutral (the 3 failures call AOIs
   whose definitions are not in that export, so their operand count is unknown).
 
+- **Findings from validating a private production project (2026-11-18; only the error list
+  was shared, no code):**
+  - File, FIFO/LIFO, sequencer and bit-shift instructions (FAL, FSC, FFL, FFU, LFL, LFU, BSL,
+    BSR, SQI, SQL, SQO, AVE, STD, SRT, FBC) export `length` and `position` as `?`. They are
+    displays of `CONTROL.LEN` / `.POS`, like timer presets. FAL/FSC `mode` is a keyword
+    (`ALL`, `INC`) or a number, not a tag.
+  - GSV/SSV `instance_name` is blank or `?` for classes without instances (e.g. WallClockTime).
+  - Compare instructions accept strings: Rockwell's NE page lists "String type" operands on
+    5380/5580 controllers. Custom string types come from `<DataType Family="StringFamily">`.
+  - `MID(source,quantity,start,destination)` was missing from Rockwell's neutral-text table.
+  - A call to an AOI whose definition is not in the export is recognised when the first
+    operand's tag type equals the instruction name, and reported as a warning. Source-protected
+    AOIs (`<EncodedData Type="AddOnInstructionDefinition">`) are registered with unknown operands.
+  - Identical issues within one rung are reported once.
+
 Still unverified (needs a real import into Studio 5000):
 - How the editor's ASCII mode writes an operand containing spaces (CPT expressions, string
   literals). We use double quotes.

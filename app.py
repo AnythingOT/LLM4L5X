@@ -134,7 +134,8 @@ def _compile(stmts, s: dict) -> dict:
         return {"kind": "error", "message": str(e)}
     types = dict(known or {})
     types.update({t.name: t.datatype for t in res.tags.values()})
-    issues = validate(res.rungs, types if proj else None, catalog=catalog, revision=s["revision"])
+    issues = validate(res.rungs, types if proj else None, catalog=catalog, revision=s["revision"],
+                      string_types=proj.string_types if proj else None)
     out = {
         "kind": "compiled",
         "readback": [describe_statement(st) for st in res.statements],
@@ -185,7 +186,8 @@ def _explain_rungs(parsed, source: str) -> dict:
         })
     catalog = proj.catalog() if proj else None
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None
-    issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None)
+    issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None,
+                      string_types=proj.string_types if proj else None)
     return {"kind": "rungs", "source": source, "rungs": rungs, "issues": _issues_json(issues)}
 
 
@@ -270,7 +272,7 @@ def _project_action(action: str) -> dict:
                              "message": f"parse error: {x.parse_error}"})
             else:
                 good.append(x.rung)
-        for i in validate(good, p.tag_types(rt.program), catalog=cat, revision=p.software_revision):
+        for i in validate(good, p.tag_types(rt.program), catalog=cat, revision=p.software_revision, string_types=p.string_types):
             rows.append({"where": f"{rt.program}/{rt.name} rung {i.rung}", "level": i.level, "message": i.message})
     return {"kind": "validated", "rows": rows}
 
