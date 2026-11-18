@@ -66,8 +66,8 @@ def _presets(compiled) -> dict[str, int]:
 
 
 def _context_presets(case: Case) -> dict[str, int]:
-    """Presets of the case's existing timers: project data, not something the answer sets."""
-    return {k: v for k, v in case.presets.items() if any(f"({k}," in t for t in case.context)}
+    """Presets of the case's existing timers/counters: project data, not something the answer sets."""
+    return {k: v for k, v in case.presets.items() if case.tags.get(k) in ("TIMER", "COUNTER")}
 
 
 def self_test(cases: list[Case], version: int, progress=None) -> list[Outcome]:

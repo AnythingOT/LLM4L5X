@@ -200,6 +200,8 @@ class Compiler:
         if isinstance(a, Clear):
             return Instr("CLR", (a.tag,))
         if isinstance(a, ResetAcc):
+            if is_plain_tag(a.tag) and a.tag not in self.known:
+                self._reset_only.add(a.tag)  # may still be created by a COUNT_UP/START_TIMER later
             return Instr("RES", (a.tag,))
         if isinstance(a, Count):
             self._struct_tag(a.tag, "COUNTER", a.preset)
@@ -239,12 +241,18 @@ class Compiler:
 
     def compile(self, stmts: list[Statement]) -> CompileResult:
         self._user_names = _names_in(stmts)
+        self._reset_only: set[str] = set()
         rungs: list[Rung] = []
         for s in stmts:
             try:
                 rungs += self.statement(s)
             except CompileError as e:
                 raise CompileError(f"{format_statement(s)}\n  -> {e}") from None
+        # RESET_ACC on a tag nothing else creates: it must be a counter or timer; guess from the name
+        for name in sorted(self._reset_only - set(self.tags)):
+            dt = "TIMER" if re.search(r"(TMR|TIMER|TON|TOF)", name, re.I) else "COUNTER"
+            self.tags[name] = TagDef(name, dt, None)
+            self.warnings.append(f"{name} is new and only reset here; created as a {dt} (check its preset)")
         if self.major is not None and self.major >= 36:
             rungs = [Rung(_rename(r.body, self.cat), r.comment) for r in rungs]
         self._type_tags(rungs)

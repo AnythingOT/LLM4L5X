@@ -86,3 +86,6 @@
 
 - english: Unlatch Motor_Enable if the motor temperature reaches 95 or the emergency stop is not healthy.
   spec: IF Motor_Temp >= 95 OR NOT EStop_Healthy THEN RESET Motor_Enable;
+
+- english: Move the batch weight to the report weight when the batch is done.
+  spec: IF Batch_Done THEN Report_Weight := Batch_Weight;

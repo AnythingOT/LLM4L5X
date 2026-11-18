@@ -87,3 +87,9 @@ def test_model_run_and_excel(tmp_path):
     wb = openpyxl.load_workbook(path)
     assert wb["Results"].max_row == len(cases) + 1 and "behaviour match" in wb["Summary"]["A2"].value
     assert "by structure" in summary(out, "t")
+
+
+def test_reset_case_offers_the_existing_counter():
+    for c in generate(per_combo=1, seed=1, instructions=["RES"]):
+        ctr = c.answer.split("RESET_ACC ")[1].split(",")[0].rstrip(";").strip()
+        assert c.tags.get(ctr) == "COUNTER", (c.id, ctr, c.tags)

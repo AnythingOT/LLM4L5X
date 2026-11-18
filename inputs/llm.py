@@ -47,7 +47,11 @@ Rules:
   - Never mix AND and OR without parentheses: write (A AND B) OR C.
   - "keeps running until", "stays on until" = seal-in: X := (Start OR X) AND NOT Stop;
   - "turn on"/"energize" with other actions = ENERGIZE; "latch"/"keep it set" = SET; "unlatch" = RESET.
-  - "run/start the timer T with a 5 second preset" = START_TIMER(T, 5s) (START_OFF_TIMER for off-delay).
+  - "on-delay timer T, 5 second preset" = START_TIMER(T, 5s); "off-delay timer" = START_OFF_TIMER(T, 5s).
+  - "move A to B", "copy A into B", "store A in B" = B := A; (the destination is on the left).
+  - Several actions under one condition: ONE IF with commas, IF c THEN a, b, c; (';' ends the IF).
+  - COUNT_UP and COUNT_DOWN already count once per rising edge: do not wrap their condition in RISE.
+  - "reset the counter/timer C" = RESET_ACC C.
   - "at the moment X turns on", "on the rising edge of X" = RISE(X).
   - Copy tag names EXACTLY as written in the request (same spelling, case and underscores).
   - Times need units: 500ms, 5s, 2min, 1h."""

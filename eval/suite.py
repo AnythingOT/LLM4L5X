@@ -280,7 +280,7 @@ def action(b: Builder, kind: str):
         kw = "COUNT_UP" if kind == "CTU" else "COUNT_DOWN"
         return (eng, f"{kw}({c}, {n})", Instr(kind, (c, "?", "?")), None)
     if kind == "RES":
-        c = b.pick(COUNTERS, "")
+        c = b.pick(COUNTERS, "COUNTER")  # an existing counter: offered to the model like a project tag
         b.presets.setdefault(c, 10)
         return (f"reset the counter {c}", f"RESET_ACC {c}", Instr("RES", (c,)), None)
     raise ValueError(kind)

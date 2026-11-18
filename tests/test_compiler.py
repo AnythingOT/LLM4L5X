@@ -196,3 +196,12 @@ def test_simulator_add_with_zero_does_not_evaluate_division():
     from core.rung import parse_rung
     sim = Simulator([parse_rung("ADD(A,B,C);")], {"A": 3, "B": 0})
     assert sim.scan()["C"] == 3
+
+
+def test_reset_only_counter_or_timer_is_created_with_a_warning():
+    from core.compiler import compile_spec
+    r = compile_spec("IF a THEN RESET_ACC Part_CTR, RESET_ACC Fill_TMR;", comments=False)
+    assert r.tags["Part_CTR"].datatype == "COUNTER" and r.tags["Fill_TMR"].datatype == "TIMER"
+    assert any("Part_CTR is new and only reset here" in w for w in r.warnings)
+    r = compile_spec("IF r THEN RESET_ACC Box;\nIF b THEN COUNT_UP(Box, 12);", comments=False)
+    assert r.tags["Box"].preset == 12 and not r.warnings
