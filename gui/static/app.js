@@ -20,11 +20,13 @@ const store = {
 const DEFAULTS = {
     output: 'rungs', routine: 'GeneratedRoutine', program: 'MainProgram', controller: 'LLM4L5X',
     revision: '32.04', scope: 'controller', display: 'placeholder', prefix: 'L4X', comments: true,
+    model: 'phi4-mini', ollama: 'http://127.0.0.1:11434', think: 'default',
 };
 let settings = Object.assign({}, DEFAULTS, store.get('llm4l5x.settings', {}));
 const fields = {
     output: 'setOutput', routine: 'setRoutine', program: 'setProgram', controller: 'setController',
     revision: 'setRevision', scope: 'setScope', display: 'setDisplay', prefix: 'setPrefix', comments: 'setComments',
+    model: 'setModel', ollama: 'setOllama', think: 'setThink',
 };
 function fillSettings() {
     for (const [k, id] of Object.entries(fields)) {
@@ -122,12 +124,28 @@ function issuesBlock(issues) {
     return box;
 }
 
+function attemptsBlock(attempts) {
+    const det = el('details');
+    det.appendChild(el('summary', { text: `Model attempts (${attempts.length})` }));
+    attempts.forEach((a, i) => {
+        det.appendChild(el('div', { cls: a.error ? 'warn' : 'ok', text: `#${i + 1}: ${a.error ? a.error : 'ok'}` }));
+        if (a.spec) det.appendChild(code(a.spec));
+    });
+    return det;
+}
+
 // ---------------------------------------------------------------- renderers
 const render = {
     help() {
         return addBot(
-            el('div', { text: 'Type LogicSpec, paste existing rung text, or attach an .L5X export.' }),
-            title('LogicSpec'),
+            el('div', { text: 'Describe the logic in plain English. A local model (⚙️ Settings, via Ollama) turns it into LogicSpec; checked code builds the rungs. Attach your .L5X so it uses your real tags.' }),
+            title('Plain English (examples)'),
+            code([
+                'Start the pump with the start button and keep it running until stop is pressed.',
+                'Raise a high level alarm when level stays above 80 for 5 seconds.',
+                'Count boxes on the photo eye; the batch is done at 12.',
+            ].join('\n')),
+            title('LogicSpec (what the model writes; you can type it directly)'),
             code([
                 'Pump := (Start_PB OR Pump) AND NOT Stop_PB;      // OTE, OR = branch',
                 'IF A AND N > 5 THEN SET B, CLEAR N;              // several outputs',
@@ -149,7 +167,27 @@ const render = {
     },
 
     error(d) {
-        return addBot(el('div', { cls: 'err', text: d.message }), d.hint ? el('div', { cls: 'rung-comment', text: d.hint }) : null);
+        const parts = [el('div', { cls: 'err', text: d.message })];
+        if (d.hint) parts.push(el('div', { cls: 'rung-comment', text: d.hint }));
+        if (d.attempts && d.attempts.length) parts.push(attemptsBlock(d.attempts));
+        return addBot(...parts);
+    },
+
+    generated(d) {
+        // plain English -> model -> LogicSpec; then the normal compiled view
+        const head = [
+            title(`Understood as (LogicSpec from ${d.model})`),
+            code(d.spec),
+        ];
+        const row = el('div', { cls: 'btn-row' });
+        row.appendChild(button('Edit', () => { inputBox.value = d.spec; onInput(); inputBox.focus(); }));
+        row.appendChild(el('span', { cls: 'duration', text:
+            `🤖 ${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` }));
+        head.push(row);
+        if (d.attempts.length > 1) head.push(attemptsBlock(d.attempts));
+        const msg = render.compiled(d);
+        msg.prepend(...head);
+        return msg;
     },
 
     info(d) { return addBot(el('div', { text: d.message })); },
@@ -198,10 +236,12 @@ const render = {
     },
 
     rungs(d) {
-        const parts = [title(`${d.source === 'ASCII' ? 'ASCII' : 'Neutral'} rung text → LogicSpec (${d.rungs.length})`)];
+        const parts = [title(d.source === 'ASCII'
+            ? `ASCII → neutral text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`
+            : `Neutral → ASCII text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`)];
         d.rungs.forEach((r) => {
-            parts.push(code(r.text));
-            parts.push(el('div', { cls: 'rung-comment', text: `ASCII: ${r.ascii}` }));
+            // show the form the user did not type
+            parts.push(code(d.source === 'ASCII' ? r.text : r.ascii));
             if (r.logicspec) {
                 parts.push(code(r.logicspec));
                 r.english.forEach((e) => parts.push(el('div', { cls: 'rung-comment', text: e })));
@@ -211,11 +251,18 @@ const render = {
         });
         const ib = issuesBlock(d.issues);
         if (ib) { parts.push(title('Checks')); parts.push(ib); }
+        if (d.tags && d.tags.length) {
+            parts.push(title(`New tags (${d.tags.length})`));
+            parts.push(table(['Tag', 'Type', 'Preset'], d.tags.map((t) => [t.name, t.type, t.preset ?? '']), [0]));
+        }
+        (d.warnings || []).forEach((w) => parts.push(el('div', { cls: 'warn', text: `⚠ ${w}` })));
         const row = el('div', { cls: 'btn-row' });
+        if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
+        // offer only the form the user did not type
+        if (d.source === 'ASCII') row.appendChild(copyButton(() => d.rungs.map((r) => r.text).join('\n'), 'Copy neutral'));
+        else row.appendChild(copyButton(() => d.rungs.map((r) => r.ascii).join('\n'), 'Copy ASCII'));
         const specs = d.rungs.filter((r) => r.logicspec).map((r) => r.logicspec).join('\n');
         if (specs) row.appendChild(button('Edit as LogicSpec', () => { inputBox.value = specs; onInput(); inputBox.focus(); }));
-        row.appendChild(copyButton(() => d.rungs.map((r) => r.text).join('\n'), 'Copy neutral'));
-        row.appendChild(copyButton(() => d.rungs.map((r) => r.ascii).join('\n'), 'Copy ASCII'));
         const dur = duration(d.seconds); if (dur) row.appendChild(dur);
         parts.push(row);
         return addBot(...parts);
@@ -287,7 +334,9 @@ function show(d) { (render[d.kind] || render.error)(d.kind in render ? d : { mes
 // ---------------------------------------------------------------- sending
 async function send(text) {
     addUser(text);
-    const wait = loading('Working');
+    const english = !/:=|;|^\s*(help|summary|decompile|validate|xref)\b/i.test(text) && !/^\s*\w+\s*\(/.test(text)
+        && !/^\s*(XIC|XIO|SOR|BST)\b/i.test(text);
+    const wait = loading(english ? `Asking ${settings.model} (can take a minute on CPU)` : 'Working');
     try {
         const res = await fetch('/api/process', {
             method: 'POST',
@@ -369,7 +418,7 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
         setProject(s.project, s.programs);
     } catch { /* server not ready */ }
     addBot(
-        el('div', { text: 'LLM4L5X — LogicSpec to Studio 5000 ladder, and back. Everything runs on this PC.' }),
-        el('div', { cls: 'rung-comment', text: "Try a chip below, type 'help', or Attach an .L5X export to check against your real tags." }),
+        el('div', { text: 'LLM4L5X — describe ladder logic in plain English, get checked Studio 5000 rungs. Everything runs on this PC.' }),
+        el('div', { cls: 'rung-comment', text: "Try a chip below or type 'help'. Attach your .L5X so the model uses your real tag names." }),
     );
 })();

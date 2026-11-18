@@ -172,6 +172,18 @@ JSR, instructions with no LogicSpec form) are marked non-convertible and skipped
 
 ## 7. LLM layer
 
+**Status (2026-11-18): built, not yet run against a real model.** `inputs/llm.py` talks to
+Ollama's `/api/chat` (temperature 0, optional `think: false`) with a short system prompt, the
+most similar examples from `inputs/examples.yaml`, and, when a project is attached, its
+most relevant tags by name and description. The reply is stripped of thinking, code fences and
+prose; then it is parsed, compiled and validated. Errors go back to the model (2 retries). New
+tags close to existing ones are flagged. No grammar-constrained decoding yet (Ollama cannot
+take a custom grammar); the retry loop covers syntax. `eval/` scores models by truth-table
+equivalence. Tested with fake models and a stand-in HTTP server only. Accuracy of phi4-mini,
+Qwen or Gemma is unknown until someone runs `python cli.py eval`.
+
+Original plan:
+
 Runtime: llama.cpp (GBNF grammars per request). Ollama's structured output is JSON-schema
 only, which is not enough for a custom language. Verify current capabilities before relying on
 this note. Embeddings for retrieval also run locally.
@@ -273,11 +285,13 @@ Confirmed:
     AOIs (`<EncodedData Type="AddOnInstructionDefinition">`) are registered with unknown operands.
   - Identical issues within one rung are reported once.
 
-Still unverified (needs a real import into Studio 5000):
+**Verified by import (2026-11-18, owner, Studio 5000):** a generated Rung-target L5X and a
+generated Routine-target L5X both import cleanly. Not yet recorded: the Studio 5000 version used,
+and whether the timer case (`TON(T,?,?)` + TIMER tag data with PRE) imports with PRE set.
+
+Still unverified:
 - How the editor's ASCII mode writes an operand containing spaces (CPT expressions, string
   literals). We use double quotes.
-- Whether a **Rung-target** L5X written by `l5x/writer.py` imports without errors. The element
-  layout follows exports, but no import has been tried.
 - Which `SoftwareRevision` values import cleanly into the owner's version.
 - `MOV` with STRING tags appears in real exports; whether it verifies is unknown, so the
   validator only warns.

@@ -7,6 +7,8 @@
   python cli.py inspect project.L5X [--xref TAG] [--decompile]
   python cli.py validate project.L5X
   python cli.py survey folder_of_L5X_exports
+  python cli.py ask "run the pump from start, stop with stop" [--project plant.L5X] [--model phi4-mini]
+  python cli.py eval eval/requests.yaml --model phi4-mini
   python cli.py grammar --project project.L5X [--program MainProgram] [--new-tags]
 """
 
@@ -155,6 +157,56 @@ def cmd_validate(a) -> int:
     return 1 if bad else 0
 
 
+def _client(a):
+    from inputs.llm import OllamaClient
+    return OllamaClient(model=a.model, url=a.ollama, think=False if a.no_think else None)
+
+
+def cmd_ask(a) -> int:
+    """Plain English -> LogicSpec (local model) -> rungs, optionally L5X."""
+    from inputs.llm import Generator, LLMError
+    project = read_l5x(Path(a.project)) if a.project else None
+    revision = a.revision or (project.software_revision if project else None) or "32.04"
+    try:
+        r = Generator(_client(a)).generate(
+            a.request,
+            known_tags=project.tag_types(a.program) if project else None,
+            descriptions=project.tag_descriptions(a.program) if project else None,
+            catalog=project.catalog() if project else None,
+            compiler_kw={"revision": revision},
+            string_types=project.string_types if project else None)
+    except LLMError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
+    for i, at in enumerate(r.attempts, 1):
+        print(f"# attempt {i}: {at.error or 'ok'}", file=sys.stderr)
+    if r.spec is None:
+        print(f"error: {r.error}", file=sys.stderr)
+        return 1
+    print(r.spec)
+    for s in r.compiled.statements:
+        print("#", describe_statement(s))
+    for t in r.compiled.texts:
+        print(t)
+    for w in r.warnings + r.compiled.warnings:
+        print("warning:", w, file=sys.stderr)
+    print(f"# {r.seconds}s with {a.model}", file=sys.stderr)
+    if a.output:
+        kw = dict(controller=a.controller, program=a.program or "MainProgram", revision=revision, scope=a.scope)
+        Path(a.output).write_text(write_rungs(r.compiled.rungs, r.compiled.tags.values(), **kw), "utf-8")
+        print(f"wrote {a.output}", file=sys.stderr)
+    return 0
+
+
+def cmd_eval(a) -> int:
+    from eval.run import report, run_eval
+    def progress(n, total, row):
+        print(f"[{n}/{total}] {'ok ' if row.ok else 'BAD'} {row.seconds:5.1f}s  {row.request[:70]}", file=sys.stderr)
+    rows = run_eval(a.file, _client(a), limit=a.limit, progress=progress)
+    print(report(rows, a.model))
+    return 0
+
+
 def cmd_survey(a) -> int:
     from explain.survey import survey
     print(survey(a.folder).report())
@@ -205,6 +257,28 @@ def main(argv: list[str] | None = None) -> int:
     v = sub.add_parser("validate", help="check every ladder rung in an L5X file")
     v.add_argument("file")
     v.set_defaults(fn=cmd_validate)
+
+    def llm_args(p):
+        p.add_argument("--model", default="phi4-mini", help="Ollama model name (default phi4-mini)")
+        p.add_argument("--ollama", default="http://127.0.0.1:11434", help="Ollama address")
+        p.add_argument("--no-think", action="store_true", help="ask thinking models (Qwen3 etc.) not to think")
+
+    ak = sub.add_parser("ask", help="plain English -> LogicSpec -> rungs, with a local model via Ollama")
+    ak.add_argument("request")
+    ak.add_argument("--project", help="existing L5X: the model uses its real tags")
+    ak.add_argument("--program")
+    ak.add_argument("--revision")
+    ak.add_argument("--controller", default="LLM4L5X")
+    ak.add_argument("--scope", choices=["controller", "program"], default="controller")
+    ak.add_argument("-o", "--output", help="write a rungs L5X file")
+    llm_args(ak)
+    ak.set_defaults(fn=cmd_ask)
+
+    ev = sub.add_parser("eval", help="score a model on English requests with expected LogicSpec")
+    ev.add_argument("file", nargs="?", default="eval/requests.yaml")
+    ev.add_argument("--limit", type=int)
+    llm_args(ev)
+    ev.set_defaults(fn=cmd_eval)
 
     sv = sub.add_parser("survey", help="check parser/catalog/decompiler against a folder of L5X exports")
     sv.add_argument("folder")

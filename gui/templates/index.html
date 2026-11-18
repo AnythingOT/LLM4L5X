@@ -24,9 +24,10 @@
         <div id="inputWrapper">
             <div class="chips" id="chips">
                 <button class="chip" data-text="help">help</button>
-                <button class="chip" data-text="Pump := (Start_PB OR Pump) AND NOT Stop_PB AND NOT Fault;">seal-in</button>
-                <button class="chip" data-text="Alarm := DELAY(Level > 80.0, 5s) AND NOT Muted;">delay</button>
-                <button class="chip" data-text="IF RISE(Part_Sensor) THEN COUNT_UP(Parts, 10), Total := Total + 1;">counter</button>
+                <button class="chip" data-text="Start the pump with the start button and keep it running until the stop button is pressed or the pump faults.">pump start/stop</button>
+                <button class="chip" data-text="Raise the high level alarm when the level stays above 80 for 5 seconds, unless the alarm is muted.">delayed alarm</button>
+                <button class="chip" data-text="Count parts on the part sensor; the batch is complete at 10 parts.">counter</button>
+                <button class="chip" data-text="Pump := (Start_PB OR Pump) AND NOT Stop_PB;">LogicSpec</button>
                 <button class="chip" data-text="XIC(a)[XIC(b) ,XIO(c) ]OTE(d);">explain rung</button>
                 <button class="chip" data-text="XIC Start BST XIC Run NXB XIO Stop BND OTE Motor">ASCII rung</button>
                 <button class="chip project-only" data-text="decompile" hidden>decompile project</button>
@@ -35,7 +36,7 @@
             <div class="input-row">
                 <div class="input-with-buttons">
                     <button id="attachButton" title="Attach an .L5X export">Attach</button>
-                    <textarea id="inputBox" placeholder="Type LogicSpec, paste rungs (neutral or ASCII), or 'help'   (Enter = send, Shift+Enter = new line)"></textarea>
+                    <textarea id="inputBox" placeholder="Describe the logic in plain English, or paste rungs (neutral/ASCII)   (Enter = send, Shift+Enter = new line)"></textarea>
                     <button id="enterButton" title="Send" disabled>Enter</button>
                 </div>
             </div>
@@ -84,6 +85,18 @@
 
                     <label for="setComments">Rung comments</label>
                     <input id="setComments" type="checkbox" />
+
+                    <label for="setModel" title="Any model installed in Ollama (ollama list)">Local model</label>
+                    <input id="setModel" type="text" placeholder="phi4-mini" />
+
+                    <label for="setOllama">Ollama address</label>
+                    <input id="setOllama" type="text" />
+
+                    <label for="setThink" title="Qwen3 and similar models think before answering; slow on CPU">Model thinking</label>
+                    <select id="setThink">
+                        <option value="default">Model default</option>
+                        <option value="off">Off (faster)</option>
+                    </select>
                 </div>
                 <div class="modal-actions">
                     <button id="resetSettings" class="modal-button">Reset</button>

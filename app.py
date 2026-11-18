@@ -16,7 +16,7 @@ from flask import Flask, jsonify, render_template, request
 
 from core.catalog import major_version
 from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_ascii
-from core.compiler import CompileError, Compiler
+from core.compiler import CompileError, Compiler, infer_tags
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import RungSyntaxError, format_rung, parse_rung
 from core.validator import errors, validate
@@ -41,6 +41,9 @@ DEFAULTS = {
     "display": "placeholder",   # placeholder | values
     "comments": True,
     "prefix": "L4X",
+    "model": "phi4-mini",
+    "ollama": "http://127.0.0.1:11434",
+    "think": "default",         # default | off
 }
 
 
@@ -56,6 +59,8 @@ def _settings(raw: dict | None) -> dict:
     if s["display"] not in ("placeholder", "values"):
         s["display"] = "placeholder"
     s["comments"] = bool(s["comments"])
+    if s["think"] not in ("default", "off"):
+        s["think"] = "default"
     return s
 
 
@@ -110,15 +115,16 @@ def _logicspec_or_rung(text: str, s: dict) -> dict:
         catalog = proj.catalog() if proj else None
         if looks_like_ascii(text, catalog):
             try:
-                return _explain_rungs(parse_ascii(text, catalog), source="ASCII")
+                return _explain_rungs(parse_ascii(text, catalog), source="ASCII", s=s)
             except AsciiSyntaxError as e:
                 return {"kind": "error", "message": f"Not valid ASCII rung text: {e}"}
-        rung_out = _try_rungs(text)
+        rung_out = _try_rungs(text, s)
         if rung_out:
             return rung_out
-        return {"kind": "error", "message": f"Not valid LogicSpec: {spec_err}",
-                "hint": "Type 'help' for the syntax. You can also paste rung text as neutral text "
-                        "(XIC(a)OTE(b);) or ASCII (XIC a OTE b)."}
+        if _looks_like_logicspec(text):
+            return {"kind": "error", "message": f"Not valid LogicSpec: {spec_err}",
+                    "hint": "Type 'help' for the syntax, or describe the logic in plain English."}
+        return _english(text, s)
     return _compile(stmts, s)
 
 
@@ -158,7 +164,41 @@ def _compile(stmts, s: dict) -> dict:
     return out
 
 
-def _try_rungs(text: str) -> dict | None:
+def _looks_like_logicspec(text: str) -> bool:
+    """Someone typing LogicSpec (with a mistake) rather than English."""
+    return bool(re.search(r":=|^\s*IF\b.*\bTHEN\b", text, flags=re.I | re.M)) and text.rstrip().endswith(";")
+
+
+def _english(text: str, s: dict) -> dict:
+    """Plain English -> local model -> LogicSpec -> compiled, checked rungs."""
+    from inputs.llm import Generator, LLMError, OllamaClient
+    proj = _project()
+    client = OllamaClient(model=s["model"], url=s["ollama"], think=False if s["think"] == "off" else None)
+    try:
+        r = Generator(client).generate(
+            text,
+            known_tags=proj.tag_types(s["program"]) if proj else None,
+            descriptions=proj.tag_descriptions(s["program"]) if proj else None,
+            catalog=proj.catalog() if proj else None,
+            compiler_kw={"revision": s["revision"], "prefix": s["prefix"],
+                         "display_operands": s["display"], "comments": s["comments"]},
+            string_types=proj.string_types if proj else None)
+    except LLMError as e:
+        return {"kind": "error", "message": str(e),
+                "hint": f"Model: {s['model']} at {s['ollama']} (change in ⚙️ Settings)."}
+    attempts = [{"spec": a.spec, "error": a.error} for a in r.attempts]
+    if r.spec is None:
+        return {"kind": "error", "message": f"The model could not produce valid logic: {r.error}",
+                "hint": "Try rewording, or name the tags you mean.", "attempts": attempts}
+    out = _compile(r.compiled.statements, s)
+    if out["kind"] == "compiled":
+        out.update(kind="generated", spec=r.spec, model=s["model"], attempts=attempts,
+                   model_seconds=r.seconds)
+        out["warnings"] = r.warnings + out["warnings"]
+    return out
+
+
+def _try_rungs(text: str, s: dict) -> dict | None:
     """Rung text, one rung per ';'. Returns None if it does not look like rungs."""
     if "(" not in text or ";" not in text:
         return None
@@ -167,11 +207,11 @@ def _try_rungs(text: str) -> dict | None:
         parsed = [parse_rung(p) for p in parts]
     except RungSyntaxError:
         return None
-    return _explain_rungs(parsed, source="neutral")
+    return _explain_rungs(parsed, source="neutral", s=s)
 
 
-def _explain_rungs(parsed, source: str) -> dict:
-    """Rung ASTs -> neutral text, ASCII, LogicSpec and English, plus checks."""
+def _explain_rungs(parsed, source: str, s: dict) -> dict:
+    """Rung ASTs -> the other text form, LogicSpec, English, checks, and an L5X."""
     rungs = []
     proj = _project()
     presets = proj.presets() if proj else {}
@@ -188,7 +228,25 @@ def _explain_rungs(parsed, source: str) -> dict:
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None
     issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None,
                       string_types=proj.string_types if proj else None)
-    return {"kind": "rungs", "source": source, "rungs": rungs, "issues": _issues_json(issues)}
+    out = {"kind": "rungs", "source": source, "rungs": rungs, "issues": _issues_json(issues),
+           "tags": [], "warnings": [], "l5x": None, "used_project": STATE["filename"]}
+    known = proj.tag_types(s["program"]) if proj else None
+    try:
+        tags, warns = infer_tags(parsed, known, catalog)
+    except CompileError as e:
+        out["warnings"].append(f"no L5X: {e}")
+        return out
+    out["tags"] = [{"name": t.name, "type": t.datatype, "preset": t.preset, "auto": False} for t in tags.values()]
+    out["warnings"] = warns
+    if not errors(issues):
+        kw = dict(controller=s["controller"], program=s["program"], revision=s["revision"], scope=s["scope"])
+        if s["output"] == "routine":
+            out["l5x"] = write_routine(parsed, tags.values(), routine=s["routine"], **kw)
+            out["filename"] = f"{_safe(s['routine'])}_Routine.L5X"
+        else:
+            out["l5x"] = write_rungs(parsed, tags.values(), **kw)
+            out["filename"] = f"{_safe(s['routine'])}_Rungs.L5X"
+    return out
 
 
 def _safe(name: str) -> str:

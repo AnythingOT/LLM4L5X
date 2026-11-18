@@ -1,0 +1,59 @@
+# English -> LogicSpec examples shown to the model (few-shot).
+# The most similar ones to each request are picked by word overlap.
+# Add your own plant's wording here: it is the cheapest way to improve results
+# without fine-tuning. Every "spec" must compile (tests check this).
+
+- english: Start the pump with the start button and keep it running until the stop button is pressed or there is a fault.
+  spec: Pump_Run := (Start_PB OR Pump_Run) AND NOT Stop_PB AND NOT Pump_Fault;
+
+- english: Turn on the lamp when the door is open.
+  spec: Door_Lamp := Door_Open;
+
+- english: The motor may run only when the guard is closed and the e-stop is healthy.
+  spec: Motor_Run := Motor_Request AND Guard_Closed AND EStop_OK;
+
+- english: Sound the horn if either the high level switch or the high pressure switch is on.
+  spec: Horn := High_Level OR High_Pressure;
+
+- english: Raise the high temperature alarm when temperature stays above 80 for 5 seconds.
+  spec: High_Temp_Alarm := DELAY(Temperature > 80, 5s);
+
+- english: Keep the fan running for 30 seconds after the heater turns off.
+  spec: Fan_Run := OFFDELAY(Heater_On, 30s);
+
+- english: Latch the fault when the overload trips, and clear it when reset is pressed and the overload is gone.
+  spec: |-
+    IF Overload THEN SET Fault_Latched;
+    IF Reset_PB AND NOT Overload THEN RESET Fault_Latched;
+
+- english: Count each box on the photo eye; the batch is done at 12 boxes. Reset the count with the reset button.
+  spec: |-
+    IF Box_Eye THEN COUNT_UP(Box_Count, 12);
+    Batch_Done := Box_Count.DN;
+    IF Reset_PB THEN RESET_ACC Box_Count;
+
+- english: Add one to the cycle counter each time the cycle starts.
+  spec: IF RISE(Cycle_Start) THEN Cycle_Count := Cycle_Count + 1;
+
+- english: When auto mode is selected, copy the recipe speed into the speed setpoint.
+  spec: IF Auto_Mode THEN Speed_SP := Recipe_Speed;
+
+- english: Open the fill valve when the tank level is below 20 percent, and close it at 90 percent.
+  spec: |-
+    IF Tank_Level < 20 THEN SET Fill_Valve;
+    IF Tank_Level >= 90 THEN RESET Fill_Valve;
+
+- english: Run the conveyor when the start button is pressed in manual mode, or automatically when the upstream machine requests it.
+  spec: Conveyor_Run := (Manual_Mode AND Start_PB) OR (Auto_Mode AND Upstream_Request);
+
+- english: Pulse the reset output for one scan when the reset button is pressed.
+  spec: Reset_Pulse := RISE(Reset_PB);
+
+- english: Two-hand start - both buttons must be pressed and the press must not already be cycling.
+  spec: Press_Start := Left_Hand_PB AND Right_Hand_PB AND NOT Press_Cycling;
+
+- english: Clear the total when the shift changes.
+  spec: IF RISE(Shift_Change) THEN CLEAR Shift_Total;
+
+- english: Warn when the pump has been commanded on for 10 seconds but there is still no flow.
+  spec: No_Flow_Warning := DELAY(Pump_Run AND NOT Flow_Switch, 10s);

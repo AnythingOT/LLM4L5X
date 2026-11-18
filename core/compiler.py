@@ -248,7 +248,7 @@ class Compiler:
 
     # ------------------------------------------------------------ tag typing
 
-    def _type_tags(self, rungs: list[Rung]) -> None:
+    def _type_tags(self, rungs: list[Rung], skip_unknown: bool = False) -> None:
         """Infer data types for plain tags from the operand types they are used in."""
         want: dict[str, set[str]] = {}
         member_refs: set[str] = set()
@@ -257,6 +257,8 @@ class Compiler:
             for ins in walk(r.body):
                 spec = self.cat.get(ins.name)
                 if spec is None:
+                    if skip_unknown:
+                        continue
                     raise CompileError(f"compiler produced unknown instruction {ins.name}")
                 floats = any(is_literal(x) and _is_float(x) for x in ins.args)
                 for op, arg in zip(spec.operands, ins.args):
@@ -300,6 +302,31 @@ class Compiler:
         for b in sorted(member_refs):
             if b not in self.tags and b not in self.known:
                 self.warnings.append(f"{b} is used with a member, bit or index; it must already exist in the project")
+
+
+def infer_tags(rungs: list[Rung], known_tags: dict[str, str] | None = None,
+               catalog: Catalog | None = None) -> tuple[dict[str, TagDef], list[str]]:
+    """New tags needed by existing rung text (pasted neutral/ASCII), typed from use.
+
+    Timer/counter presets come from literal display operands (TON(T,5000,0));
+    with '?' they are unknown and written as 0, with a warning.
+    """
+    comp = Compiler(known_tags=known_tags, catalog=catalog, comments=False)
+    comp._type_tags(rungs, skip_unknown=True)
+    for r in rungs:
+        for ins in walk(r.body):
+            spec = comp.cat.get(ins.name)
+            if spec is None or not ins.args:
+                continue
+            tag = comp.tags.get(ins.args[0])
+            if tag and tag.datatype in ("TIMER", "COUNTER"):
+                pre = [a for o, a in zip(spec.operands, ins.args) if o.member == "PRE"]
+                if pre and is_literal(pre[0]):
+                    tag.preset = int(float(pre[0]))
+                else:
+                    comp.warnings.append(f"preset of new {tag.datatype.lower()} {tag.name} is unknown; "
+                                         "it is created with PRE = 0, set it after import")
+    return comp.tags, comp.warnings
 
 
 def _rename(node, cat: Catalog):

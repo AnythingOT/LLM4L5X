@@ -96,6 +96,12 @@ class Project:
             out.update({t.name: t.datatype for t in self.tags.values() if t.scope == program})
         return out
 
+    def tag_descriptions(self, program: str | None = None) -> dict[str, str]:
+        out = {t.name: t.description for t in self.tags.values() if t.scope == "controller" and t.description}
+        if program:
+            out.update({t.name: t.description for t in self.tags.values() if t.scope == program and t.description})
+        return out
+
     def presets(self) -> dict[str, int]:
         return {t.name: t.preset for t in self.tags.values() if t.preset is not None}
 

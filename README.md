@@ -1,11 +1,12 @@
 # LLM4L5X
 
-Plain logic → ladder for Rockwell Studio 5000, importable as L5X, and back again. Everything runs locally, and it's built so a **small local LLM** can be added later as one optional input.
+Plain English → ladder logic for Rockwell Studio 5000, importable as L5X, and back again. Everything runs on your PC with a **small local model** via Ollama. No cloud, no fine-tuning.
 
-You (or later a model) write **LogicSpec**, a tiny boolean language. Deterministic code compiles it into rungs (branches included), checks them and writes the L5X. **No AI is needed for any of this.**
+The model only writes **LogicSpec**, a tiny boolean language. Deterministic code compiles that into rungs (branches included), checks them and writes the L5X. If the model's answer fails a check, the exact error goes back to it for another try. Nothing the model writes reaches an L5X unchecked.
 
 ```
-LogicSpec ─> compiler ─> rungs ─> validator ─> L5X
+English ─> local model ─> LogicSpec ─> compiler ─> rungs ─> validator ─> L5X
+                 ▲ retry with the error  │
                                      ▲
        existing L5X ─> reader ─> decompiler ─> LogicSpec + plain English
 ```
@@ -24,11 +25,23 @@ pip install -r requirements.txt
 python app.py
 ```
 
+## Plain English (needs Ollama)
+
+1. Install Ollama from ollama.com, then `ollama pull phi4-mini` (or any model; set it in ⚙️).
+2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
+3. You get the **LogicSpec the model understood**, a plain-English read-back, the rungs and a Download button. Check the read-back: it tells you what the logic will actually do.
+
+**Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*).
+
+Improve results without fine-tuning by adding examples in your plant's wording to `inputs/examples.yaml`. The most similar ones are shown to the model for each request.
+
+**Compare models by measurement:** `python cli.py eval --model phi4-mini` scores a model on `eval/requests.yaml` by meaning (truth tables), not text. Add your own requests there.
+
 ## GUI
 
 A chat-style page, same look as LLM4L5XGen:
 
-- **Type LogicSpec.** You get a plain-English read-back to check, the rungs, any new tags, the checks, and a **Download L5X** button.
+- **Describe logic in plain English** (needs Ollama), or type LogicSpec directly for testing. You get a read-back to check, the rungs, new tags, checks and a **Download L5X** button.
 - **Paste existing rungs** in either text form Studio 5000 uses. You get the other form, LogicSpec and English back:
   - neutral text `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);`, which is what L5X files contain
   - ASCII text `XIC a BST XIC b NXB XIO c BND OTE d`, the editor's ASCII mode (one rung per line; `SOR … EOR` accepted)
@@ -70,6 +83,8 @@ python cli.py inspect plant.L5X --decompile
 python cli.py inspect plant.L5X --xref Pump
 python cli.py validate plant.L5X
 python cli.py survey folder_of_exports
+python cli.py ask "run the pump from start, stop with stop" --project plant.L5X --model phi4-mini -o pump.L5X
+python cli.py eval --model qwen3.6:35b-a3b --no-think
 python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
@@ -83,9 +98,10 @@ core/               catalog.py + instructions.yaml (124 instructions), rung.py, 
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
 explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
-inputs/             front ends that produce LogicSpec: gbnf.py now; Excel C&E and LLM later
+inputs/             llm.py (Ollama, English -> LogicSpec), examples.yaml (few-shot), gbnf.py
+eval/               requests.yaml (English + expected LogicSpec), run.py (scoring)
 gui/                templates/index.html, static/ (style.css, app.js, favicon.ico)
-tests/              pytest (151 tests); fixtures/ is hand-written, not a real export
+tests/              pytest (170 tests); fixtures/ is hand-written, not a real export
 examples/  docs/
 requirements.txt  start.bat  start.sh
 ```
@@ -113,7 +129,8 @@ Run the same check on your own exports:
 python cli.py survey C:\path\to\your\exports
 ```
 
-**Not yet tested: importing a generated file into Studio 5000.** That is the most useful next step.
+**Import verified:** generated Rung and Routine L5X files import cleanly into Studio 5000.
+Still to confirm: a timer import keeps its preset.
 
 ## Safety
 

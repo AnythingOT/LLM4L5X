@@ -95,3 +95,39 @@ def test_ascii_paste(client):
 def test_compiled_includes_ascii(client):
     d = post(client, "Pump := (Start OR Pump) AND NOT Stop;")
     assert d["rungs"][0]["ascii"] == "BST XIC Start NXB XIC Pump BND XIO Stop OTE Pump"
+
+
+def test_pasted_rungs_download_with_inferred_tags(client):
+    d = post(client, "XIC Start BST XIC Run NXB XIO Stop BND OTE Motor\nGRT Level 5 TON T1 ? ?")
+    assert d["kind"] == "rungs" and d["l5x"] and d["filename"].endswith("_Rungs.L5X")
+    types = {t["name"]: t["type"] for t in d["tags"]}
+    assert types == {"Start": "BOOL", "Run": "BOOL", "Stop": "BOOL", "Motor": "BOOL", "Level": "DINT", "T1": "TIMER"}
+    assert any("preset of new timer T1 is unknown" in w for w in d["warnings"])
+    d = post(client, "XIC(a)TON(T2,3000,0);")
+    assert [t["preset"] for t in d["tags"] if t["name"] == "T2"] == [3000]
+
+
+def test_english_goes_to_the_model(client, monkeypatch):
+    import inputs.llm as llm
+    monkeypatch.setattr(llm.OllamaClient, "chat", lambda self, m: "Pump_Run := (Start_PB OR Pump_Run) AND NOT Stop_PB;")
+    d = post(client, "start the pump with start and keep it running until stop", model="fake-model")
+    assert d["kind"] == "generated" and d["model"] == "fake-model"
+    assert d["spec"] == "Pump_Run := (Start_PB OR Pump_Run) AND NOT Stop_PB;"
+    assert d["rungs"][0]["text"] == "[XIC(Start_PB) ,XIC(Pump_Run) ]XIO(Stop_PB)OTE(Pump_Run);"
+    assert d["l5x"] and len(d["attempts"]) == 1
+
+
+def test_english_when_ollama_is_down(client, monkeypatch):
+    import inputs.llm as llm
+    def down(self, m):
+        raise llm.LLMError("Cannot reach Ollama at http://127.0.0.1:11434. Is Ollama running?")
+    monkeypatch.setattr(llm.OllamaClient, "chat", down)
+    d = post(client, "turn on the lamp when the door is open")
+    assert d["kind"] == "error" and "Is Ollama running" in d["message"] and "Settings" in d["hint"]
+
+
+def test_broken_logicspec_is_not_sent_to_the_model(client, monkeypatch):
+    import inputs.llm as llm
+    monkeypatch.setattr(llm.OllamaClient, "chat", lambda self, m: (_ for _ in ()).throw(AssertionError("called")))
+    d = post(client, "X := A AND B OR C;")
+    assert d["kind"] == "error" and "parentheses" in d["message"]
