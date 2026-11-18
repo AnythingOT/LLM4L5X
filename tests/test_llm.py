@@ -215,3 +215,10 @@ def test_ollama_lists_models(monkeypatch):
     monkeypatch.setattr(urllib.request, "urlopen", lambda url, timeout=None: Resp(
         {"models": [{"name": "qwen3.6:35b-a3b"}, {"name": "phi4-mini:latest"}]}))
     assert OllamaClient().list_models() == ["phi4-mini:latest", "qwen3.6:35b-a3b"]
+
+
+def test_extract_spec_joins_statements_split_over_lines():
+    from inputs.llm import extract_spec
+    reply = ("Here you go:\nIF (A <= B) OR C THEN\n  P := S * T;\nIf you need more, ask.\n"
+             "Lamp := Door;")
+    assert extract_spec(reply) == "IF (A <= B) OR C THEN P := S * T;\nLamp := Door;"

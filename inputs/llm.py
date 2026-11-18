@@ -218,15 +218,28 @@ def pick_tags(request: str, tags: dict[str, str], descriptions: dict[str, str] |
 
 
 def extract_spec(reply: str) -> str:
-    """LogicSpec statements from a model reply: drops thinking, fences and prose."""
+    """LogicSpec statements from a model reply: drops thinking, fences and prose.
+
+    A statement may span lines ("IF ... THEN" newline "X := Y;"), so lines are joined
+    until the ';' that ends the statement.
+    """
     text = re.sub(r"<think>.*?</think>", "", reply, flags=re.S | re.I)
     text = re.sub(r"```[a-zA-Z]*", "", text)
-    keep = []
+    keep: list[str] = []
+    buf: list[str] = []
     for line in text.splitlines():
         line = line.strip().strip("`").strip()
         line = re.sub(r"^\s*(\d+[.)]|[-*])\s+", "", line)  # list markers
-        if re.match(r"(IF\b|[A-Za-z_][\w.\[\]:]*\s*:=)", line, flags=re.I) and ";" in line:
-            keep.append(line[: line.rindex(";") + 1])
+        if not line:
+            continue
+        # "IF" in capitals only: "If you need..." is prose
+        if not buf and not re.match(r"(IF\b|[A-Za-z_][\w.\[\]:]*\s*:=)", line):
+            continue
+        buf.append(line)
+        if ";" in line:
+            stmt = " ".join(buf)
+            keep.append(stmt[: stmt.rindex(";") + 1])
+            buf = []
     return "\n".join(keep)
 
 
