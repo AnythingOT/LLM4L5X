@@ -12,12 +12,12 @@ window.addEventListener('focus', () => { settings = loadSettings(); updateBadge(
 async function updateBadge() {
     const dot = $('modelDot');
     const label = BACKEND_INFO[settings.backend] ? BACKEND_INFO[settings.backend].label : settings.backend;
-    $('modelBadgeText').textContent = settings.backend === 'llamacpp' ? label : `${settings.model || 'default model'} · ${label}`;
+    $('modelBadgeText').textContent = settings.backend === 'llamacpp' ? label : `${settings.model || 'default model'} on ${label}`;
     dot.className = 'dot';
     try {
         const d = await fetchModels(settings);
         dot.className = 'dot ' + (d.ok ? 'ok' : 'bad');
-        if (d.ok && settings.backend === 'llamacpp' && d.models.length) $('modelBadgeText').textContent = `${d.models[0]} · ${label}`;
+        if (d.ok && settings.backend === 'llamacpp' && d.models.length) $('modelBadgeText').textContent = `${d.models[0]} on ${label}`;
         $('modelBadge').title = d.ok ? `Connected: ${d.url}${d.grammar ? ' (grammar-constrained)' : ''}. Click to change.`
             : `${d.error}. Click to change.`;
     } catch { dot.className = 'dot bad'; }
@@ -43,8 +43,8 @@ setChips(store.get('llm4l5x.chips', false));
 
 // ---------------------------------------------------------------- Logic / UDT mode
 const PLACEHOLDER = {
-    logic: 'Describe the logic in plain English, or paste rungs (neutral or ASCII text).  Enter = send, Shift+Enter = new line',
-    udt: 'Describe a UDT: "A motor with running and faulted bits, speed in rpm and 32 alarm bits."  Or attach an Excel sheet.',
+    logic: 'Describe the logic, or paste rungs in neutral or ASCII text',
+    udt: 'Describe a UDT, for example: a motor with run and fault bits and a speed',
 };
 let mode = store.get('llm4l5x.mode', 'logic');
 function setMode(m) {
@@ -72,7 +72,36 @@ function loading(label) {
     for (let i = 0; i < 3; i++) t.appendChild(el('span', { cls: 'loading-dot', text: '.' }));
     return addBot(t);
 }
-function title(text) { return el('div', { cls: 'section-title', text }); }
+function title(text, count) {
+    const t = el('div', { cls: 'section-title', text });
+    if (count !== undefined) t.appendChild(el('span', { cls: 'count', text: String(count) }));
+    return t;
+}
+// ladder drawings: SVG made by the server (explain/ladder.py), styled by the page's CSS
+function drawing(svg, note) {
+    const d = el('div', { cls: 'drawing' });
+    if (note) d.appendChild(el('div', { cls: 'rung-note', text: note }));
+    if (svg) d.insertAdjacentHTML('beforeend', svg);
+    return d;
+}
+async function ladders(rungs) {  // [{text, number}] -> [svg | null]
+    try {
+        const res = await fetch('/api/ladder', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rungs }),
+        });
+        return (await res.json()).svgs;
+    } catch { return rungs.map(() => null); }
+}
+// long lists: the first `n` items, then a button for the rest
+function capped(items, n, make, into) {
+    items.slice(0, n).forEach((x) => into.appendChild(make(x)));
+    if (items.length > n) {
+        const more = el('button', { cls: 'show-more', text: `Show all ${items.length}` });
+        more.onclick = () => { items.slice(n).forEach((x) => into.insertBefore(make(x), more)); more.remove(); };
+        into.appendChild(more);
+    }
+    return into;
+}
 function code(text) { return el('div', { cls: 'code-style', text }); }
 function button(label, onClick) {
     const b = el('button', { cls: 'save-btn', text: label });
@@ -107,7 +136,7 @@ async function downloadUdt(selected, output, notesBox) {
     if (!res.ok) {
         let msg = `Download failed (${res.status})`;
         try { msg = (await res.json()).message || msg; } catch { /* not JSON */ }
-        notesBox.replaceChildren(el('div', { cls: 'err', text: `✖ ${msg}` }));
+        notesBox.replaceChildren(el('div', { cls: 'err', text: msg }));
         return;
     }
     const cd = res.headers.get('Content-Disposition') || '';
@@ -120,7 +149,11 @@ async function downloadUdt(selected, output, notesBox) {
     }
     download(name, await res.blob());
 }
-function duration(s) { return s === undefined || s === null ? null : el('span', { cls: 'duration', text: `⏱️ ${s.toFixed(2)}s` }); }
+function duration(s) { return s === undefined || s === null || s < 0.05 ? null : el('span', { cls: 'duration', text: `${s.toFixed(2)} s` }); }
+function modelLine(d) {
+    return el('div', { cls: 'meta', text: `${d.model} on ${d.backend}${d.grammar ? ', grammar-constrained' : ''}, `
+        + `${d.model_seconds.toFixed(1)} s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` });
+}
 function table(headers, rows, monoCols = []) {
     const t = el('table', { cls: 'grid' });
     const hr = el('tr');
@@ -134,6 +167,7 @@ function table(headers, rows, monoCols = []) {
     return t;
 }
 const fmtName = (f) => (f === 'ascii' ? 'ASCII' : 'neutral');
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 // import checks (will it import) and rule findings (is it good), one list
 function checksBlock(issues, findings, warnings) {
@@ -143,7 +177,7 @@ function checksBlock(issues, findings, warnings) {
         cls: i.level === 'error' ? 'err' : 'warn',
         text: `${i.level === 'error' ? '✖' : '⚠'} ${i.where ?? 'Rung ' + i.rung}: ${i.message}`,
     })));
-    (findings || []).forEach((f) => box.appendChild(findingRow(f)));
+    capped(findings || [], 50, findingRow, box);
     return box.childNodes.length ? box : null;
 }
 function findingRow(f) {
@@ -165,16 +199,22 @@ function attemptsBlock(attempts) {
 function resultBody(d, { rungs, english, copyForm }) {
     const parts = [];
     if (english && english.length) {
-        parts.push(title('What this does: check it'));
+        parts.push(title('What it does'));
         const ul = el('ul', { cls: 'readback' });
         english.forEach((r) => ul.appendChild(el('li', { text: r })));
         parts.push(ul);
     }
+    parts.push(title(rungs.length > 1 ? 'Rungs' : 'Rung', rungs.length > 1 ? rungs.length : undefined));
+    rungs.forEach((r) => parts.push(drawing(r.svg, r.comment)));
+    const pasted = d.kind === 'rungs';  // the person already has the text they pasted: no text, no Copy
     const shown = rungs.map((r) => (copyForm === 'ascii' ? r.ascii : r.text)).join('\n');
-    parts.push(title(`Rungs (${rungs.length}), ${fmtName(copyForm)} text`));
-    parts.push(code(shown));
+    const txt = el('details');
+    txt.appendChild(el('summary', { text: `${fmtName(copyForm) === 'ASCII' ? 'ASCII' : 'Neutral'} text` }));
+    txt.appendChild(code(shown));
+    txt.open = true;
+    if (!pasted) parts.push(txt);
     if (d.tags && d.tags.length) {
-        parts.push(title(`Tags in the download (${d.tags.length})`));
+        parts.push(title('Tags in the download', d.tags.length));
         parts.push(table(['Tag', 'Type', 'Preset', ''],
             d.tags.map((t) => [t.name, t.type, t.preset ?? '', t.auto ? 'helper' : '']), [0]));
     }
@@ -183,12 +223,16 @@ function resultBody(d, { rungs, english, copyForm }) {
     const errs = (d.issues || []).filter((i) => i.level === 'error').length;
     parts.push(el('div', {
         cls: 'status-line ' + (errs ? 'err' : 'ok'),
-        text: errs ? `✖ ${errs} import error(s): no L5X produced`
-            : `✔ Ready${d.used_project ? `, checked against ${d.used_project}` : ': no project attached, so tag names are not checked'}`,
+        text: errs ? `${errs} import error${errs > 1 ? 's' : ''}: fix ${errs > 1 ? 'them' : 'it'} to get an L5X`
+            : `Ready to import${d.used_project ? `, checked against ${d.used_project}` : '. No file attached, so tag names are not checked'}`,
     }));
     const row = el('div', { cls: 'btn-row' });
-    row.appendChild(copyButton(() => shown, `Copy ${fmtName(copyForm)}`));
-    if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
+    if (d.l5x) {
+        const dl = button(`Download ${d.filename}`, () => download(d.filename, d.l5x));
+        dl.classList.add('primary');
+        row.appendChild(dl);
+    }
+    if (!pasted) row.appendChild(copyButton(() => shown, `Copy ${fmtName(copyForm)} text`));
     const dur = duration(d.seconds); if (dur) row.appendChild(dur);
     parts.push(row);
     return parts;
@@ -210,9 +254,7 @@ const render = {
 
     generated(d) {
         const parts = resultBody(d, { rungs: d.rungs, english: d.readback, copyForm: settings.rung_format });
-        const meta = el('div', { cls: 'duration', text: `🤖 ${d.model} via ${d.backend}${d.grammar ? ', grammar-constrained' : ''}: `
-            + `${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` });
-        parts.unshift(meta);
+        parts.unshift(modelLine(d));
         if (d.attempts.length > 1) parts.splice(1, 0, attemptsBlock(d.attempts));
         return addBot(...parts);
     },
@@ -231,9 +273,7 @@ const render = {
             else english.push(`Rung ${i}: not explained (${r.why})`);
         });
         parts.push(...resultBody(d, { rungs: d.rungs, english, copyForm: other }));
-        parts.unshift(el('div', { cls: 'status-line', text: d.source === 'ASCII'
-            ? `ASCII → neutral text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})`
-            : `Neutral → ASCII text (${d.rungs.length} rung${d.rungs.length > 1 ? 's' : ''})` }));
+        parts.unshift(el('div', { cls: 'meta', text: `Read as ${d.source === 'ASCII' ? 'ASCII' : 'neutral'} rung text` }));
         return addBot(...parts);
     },
 
@@ -246,15 +286,15 @@ const render = {
         }
         const unparsed = d.routines.reduce((a, r) => a + r.unparsed, 0);
         const parts = [
-            el('div', { cls: 'status-line ok', text: `✔ Attached ${d.filename}` }),
-            el('div', { text: `${d.target ?? '?'} export · controller ${d.controller ?? '?'} · version ${d.revision ?? '?'}` }),
-            el('div', { text: `${d.tags} tags · ${d.udts.length} UDTs · ${d.aois.length} AOIs · ${d.routines.length} routines` }),
+            el('div', { cls: 'status-line', text: d.filename }),
+            el('div', { cls: 'meta', text: `${d.target ?? 'Unknown'} export of ${d.controller ?? 'an unnamed controller'}, version ${d.revision ?? 'unknown'}` }),
+            el('div', { text: [plural(d.tags, 'tag'), plural(d.udts.length, 'UDT'), plural(d.aois.length, 'AOI'), plural(d.routines.length, 'routine')].join(', ') }),
             table(['Program', 'Routine', 'Type', 'Rungs', 'Did not parse'],
                 d.routines.map((r) => [r.program, r.name, r.type, String(r.rungs), r.unparsed ? String(r.unparsed) : ''])),
         ];
-        if (unparsed) parts.push(el('div', { cls: 'warn', text: `⚠ ${unparsed} rung(s) could not be read: Validate lists them.` }));
+        if (unparsed) parts.push(el('div', { cls: 'warn', text: `${plural(unparsed, 'rung')} could not be read. Validate lists them.` }));
         const v36 = (d.revision_major ?? 0) >= 36;
-        if (d.target !== 'DataType') parts.push(el('div', { cls: 'rung-comment', text: `New logic now uses this project's tags and AOIs, with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE …' : 'GRT, EQU, MOV …'}).` }));
+        if (d.target !== 'DataType') parts.push(el('div', { cls: 'rung-comment', text: `New logic now uses these tags and AOIs, with v${d.revision_major ?? '?'} instruction names (${v36 ? 'GT, EQ, MOVE' : 'GRT, EQU, MOV'}).` }));
         const row = el('div', { cls: 'btn-row' });
         if (d.target !== 'DataType') {
             row.appendChild(button('Explain all rungs', () => send('decompile')));
@@ -269,14 +309,26 @@ const render = {
 
     decompiled(d) {
         const form = settings.rung_format;
-        const parts = [el('div', { cls: 'status-line', text: `${d.ok} of ${d.total} rungs explained` })];
-        const det = el('details');
-        det.open = d.total <= 40;
-        det.appendChild(el('summary', { text: 'Show every rung' }));
-        det.appendChild(table(['Where', `Rung (${fmtName(form)})`, 'What it does'],
-            d.rows.map((r) => [r.where, (form === 'ascii' && r.ascii) ? r.ascii : r.text,
-                r.english ? r.english.join(' ') : `✖ ${r.why}`]), [1]));
-        parts.push(det);
+        const parts = [el('div', { cls: 'status-line', text: `${d.ok} of ${plural(d.total, 'rung')} explained` })];
+        const list = el('div', { cls: 'checks' });
+        const PAGE = 20;
+        let shown = 0;
+        const more = el('button', { cls: 'show-more' });
+        async function next() {
+            const page = d.rows.slice(shown, shown + PAGE);
+            shown += page.length;
+            const svgs = await ladders(page.map((r) => ({ text: r.text, number: r.number })));
+            page.forEach((r, i) => {
+                list.appendChild(el('div', { cls: 'finding-where', text: r.where }));
+                list.appendChild(svgs[i] ? drawing(svgs[i]) : code((form === 'ascii' && r.ascii) ? r.ascii : r.text));
+                list.appendChild(el('div', { cls: r.english ? 'rung-comment' : 'warn', text: r.english ? r.english.join(' ') : `Not explained: ${r.why}` }));
+            });
+            more.textContent = `Show the next ${Math.min(PAGE, d.rows.length - shown)} of ${d.rows.length - shown} left`;
+            more.hidden = shown >= d.rows.length;
+        }
+        more.onclick = next;
+        parts.push(list, more);
+        next();
         const text = d.rows.map((r) => `${r.where}\n  ${r.english ? r.english.join('\n  ') : 'not explained: ' + r.why}`).join('\n');
         const row = el('div', { cls: 'btn-row' });
         row.appendChild(copyButton(() => text, 'Copy explanations'));
@@ -291,16 +343,20 @@ const render = {
         const L = d.lint;
         const c = L.counts;
         const parts = [
-            title('Import checks: will Studio 5000 accept it'),
+            title('Will Studio 5000 import it?'),
             el('div', { cls: 'status-line ' + (errs ? 'err' : 'ok'), text: errs || imp.length
-                ? `${errs} error(s), ${imp.length - errs} warning(s)` : '✔ No problems' }),
+                ? `${plural(errs, 'error')}, ${plural(imp.length - errs, 'warning')}` : 'Yes: no import problems found' }),
         ];
         const ib = checksBlock(imp, [], []);
         if (ib) parts.push(ib);
-        parts.push(title('Rules: is it good'));
+        parts.push(title('Programming rules'));
         const summary = el('div', { cls: 'sev-summary' });
-        [['critical', 'Critical'], ['error', 'Error'], ['warning', 'Warning'], ['info', 'Info']].forEach(([k, label]) =>
-            summary.appendChild(el('span', { cls: `code ${k}`, text: `${c[k]} ${label}` })));
+        [['critical', 'critical', 'critical'], ['error', 'error', 'errors'], ['warning', 'warning', 'warnings'], ['info', 'info', 'info']]
+            .forEach(([k, one, many]) => {
+            const n = el('span', { cls: `sev-count ${k}${c[k] ? '' : ' zero'}` }, el('b', { text: String(c[k]) }));
+            n.appendChild(document.createTextNode(c[k] === 1 ? one : many));
+            summary.appendChild(n);
+        });
         parts.push(summary);
         const order = ['critical', 'error', 'warning', 'info'];
         for (const sev of order) {
@@ -312,20 +368,25 @@ const render = {
                 const det = el('details', { cls: 'rule-findings' });
                 det.open = sev === 'critical' || (sev === 'error' && fs.length <= 5);
                 det.appendChild(el('summary', {}, el('span', { cls: `code ${sev}`, text: codeName }),
-                    el('span', { text: ` ${fs[0].title} (${fs.length})` })));
-                fs.forEach((f) => det.appendChild(el('div', { cls: 'finding' },
-                    el('span', { cls: 'finding-where', text: f.location }), el('span', { text: f.message }))));
+                    el('span', { text: ` ${fs[0].title} ` }), el('span', { cls: 'muted', text: String(fs.length) })));
+                capped(fs, 100, (f) => el('div', { cls: 'finding' },
+                    el('span', { cls: 'finding-where', text: f.location }), el('span', { text: f.message })), det);
                 parts.push(det);
             }
         }
-        (L.not_verified || []).forEach((n) => parts.push(el('div', { cls: 'warn', text: `? not verified ${n}` })));
-        (L.errors || []).forEach((n) => parts.push(el('div', { cls: 'err', text: `✖ a rule crashed: ${n}` })));
+        if ((L.not_verified || []).length) {
+            const nv = el('details');
+            nv.appendChild(el('summary', { text: `${plural(L.not_verified.length, 'rule')} could not be checked from this export` }));
+            L.not_verified.forEach((n) => nv.appendChild(el('div', { cls: 'finding', text: n })));
+            parts.push(nv);
+        }
+        (L.errors || []).forEach((n) => parts.push(el('div', { cls: 'err', text: `A rule failed to run: ${n}` })));
         (L.notes || []).forEach((n) => parts.push(el('div', { cls: 'rung-comment', text: n })));
         const extra = [];
         if (L.suppressed.length) extra.push(`${L.suppressed.length} finding(s) accepted with lint:disable`);
         if (L.disabled.length) extra.push(`${L.disabled.length} rule(s) switched off`);
         const row = el('div', { cls: 'btn-row' });
-        if (extra.length) row.appendChild(el('span', { cls: 'muted', text: extra.join(' · ') }));
+        if (extra.length) row.appendChild(el('span', { cls: 'muted', text: extra.join('; ') }));
         const a = el('a', { cls: 'save-btn', text: 'Rules page' }); a.href = '/rules';
         row.appendChild(a);
         const report = [`Validation of ${d.filename}`, '', 'Import checks:',
@@ -341,23 +402,24 @@ const render = {
     udt_created(d) {
         const parts = [];
         if (d.model) {
-            parts.push(el('div', { cls: 'duration', text: `🤖 ${d.model} via ${d.backend}${d.grammar ? ', grammar-constrained' : ''}: `
-                + `${d.model_seconds.toFixed(1)}s, ${d.attempts.length} attempt${d.attempts.length > 1 ? 's' : ''}` }));
+            parts.push(modelLine(d));
             if (d.attempts.length > 1) parts.push(attemptsBlock(d.attempts));
         }
         parts.push(el('div', { cls: 'status-line', text: `${d.udts.length} UDT${d.udts.length > 1 ? 's' : ''} from ${d.source}` }));
         d.udts.forEach((u) => {
             const head = el('div', { cls: 'udt-head' }, el('span', { cls: 'udt-name', text: u.name }),
-                el('span', { cls: 'muted', text: `${u.size} bytes${u.size_as_written > u.size ? ` (${u.size_as_written} in the order given)` : ''}` }));
+                el('span', { cls: 'muted', text: u.size === null ? 'size unknown: it nests a type this file cannot size'
+                    : `${u.size} bytes${u.size_as_written > u.size ? `, ${u.size_as_written} in the order given` : ''}` }));
             parts.push(head);
             if (u.description) parts.push(el('div', { cls: 'rung-comment', text: u.description }));
             parts.push(table(['Member', 'Data type', 'Description'], u.members.map((m) => [m.name, m.type, m.description]), [0, 1]));
         });
-        (d.warnings || []).forEach((w) => parts.push(el('div', { cls: 'warn', text: `⚠ ${w}` })));
-        parts.push(el('div', { cls: 'rung-comment', text: 'Members are in the order that wastes no memory (BOOLs packed together, then by size). Import with Data Types → Import Data Type.' }));
+        (d.warnings || []).forEach((w) => parts.push(el('div', { cls: 'warn', text: w })));
+        parts.push(el('div', { cls: 'rung-comment', text: 'Members are in the order that wastes no memory: BOOLs packed together, then by size. In Studio 5000: Data Types, Import Data Type.' }));
         const row = el('div', { cls: 'btn-row' });
-        if (d.l5x) row.appendChild(button(`Download ${d.filename}`, () => download(d.filename, d.l5x)));
-        if (d.zip_b64) row.appendChild(button(`Download ${d.filename}`, () => downloadBase64(d.filename, d.zip_b64)));
+        const dl = button(`Download ${d.filename}`, () => (d.l5x ? download(d.filename, d.l5x) : downloadBase64(d.filename, d.zip_b64)));
+        dl.classList.add('primary');
+        row.appendChild(dl);
         const dur = duration(d.seconds); if (dur) row.appendChild(dur);
         parts.push(row);
         return addBot(...parts);
@@ -365,13 +427,13 @@ const render = {
 
     udt_plan(d) {
         const parts = [el('div', { cls: 'status-line', text: d.target
-            ? `UDT export: ${d.target}${d.plans.length > 1 ? ` (+${d.plans.length - 1} nested)` : ''}`
-            : `UDTs in ${d.filename}: ${d.plans.length}` })];
+            ? `${d.target}${d.plans.length > 1 ? `, with ${plural(d.plans.length - 1, 'nested UDT')}` : ''}`
+            : `${plural(d.plans.length, 'UDT')} in ${d.filename}` })];
         if (!d.plans.length) return addBot(el('div', { text: 'This file has no UDTs.' }));
         const reorder = d.plans.filter((p) => p.status === 'reordered');
         const t = el('table', { cls: 'grid udt-plan' });
         const hr = el('tr');
-        ['', 'UDT', 'Bytes now → after', 'Saved / instance', 'Instances', 'Saved in total', 'Notes'].forEach((h) => hr.appendChild(el('th', { text: h })));
+        ['', 'UDT', 'Bytes', 'Saved each', 'Instances', 'Saved total', 'Notes'].forEach((h) => hr.appendChild(el('th', { text: h })));
         t.appendChild(hr);
         const boxes = [];
         d.plans.forEach((p) => {
@@ -389,18 +451,18 @@ const render = {
             tr.appendChild(el('td', { text: p.instances === null ? '—' : String(p.instances) }));
             tr.appendChild(el('td', { text: p.total_saved === null || p.total_saved === undefined ? '—' : String(p.total_saved) }));
             const notes = el('td');
-            if (p.status === 'skipped') notes.appendChild(el('span', { cls: 'muted', text: `not changed: ${p.reason}` }));
+            if (p.status === 'skipped') notes.appendChild(el('span', { cls: 'muted', text: `Not changed: ${p.reason}` }));
             else if (p.status === 'optimal') notes.appendChild(el('span', { cls: 'muted', text: p.saved
-                ? 'order already optimal; smaller once its nested UDTs are reordered' : 'already optimal' }));
+                ? 'Order already best; smaller once its nested UDTs are reordered' : 'Already in the best order' }));
             if (p.risks.length) notes.appendChild(el('span', { cls: 'code error', text: 'layout risk', title: p.risks.join('\n') }));
             if (p.in_aoi.length) notes.appendChild(el('span', { cls: 'code info', text: 'in AOI', title: `Used inside ${p.in_aoi.join(', ')}` }));
-            if (p.status === 'reordered' && !p.saved) notes.appendChild(el('span', { cls: 'muted', text: 'saves nothing ' }));
+            if (p.status === 'reordered' && !p.saved) notes.appendChild(el('span', { cls: 'muted', text: 'Saves nothing ' }));
             if (p.status === 'reordered') {
                 const det = el('details', { cls: 'order' });
-                det.appendChild(el('summary', { text: 'order' }));
+                det.appendChild(el('summary', { text: 'Member order' }));
                 det.appendChild(el('div', { cls: 'mono small', text: `before: ${p.before.join(', ')}` }));
                 det.appendChild(el('div', { cls: 'mono small', text: `after:  ${p.after.join(', ')}` }));
-                p.risks.forEach((r) => det.appendChild(el('div', { cls: 'err small', text: `⚠ ${r}` })));
+                p.risks.forEach((r) => det.appendChild(el('div', { cls: 'err small', text: r })));
                 notes.appendChild(det);
             }
             tr.appendChild(notes);
@@ -418,6 +480,7 @@ const render = {
         if (reorder.length) {
             const label = () => (sel().length === 1 ? `Download ${sel()[0]}_opt.L5X` : `Download ${sel().length} UDTs (zip)`);
             const one = button(label(), () => downloadUdt(sel(), sel().length === 1 ? 'single' : 'zip', notesBox));
+            one.classList.add('primary');
             row.appendChild(one);
             let full = null;
             if (d.full) {
@@ -438,10 +501,56 @@ const render = {
         return addBot(...parts);
     },
 
+    spec_started(d) {
+        // a requirements workbook: rows are built in the background; poll and show them as they come
+        const total = d.sheets.reduce((n, x) => n + x.rows, 0);
+        const modelRows = d.sheets.reduce((n, x) => n + x.model_rows, 0);
+        const head = el('div', { cls: 'status-line', text: `${d.filename}: ${plural(d.sheets.length, 'routine')}, ${plural(total, 'row')}` });
+        const sub = el('div', { cls: 'meta', text: `${d.sheets.map((x) => `${x.routine} (${x.rows})`).join(', ')}. `
+            + `${modelRows ? `${plural(modelRows, 'row')} go${modelRows === 1 ? 'es' : ''} to the model, about 10 to 60 s each on a CPU. ` : ''}`
+            + `${d.project ? `Tags of ${d.project} are used.` : 'No L5X attached: tag names are not checked against a project.'}` });
+        const bar = el('div', { cls: 'progress' }, el('span'));
+        const now = el('div', { cls: 'meta', text: 'Starting' });
+        const list = el('div', { cls: 'spec-rows' });
+        const row = el('div', { cls: 'btn-row' });
+        const stop = button('Stop after this row', async () => {
+            stop.disabled = true;
+            stop.textContent = 'Stopping after this row';
+            await fetch(`/api/jobs/${d.job}`, { method: 'DELETE' });
+        });
+        row.appendChild(stop);
+        const msg = addBot(head, sub, bar, now, list, row);
+        let since = 0;
+        let sheet = null;
+        const tick = async () => {
+            let v;
+            try { v = await (await fetch(`/api/jobs/${d.job}?since=${since}`)).json(); } catch { setTimeout(tick, 2000); return; }
+            if (v.kind === 'error') { row.replaceChildren(el('div', { cls: 'err', text: v.message })); return; }
+            since = v.next;
+            bar.firstChild.style.width = `${Math.round((100 * v.done) / Math.max(v.total, 1))}%`;
+            v.events.forEach((e) => {
+                if (e.sheet !== sheet) { sheet = e.sheet; list.appendChild(title(e.sheet)); }
+                list.appendChild(specRow(e));
+            });
+            if (v.status === 'running') {
+                now.textContent = `${v.done} of ${v.total} done. Working on ${v.label}`;
+                setTimeout(tick, 1000);
+                return;
+            }
+            stop.remove();
+            if (v.status === 'failed') { now.replaceWith(el('div', { cls: 'err', text: `Stopped by an error: ${v.error}` })); return; }
+            now.remove();
+            specSummary(v.result, row);
+            msg.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        };
+        tick();
+        return msg;
+    },
+
     xref(d) {
-        if (!d.refs.length) return addBot(el('div', { text: `No references to ${d.tag}.` }));
+        if (!d.refs.length) return addBot(el('div', { text: `${d.tag} is not used in any rung.` }));
         return addBot(
-            el('div', { cls: 'status-line', text: `${d.refs.length} reference(s) to ${d.tag}` }),
+            el('div', { cls: 'status-line', text: `${d.tag}: ${plural(d.refs.length, 'reference')}` }),
             table(['Where', 'Instruction', 'Operand', 'Role'],
                 d.refs.map((r) => [r.where, r.instruction, r.operand, r.role]), [1, 2]),
         );
@@ -472,7 +581,7 @@ async function send(text) {
     }
 }
 
-function onInput() { enterButton.disabled = !inputBox.value.trim(); }
+function onInput() { enterButton.disabled = !inputBox.value.trim(); grow(); }
 inputBox.addEventListener('input', onInput);
 inputBox.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); }
@@ -485,7 +594,7 @@ function submit() {
     onInput();
     send(text);
 }
-document.querySelectorAll('.chip').forEach((c) => {
+document.querySelectorAll('button.chip').forEach((c) => {  // <a class="chip"> are plain downloads
     c.onclick = () => {
         if (c.dataset.send) send(c.dataset.send);
         else { inputBox.value = c.dataset.text; onInput(); inputBox.focus(); }
@@ -495,7 +604,7 @@ document.querySelectorAll('.chip').forEach((c) => {
 // ---------------------------------------------------------------- project attach / detach
 function setProject(name, programs, preferred) {
     $('projectBadge').hidden = !name;
-    $('projectName').textContent = name ? `📁 ${name}` : '';
+    $('projectName').textContent = name || '';
     document.querySelectorAll('.project-only').forEach((c) => (c.hidden = !name));
     if (programs && programs.length) {
         settings = loadSettings();
@@ -504,9 +613,9 @@ function setProject(name, programs, preferred) {
 }
 
 async function upload(file) {
-    addUser(`📎 ${file.name}`);
+    addUser(`Attached ${file.name}`);
     const excel = /\.xls[xm]$/i.test(file.name);
-    const wait = loading(excel ? 'Reading the UDT sheet' : 'Reading the L5X');
+    const wait = loading(excel ? 'Reading the workbook' : 'Reading the L5X');
     const fd = new FormData();
     fd.append('file', file);
     fd.append('settings', JSON.stringify(loadSettings()));
@@ -516,6 +625,7 @@ async function upload(file) {
         if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
         const d = await res.json();
         if (excel && d.kind === 'udt_created') setMode('udt');
+        if (excel && d.kind === 'spec_started') setMode('logic');
         show(d);
     } catch (e) {
         wait.remove();
@@ -540,8 +650,72 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
         setProject(s.project, s.programs, s.default_program);
     } catch { /* server not ready */ }
     updateBadge();
-    addBot(
-        el('div', { text: 'Describe ladder logic in plain English, or paste rungs, and get checked Studio 5000 rungs. Everything runs on this PC.' }),
-        el('div', { cls: 'rung-comment', text: 'Press ? for what it can do, ⓘ in the input box for examples. Switch Logic / UDT to create a data type. Attach your .L5X so the logic uses your real tag names.' }),
-    );
+    intro();
 })();
+
+// ---------------------------------------------------------------- requirements workbook
+function specRow(e) {
+    const box = el('div', { cls: `spec-row ${e.ok ? '' : 'failed'}` });
+    const head = el('div', { cls: 'spec-head' },
+        el('span', { cls: 'finding-where', text: e.ref ? `Rung ${e.ref} (Excel row ${e.line})` : `Excel row ${e.line}` }),
+        el('span', { cls: e.ok ? 'ok small' : 'err small', text: e.ok ? plural(e.rungs.length, 'rung') : 'Not built' }),
+        el('span', { cls: 'meta', text: `${e.seconds.toFixed(1)} s` }));
+    box.appendChild(head);
+    box.appendChild(el('div', { cls: 'spec-request', text: e.request }));
+    e.rungs.forEach((r) => box.appendChild(drawing(r.svg)));
+    if (e.error) box.appendChild(el('div', { cls: 'err small', text: e.error }));
+    (e.warnings || []).forEach((w) => box.appendChild(el('div', { cls: 'warn small', text: w })));
+    return box;
+}
+function specSummary(res, row) {
+    const parts = [];
+    if (res.cancelled) parts.push(el('div', { cls: 'warn', text: 'Stopped before the end: the files hold the rows built so far.' }));
+    const t = table(['Routine', 'Rows built', 'Failed', 'Rungs', 'New tags', 'Rule findings'],
+        res.sheets.map((x) => [x.routine, String(x.ok), String(x.failed), String(x.rungs), String(x.tags), String(x.lint.length)]), [0]);
+    parts.push(t);
+    res.sheets.forEach((x) => {
+        const cb = checksBlock([], x.lint);
+        if (cb) { parts.push(title(`Rules on ${x.routine}`)); parts.push(cb); }
+    });
+    const failed = res.sheets.reduce((n, x) => n + x.failed, 0);
+    parts.push(el('div', { cls: 'rung-comment', text: (failed ? `${plural(failed, 'row')} could not be built and ${failed === 1 ? 'is' : 'are'} left out (see above and Report.txt). ` : '')
+        + 'Import each routine with Import Routine in Studio 5000, and check the read-back of every rung first.' }));
+    row.before(...parts);
+    if (res.download) {
+        const dl = button(`Download ${res.download}`, () => (res.l5x ? download(res.download, res.l5x) : downloadBase64(res.download, res.zip_b64)));
+        dl.classList.add('primary');
+        row.appendChild(dl);
+    } else {
+        row.appendChild(el('div', { cls: 'err', text: 'No rows were built, so there is nothing to download.' }));
+    }
+}
+
+// ---------------------------------------------------------------- first screen
+const EXAMPLE = {
+    said: 'Start the pump with the start button and keep it running until the stop button is pressed or the pump faults.',
+    text: '[XIC(Start_PB) ,XIC(Pump_Run) ]XIO(Stop_PB)XIO(Pump_Fault)OTE(Pump_Run);',
+};
+async function intro() {
+    const box = el('section', { cls: 'intro' });
+    box.appendChild(el('h1', { text: 'Ladder logic from plain English, checked before it reaches Studio 5000' }));
+    box.appendChild(el('p', { text: 'Describe what a rung should do, or paste rungs to read them. A model on this PC writes the logic; '
+        + 'fixed code draws it, checks it against your project and writes the L5X.' }));
+    const ex = el('div', { cls: 'example' });
+    ex.appendChild(el('div', { cls: 'said', text: EXAMPLE.said }));
+    const [svg] = await ladders([{ text: EXAMPLE.text, number: 0 }]);
+    if (svg) ex.appendChild(drawing(svg));
+    box.appendChild(ex);
+    const row = el('div', { cls: 'btn-row' });
+    const tryIt = button('Try this example', () => { setMode('logic'); inputBox.value = EXAMPLE.said; onInput(); inputBox.focus(); });
+    tryIt.classList.add('primary');
+    row.appendChild(tryIt);
+    row.appendChild(button('Attach an L5X', () => $('fileInput').click()));
+    row.appendChild(button('Create a UDT', () => { setMode('udt'); inputBox.focus(); }));
+    row.appendChild(button('What else it does', openHelp));
+    box.appendChild(row);
+    chatWindow.prepend(box);
+}
+
+// the input grows with its text, up to its max-height
+function grow() { inputBox.style.height = 'auto'; inputBox.style.height = `${inputBox.scrollHeight}px`; }
+inputBox.addEventListener('input', grow);

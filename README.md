@@ -45,13 +45,13 @@ Pick where the model runs on the ⚙️ Settings page (or click the model badge 
 Start the server in its own terminal and keep it open while you use the app:
 
 ```
-llama-server -m "C:\path\to\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf" --alias Qwen3.6-35B-A3B --host 127.0.0.1 --port 8080 -c 16384 --jinja
+llama-server -m "C:\path\to\Qwen3.6-35B-A3B-UD-Q4_K_M.gguf" --alias Qwen3.6-35B-A3B --host 127.0.0.1 --port 8080 -c 32768 --jinja
 ```
 
 - `--jinja` is required: the app switches thinking off through the model's chat template.
 - Do **not** add `--reasoning-budget 0`: it breaks the grammar ("Unexpected empty grammar stack"). The app turns thinking off per request instead.
 - `--host 127.0.0.1` keeps the server reachable from this PC only; llama-server has no password.
-- `-c 16384` covers the prompt, your project's tags and the answer; raise it for very large projects.
+- `-c 32768` is the context window: the prompt, examples, your project's tags and the answer. Use 16384 to save RAM on small projects, 65536 for very large ones. With Ollama the same setting is in ⚙️ Settings, Context window.
 - `--alias` only sets the model name shown in the app.
 
 Then start the app (`start.bat`) and choose **llama.cpp** in ⚙️ Settings; `http://127.0.0.1:8080` is the default address. Settings only says where the server is; it does not start it.
@@ -86,10 +86,10 @@ python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a 
 
 ## GUI
 
-Three pages, AnythingOT look, light and dark. Press **?** on the chat page for the help popup; **ⓘ** in the input box shows examples and project commands.
+Three pages, light and dark. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** (rails, contacts, coils, instruction boxes with their operands, branches) next to its plain-English read-back. Press the help button in the header for what it can do; the list button next to **Send** shows examples and project commands.
 
 - **Chat** (`/`)
-  - **Plain English → ladder** (needs a model). Read-back, rungs, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
+  - **Plain English → ladder** (needs a model). Read-back, the rungs drawn as ladder, their text, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
   - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the other form, what each rung does in English, the checks, **Copy** (the other form) and **Download**.
   - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `xref TagName`.
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
@@ -105,7 +105,7 @@ Switch the input box to **UDT**.
 |---|---|---|
 | Plain English: *"a motor with running and faulted bits, speed in rpm and 32 alarm bits"* | yes | `Name.L5X`, or `UDTs.zip` for several |
 | The UDT text form (`UDT Name "desc";` then `Member TYPE[n] "desc";` lines) | no | same |
-| An Excel sheet (`.xlsx`, template under ⓘ: one row per member, blank UDT cell = same UDT as above) | no | same |
+| An Excel sheet (`.xlsx`, sample in the examples list in UDT mode: one row per member, blank UDT cell = same UDT as above) | no | same |
 | An attached UDT export, or a program, then **optimize UDTs** | no | `Name_opt.L5X`, a zip of them, or the whole program |
 
 - New UDTs are checked (names, types, BOOL arrays in multiples of 32, nesting loops, names already in the attached project) and written in the order that wastes no memory: BOOLs packed into hidden SINT hosts the way Studio 5000 names them, then members by alignment. The model writes only the UDT text form, under a grammar on llama.cpp; a failed check goes back to it, as for rungs.
@@ -114,6 +114,21 @@ Switch the input box to **UDT**.
 - Sizes are computed from the layout rules, not read from Studio 5000. A UDT can only be changed offline.
 
 This replaces two archived repos: [LLM4UDT](https://github.com/AnythingOT/LLM4UDT) (UDTs from English, L5X and CSV/Excel) and [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer). The optimizer here gives the same orders and sizes as L5X_UDTOptimizer on its samples.
+
+## Requirements Excel to ladder
+
+Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes the routine name) and **each row one requirement**:
+
+| Rung | Requirement | Rung comment | Rung text |
+|---|---|---|---|
+| 1 | Start the pump with the start button and keep it running until the stop button is pressed or the pump faults. | | |
+| 2 | Turn on the pump running lamp while the pump runs. | Running lamp | |
+| 5 | | Hand-written | `XIC(Pump_Run)XIO(Pump_Fault)OTE(Pump_Healthy);` |
+
+- **Requirement** goes to the model, like the chat box. **Rung text** (neutral or ASCII), when filled, is used as written and the model is not asked. **Rung comment** empty = the requirement becomes the rung comment. **Rung** is your reference for the report. Header names are matched loosely (*Description*, *Functional description*, *No.* ...).
+- Rows run one by one in the background; each appears drawn as it finishes, and **Stop after this row** keeps what is done. Tags created by a row are known to the rows below it. A row that fails (no valid logic, a tag type clash, an import error) is reported and left out; the rest still build.
+- Output: `SheetName.L5X` (Import Routine), or `Routines.zip` with one routine per sheet and `Report.txt`. The rung rules run on each whole routine, so a timer used by two rows is caught.
+- Sample: *Requirements Excel sample* in the examples list (next to Send). Attach your project first so the rows use its tag names.
 
 ## Validate: import checks and rules
 
@@ -175,7 +190,7 @@ python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ## Repo layout
 
 ```
-app.py              GUI server (python app.py)
+app.py              starts the GUI (python app.py)
 cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
@@ -184,19 +199,22 @@ lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, p
 udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
                     writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
                     an existing export, byte-preserving)
-explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
+explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), ladder.py (rungs -> SVG
+                    ladder diagrams), survey.py
 inputs/             llm.py (Ollama/llama.cpp, English -> LogicSpec), examples.yaml (few-shot), gbnf.py,
-                    udt_llm.py (English -> UDT text form)
+                    udt_llm.py (English -> UDT text form), spec_excel.py (requirements workbook)
 eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
                     instruction suite), rung_compare.py (behavioural oracle), mutation.py
-gui/                templates/ (base, index, settings, rules), static/ (style.css, common.js,
-                    app.js, settings.js, rules.js, favicon.ico)
-tests/              pytest (299 tests); fixtures/ are hand-written, except studio_single_udt.L5X (the public L5X_UDTOptimizer sample)
+gui/                __init__.py (routes), state.py (attached file, settings), logic.py (rungs),
+                    project.py (the attached L5X), udts.py, spec.py + jobs.py (requirements workbook
+                    in the background); templates/ and static/ (pages, CSS, JS)
+tests/              pytest (318 tests, plus 3 per file with a corpus); fixtures/ are hand-written, except studio_single_udt.L5X (the public
+                    L5X_UDTOptimizer sample). test_corpus.py runs on a folder of your exports (below)
 examples/  docs/
-requirements.txt  start.bat  start.sh
+requirements.txt  ruff.toml  start.bat  start.sh
 ```
 
-Run the tests with `pytest` from the repo folder.
+Run the tests with `pytest` from the repo folder, and `ruff check .` for the code checks.
 
 ## Neutral text vs ASCII text
 
@@ -219,8 +237,27 @@ Run the same check on your own exports:
 python cli.py survey C:\path\to\your\exports
 ```
 
+**Every feature, on every file:** `tests/test_corpus.py` attaches each export in a folder and runs summary,
+explain, validate, every ladder drawing, the UDT plan and its downloads, and a write-and-read round trip
+of every routine. The exports are never committed:
+
+```
+set LLM4L5X_CORPUS=C:\path\to\your\exports
+pytest tests/test_corpus.py -q
+```
+
+Last run: 186 files (179 public exports, plus every L5X in the AnythingOT repositories), 558 checks, all
+passing. On the same files the rules agree with L5X_Lint rule for rule, except that INF007 also sees the
+v36 `MOVE` (L5X_Lint missed it), and the UDT optimizer agrees with L5X_UDTOptimizer except where a nested
+UDT shrinks (this repo carries the saving up to the parent; L5X_UDTOptimizer did not).
+
 **Import verified:** generated Rung and Routine L5X files import cleanly into Studio 5000.
 Still to confirm: a timer import keeps its preset.
+
+## Planned
+
+- Documentation written from an attached program: what each routine does, from its rungs.
+- Translate to English: rung comments, tag descriptions and tag names of a project written in another language.
 
 ## Safety
 

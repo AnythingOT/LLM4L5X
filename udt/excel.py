@@ -35,48 +35,67 @@ def _norm(v) -> str:
     return re.sub(r"\s+", " ", str(v or "")).strip()
 
 
-def read_excel(data: bytes) -> list[UdtDef]:
-    from openpyxl import load_workbook
-    try:
-        wb = load_workbook(io.BytesIO(data), read_only=True, data_only=True)
-    except Exception as e:  # noqa: BLE001 - not an xlsx, password protected ...
-        raise UdtError(f"cannot read the workbook: {e}") from None
-    ws = next((s for s in wb.worksheets if s.title.lower() in ("udts", "udt")), wb.worksheets[0])
+def _find_header(ws):
+    """(header columns, row iterator positioned after it) or (None, None)."""
     rows = ws.iter_rows(values_only=True)
-    header = None
     for n, row in enumerate(rows, 1):
         cells = [_norm(c).lower() for c in row]
         found = {k: cells.index(next(c for c in cells if c in names)) for k, names in _COLS.items()
                  if any(c in names for c in cells)}
         if {"udt", "member", "type"} <= set(found):
-            header, start = found, n
-            break
+            return found, n, rows
         if n > 10:
             break
+    return None, 0, None
+
+
+def _open(data: bytes):
+    from openpyxl import load_workbook
+    try:
+        return load_workbook(io.BytesIO(data), read_only=True, data_only=True)
+    except Exception as e:  # noqa: BLE001 - not an xlsx, password protected ...
+        raise UdtError(f"cannot read the workbook: {e}") from None
+
+
+def is_udt_sheet(data: bytes) -> bool:
+    """True if a sheet of the workbook has the UDT / Member / Data type header."""
+    try:
+        return any(_find_header(ws)[0] for ws in _open(data).worksheets)
+    except UdtError:
+        return False
+
+
+def read_excel(data: bytes) -> list[UdtDef]:
+    wb = _open(data)
+    ws = next((s for s in wb.worksheets if s.title.lower() in ("udts", "udt")), wb.worksheets[0])
+    header, start, rows = _find_header(ws)
     if header is None:
         raise UdtError("no header row with UDT, Member and Data type columns in the first 10 rows "
                        "(download the template)")
     udts: list[UdtDef] = []
+    def cell(row, key):
+        i = header.get(key)
+        return _norm(row[i]) if i is not None and i < len(row) else ""
+
     for n, row in enumerate(rows, start + 1):
-        get = lambda k: _norm(row[header[k]]) if k in header and header[k] < len(row) else ""  # noqa: E731
-        name, member, dtype = get("udt"), get("member"), get("type")
+        name, member, dtype = cell(row, "udt"), cell(row, "member"), cell(row, "type")
         if not (name or member or dtype):
             continue
         if name and (not udts or udts[-1].name != name):
             if any(u.name == name for u in udts):
                 raise UdtError(f"row {n}: rows of UDT {name} must be together")
-            udts.append(UdtDef(name, get("udt_desc")))
+            udts.append(UdtDef(name, cell(row, "udt_desc")))
         elif not udts:
             raise UdtError(f"row {n}: the first row needs a UDT name")
-        if get("udt_desc") and not udts[-1].description:
-            udts[-1].description = get("udt_desc")
+        if cell(row, "udt_desc") and not udts[-1].description:
+            udts[-1].description = cell(row, "udt_desc")
         if not member:
             continue
         m = re.fullmatch(r"([A-Za-z_]\w*)\s*(?:\[\s*(\d+)\s*\])?", dtype)
         if not m:
             raise UdtError(f"row {n}: data type '{dtype}' is not like DINT, REAL[10] or a UDT name")
         t = m.group(1).upper() if m.group(1).upper() in NATIVE else m.group(1)
-        udts[-1].members.append(UdtMember(member, t, int(m.group(2) or 0), get("desc")))
+        udts[-1].members.append(UdtMember(member, t, int(m.group(2) or 0), cell(row, "desc")))
     if not udts:
         raise UdtError("the sheet has no UDT rows")
     return udts

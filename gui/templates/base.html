@@ -9,20 +9,20 @@
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
     <header class="header">
-        <a class="brand" href="/" title="Back to the chat">
+        <span class="brand">
             <span class="logo"><span class="logo-anything">Anything</span><span class="logo-ot">OT</span></span>
-            <span class="app-name">LLM4L5X</span>
-        </a>
+            <a class="app-name {% if page == 'chat' %}active{% endif %}" href="/" title="The chat: logic, UDTs and attached files">LLM4L5X</a>
+        </span>
         {% block header_middle %}{% endblock %}
         <nav class="header-right">
             {% block header_right %}{% endblock %}
-            <a class="icon-btn {% if page == 'rules' %}active{% endif %}" href="/rules" title="Validation rules: switch rules on or off">Rules</a>
-            <a class="icon-btn {% if page == 'settings' %}active{% endif %}" href="/settings" title="Settings">⚙️</a>
-            <button id="toggleTheme" class="icon-btn" title="Dark / light">🌓</button>
+            <a class="icon-btn {% if page == 'rules' %}active{% endif %}" href="/rules" title="Validation rules: switch rules on or off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span class="label">Rules</span></a>
+            <a class="icon-btn {% if page == 'settings' %}active{% endif %}" href="/settings" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
+            <button id="toggleTheme" class="icon-btn" title="Dark or light" aria-label="Dark or light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
         </nav>
     </header>
     {% block body %}{% endblock %}
-    <footer>LLM4L5X · AnythingOT · runs on this PC · review every rung before importing</footer>
+    <footer>Runs locally with a local model, completely offline. Test before it runs in production.</footer>
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

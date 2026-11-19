@@ -10,6 +10,8 @@ from dataclasses import dataclass, field
 from inputs.llm import LLMError
 from udt.model import MEMBER_TYPES, UdtDef, UdtError, check, format_spec, parse_spec
 
+MAX_TOKENS = 2000  # one line per member: room for about 60 members with descriptions
+
 SYSTEM = """You turn a plain-English description of a PLC data structure into a Studio 5000 UDT.
 Reply with the UDT text form only, no explanations, no code fences:
 
@@ -93,7 +95,7 @@ def generate(client, request: str, known: dict[str, str] | None = None, retries:
     use_grammar = bool(getattr(client, "supports_grammar", False))
     for _ in range(retries + 1):
         try:
-            reply = client.chat(msgs, grammar=grammar(sorted(known)) if use_grammar else None)
+            reply = client.chat(msgs, grammar=grammar(sorted(known)) if use_grammar else None, max_tokens=MAX_TOKENS)
         except LLMError as e:
             if use_grammar and "grammar" in str(e).lower():
                 use_grammar = False

@@ -21,6 +21,7 @@ _BUILTIN_MEMBERS = {
     "COUNTER": {"PRE": "DINT", "ACC": "DINT"},
     "CONTROL": {"LEN": "DINT", "POS": "DINT"},
 }
+_OPERAND = re.compile(r"[A-Za-z_][\w:]*(?:\[[^\]]*\])?(?:\.[\w]+(?:\[[^\]]*\])?)*")
 _IDENT = re.compile(r"[A-Za-z_][\w:]*")
 
 
@@ -31,7 +32,7 @@ class RungRef:
     routine: str
     index: int  # position in its routine
     number: int
-    rung: Rung
+    rung: Rung | None  # None only in Context.unparsed
     comment: str | None
 
 
@@ -62,12 +63,13 @@ class Context:
     ctrl_tags: dict[str, TagInfo] = field(default_factory=dict)
     prog_tags: dict[str, dict[str, TagInfo]] = field(default_factory=dict)
     aoi_scope: dict[str, dict[str, str]] = field(default_factory=dict)  # AOI -> {param/local: type}
-    usage_text: str = ""  # identifiers of ST/FBD/SFC routines: usage, not analysed
-    unparsed: int = 0  # rungs whose text did not parse
+    usage_text: str = ""  # ST/FBD/SFC routines and unparsed rungs: counts as usage, not analysed
+    unparsed: list[RungRef] = field(default_factory=list)  # rungs whose text did not parse (rung=None)
+    every_rung: list[RungRef] = field(default_factory=list)  # parsed and unparsed, in project order
     not_verified: dict[str, str] = field(default_factory=dict)  # code -> why the export cannot answer it
 
     @classmethod
-    def build(cls, project: Project, catalog: Catalog | None = None) -> "Context":
+    def build(cls, project: Project, catalog: Catalog | None = None) -> Context:
         ctx = cls(project, catalog or project.catalog())
         for t in project.tags.values():
             if t.scope == "controller":
@@ -85,11 +87,14 @@ class Context:
         for rt in all_routines:
             texts.append(rt.usage_text)
             for i, r in enumerate(rt.rungs):
-                if r.rung is None:
-                    ctx.unparsed += 1
-                    continue
-                ctx.rungs.append(RungRef(f"{rt.program} / {rt.name} / Rung {r.number}", rt.program, rt.name,
-                                         i, r.number, r.rung, r.comment))
+                ref = RungRef(f"{rt.program} / {rt.name} / Rung {r.number}", rt.program, rt.name,
+                              i, r.number, r.rung, r.comment)
+                ctx.every_rung.append(ref)
+                if r.rung is None:  # not analysed, but its text still counts as usage
+                    ctx.unparsed.append(ref)
+                    texts.append(r.text or "")
+                else:
+                    ctx.rungs.append(ref)
         ctx.usage_text = "\n".join(t for t in texts if t)
         return ctx
 
@@ -160,6 +165,10 @@ class Context:
         return [a for a, role in self.roles(ins) if role == "read"]
 
     # ------------------------------------------------------------- usage
+
+    def usage_operands(self) -> set[str]:
+        """Dotted/indexed operands referenced outside parsed ladder (FBD IRef/ORef, ST, unparsed rungs)."""
+        return {re.sub(r"\s+", "", m).upper() for m in _OPERAND.findall(self.usage_text)}
 
     def corpus(self) -> str:
         """All rung text plus ST/FBD identifiers, for 'is it used anywhere' questions."""

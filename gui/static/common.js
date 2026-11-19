@@ -14,14 +14,14 @@ const SETTINGS_KEY = 'llm4l5x.settings';
 const DEFAULTS = {
     output: 'routine', routine: 'GeneratedRoutine', program: 'MainProgram', controller: 'LLM4L5X',
     revision: '32.04', scope: 'controller', display: 'placeholder', prefix: 'L4X', comments: true,
-    backend: 'ollama', llm_url: '', model: 'phi4-mini', think: 'default',
+    backend: 'ollama', llm_url: '', model: 'phi4-mini', think: 'default', context: '16384',
     rung_format: 'neutral', disabled_rules: [],
 };
 const BACKEND_INFO = {
     ollama: { url: 'http://127.0.0.1:11434', label: 'Ollama',
         help: 'Models installed with "ollama pull <name>". No grammar: a malformed answer is sent back to the model to fix.' },
     llamacpp: { url: 'http://127.0.0.1:8080', label: 'llama.cpp',
-        help: 'Start it with: llama-server -m model.gguf --port 8080 --jinja. Every answer is constrained to valid logic with your tag names, and thinking is always off. The server runs the model it was started with.' },
+        help: 'Start it with: llama-server -m model.gguf --port 8080 -c 32768 --jinja. The context window is set there with -c, not here. Every answer is constrained to valid logic with your tag names, and thinking is always off. The server runs the model it was started with.' },
     openai: { url: 'http://127.0.0.1:1234', label: 'OpenAI-compatible',
         help: 'Any local server with the OpenAI chat API (LM Studio, Jan, vLLM). No grammar.' },
 };

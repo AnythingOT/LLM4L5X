@@ -4,9 +4,8 @@ import pytest
 
 from core.logicspec import Assign, format_spec
 from core.compiler import Compiler, compile_spec
-from explain.decompiler import NotConvertible, decompile_rung, try_decompile
+from explain.decompiler import decompile_rung, try_decompile
 from core.rung import parse_rung
-from core.simulator import Simulator
 from helpers import environments, evaluate, random_expr
 
 

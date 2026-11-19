@@ -8,17 +8,19 @@ from pathlib import Path
 import pytest
 
 import app as gui
+from gui import state as gui_state
+from gui.state import SESSION
 
 FIX = Path(__file__).parent / "fixtures" / "sample_project.L5X"
 
 
 @pytest.fixture()
 def client():
-    gui.STATE.update(project=None, filename=None)
+    SESSION.detach()
     gui.app.config["TESTING"] = True
     with gui.app.test_client() as c:
         yield c
-    gui.STATE.update(project=None, filename=None)
+    SESSION.detach()
 
 
 def post(c, text, **settings):
@@ -153,7 +155,7 @@ def test_model_list_endpoint(client, monkeypatch):
 def test_english_through_llamacpp_backend_uses_grammar(client, monkeypatch):
     import inputs.llm as llm
     seen = {}
-    def chat(self, messages, grammar=None):
+    def chat(self, messages, grammar=None, **kw):
         seen["grammar"] = grammar
         return "Pump_Run := Start_PB;"
     monkeypatch.setattr(llm.OpenAICompatClient, "chat", chat)
@@ -237,9 +239,16 @@ def test_plain_english_udt_goes_through_the_model(client, monkeypatch):
     class Fake:
         supports_grammar, url = True, "http://x"
 
-        def chat(self, messages, grammar=None):
+        def chat(self, messages, grammar=None, **kw):
             return 'UDT Pump "A pump";\nSpeed REAL "rpm";\nRunning BOOL "running";'
-    monkeypatch.setattr(gui, "_llm", lambda s: Fake())
+    monkeypatch.setattr(gui_state, "llm", lambda s: Fake())
     d = client.post("/api/process", json={"text": "a pump with speed and running", "mode": "udt"}).get_json()
     assert d["kind"] == "udt_created" and d["grammar"] and d["filename"] == "Pump.L5X"
     assert [m["name"] for m in d["udts"][0]["members"]] == ["Running", "Speed"]
+
+
+def test_ladder_endpoint_and_drawings_in_results(client):
+    d = client.post("/api/ladder", json={"rungs": [{"text": "XIC(A)OTE(B);", "number": 3}, {"text": "nonsense"}]}).get_json()
+    assert d["svgs"][0].startswith("<svg") and ">3<" in d["svgs"][0] and d["svgs"][1] is None
+    r = post(client, "XIC(A)OTE(B);")
+    assert r["rungs"][0]["svg"].startswith("<svg")

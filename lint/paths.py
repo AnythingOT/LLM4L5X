@@ -4,7 +4,7 @@ instruction on its power path, which sequences and branches a rung has."""
 from __future__ import annotations
 
 import re
-from typing import Iterator
+from collections.abc import Iterator
 
 from core.rung import Branch, Instr, Series
 

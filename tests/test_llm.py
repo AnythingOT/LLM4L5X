@@ -206,7 +206,7 @@ def test_grammar_rejected_falls_back(monkeypatch):
     class Picky(OpenAICompatClient):
         def chat(self, messages, grammar=None):
             if grammar:
-                raise LLMError("the server rejected the LogicSpec grammar: parse error")
+                raise LLMError("the server rejected the grammar: parse error")
             return "Motor_Run := Start_PB;"
     r = Generator(Picky(grammar=True)).generate("Turn on Motor_Run while Start_PB is on.")
     assert r.spec == "Motor_Run := Start_PB;" and any("continuing without it" in w for w in r.warnings)
@@ -224,3 +224,11 @@ def test_extract_spec_joins_statements_split_over_lines():
     reply = ("Here you go:\nIF (A <= B) OR C THEN\n  P := S * T;\nIf you need more, ask.\n"
              "Lamp := Door;")
     assert extract_spec(reply) == "IF (A <= B) OR C THEN P := S * T;\nLamp := Door;"
+
+
+def test_ollama_gets_the_context_window(monkeypatch):
+    import inputs.llm as llm
+    seen = {}
+    monkeypatch.setattr(llm, "_post_json", lambda url, body, timeout: seen.update(body) or {"message": {"content": "A := B;"}})
+    llm.make_client("ollama", context=32768).chat([{"role": "user", "content": "x"}])
+    assert seen["options"]["num_ctx"] == 32768

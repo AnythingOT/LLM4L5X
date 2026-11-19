@@ -8,7 +8,7 @@ import test is listed in docs/DESIGN.md section 9.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Iterable
+from collections.abc import Iterable
 
 from lxml import etree
 
@@ -78,7 +78,8 @@ def _rung_element(parent, number: int, r: Rung, use: str | None) -> None:
     _cdata(el, "Text", format_rung(r))
 
 
-def _skeleton(target_type: str, controller: str, revision: str, date: datetime | None, **extra):
+def skeleton(target_type: str, controller: str, revision: str, date: datetime | None, **extra):
+    """<RSLogix5000Content> with a context <Controller> holding an empty <DataTypes>, as Studio exports it."""
     stamp = (date or datetime.now()).strftime("%a %b %d %H:%M:%S %Y")
     root = etree.Element("RSLogix5000Content", {
         "SchemaRevision": "1.0",
@@ -106,7 +107,7 @@ def _tags_block(ctrl, prog, tags: Iterable[TagDef], scope: str) -> None:
         _tag_element(holder, t)
 
 
-def _serialize(root) -> str:
+def serialize(root) -> str:
     # Declaration written by hand: lxml uses single quotes, Studio 5000 exports use double.
     body = etree.tostring(root, encoding="unicode", pretty_print=True)
     return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' + body
@@ -127,7 +128,7 @@ def write_rungs(
     """L5X for pasting rungs into an existing routine (TargetType="Rung")."""
     if not rungs:
         raise ValueError("no rungs to write")
-    root, ctrl = _skeleton("Rung", controller, revision, date, TargetCount=str(len(rungs)))
+    root, ctrl = skeleton("Rung", controller, revision, date, TargetCount=str(len(rungs)))
     progs = etree.SubElement(ctrl, "Programs", Use="Context")
     prog = etree.SubElement(progs, "Program", Use="Context", Name=program)
     rts = etree.SubElement(prog, "Routines", Use="Context")
@@ -136,7 +137,7 @@ def write_rungs(
     for k, r in enumerate(rungs):
         _rung_element(rll, start_number + k, r, use="Target")
     _tags_block(ctrl, prog, tags, scope)
-    return _serialize(root)
+    return serialize(root)
 
 
 def write_routine(
@@ -153,7 +154,7 @@ def write_routine(
     """L5X for importing a whole new ladder routine (TargetType="Routine")."""
     if not rungs:
         raise ValueError("no rungs to write")
-    root, ctrl = _skeleton("Routine", controller, revision, date, TargetName=routine, TargetSubType="RLL")
+    root, ctrl = skeleton("Routine", controller, revision, date, TargetName=routine, TargetSubType="RLL")
     progs = etree.SubElement(ctrl, "Programs", Use="Context")
     prog = etree.SubElement(progs, "Program", Use="Context", Name=program)
     rts = etree.SubElement(prog, "Routines", Use="Context")
@@ -162,4 +163,4 @@ def write_routine(
     for k, r in enumerate(rungs):
         _rung_element(rll, k, r, use=None)
     _tags_block(ctrl, prog, tags, scope)
-    return _serialize(root)
+    return serialize(root)

@@ -25,7 +25,10 @@
     <p class="muted rules-note">The code fixes the severity, so a code means the same thing in every report: you can switch a rule off, not soften it.
         To accept one case, write <code>lint:disable=CODE</code> in that rung's comment or that tag's description.
         <span class="badge rung">rung</span> rules also check new and pasted rungs; <span class="badge project">project</span> rules need a full controller export.</p>
-    <div id="ruleGroups"></div>
+    <div class="rules-layout">
+        <nav id="ruleIndex" class="rule-index" aria-label="Rule groups"></nav>
+        <div id="ruleGroups"></div>
+    </div>
 </main>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='rules.js') }}"></script>{% endblock %}

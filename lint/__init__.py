@@ -74,13 +74,13 @@ def run(project: Project, disabled=(), catalog: Catalog | None = None) -> Report
                      "rung rules ran. Export the whole controller for the project rules.")
     non_ladder = [rt for rt in project.routines if rt.usage_text]
     if non_ladder:
-        notes.append(f"{len(non_ladder)} ST/FBD/SFC routine(s) are not analysed (their tag references still count as use).")
+        notes.append(f"ST/FBD/SFC routines are not analysed ({len(non_ladder)}); their tag references still count as use.")
     protected = [rt for rt in project.routines if rt.protected] + \
                 [rt for a in project.aois.values() for rt in a.routines if rt.protected]
     if protected or project.protected_aois:
-        notes.append(f"{len(protected) + len(project.protected_aois)} protected routine(s)/AOI(s) cannot be read.")
+        notes.append(f"Protected routines and AOIs cannot be read ({len(protected) + len(project.protected_aois)}).")
     if ctx.unparsed:
-        notes.append(f"{ctx.unparsed} rung(s) did not parse and were skipped; see the syntax check.")
+        notes.append(f"Rungs that did not parse ({len(ctx.unparsed)}): only their comments and tag names were checked; see the import checks.")
     return Report(kept, suppressed, ctx.not_verified, errors, notes, sorted(disabled))
 
 

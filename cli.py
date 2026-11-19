@@ -28,7 +28,7 @@ from explain.decompiler import try_decompile
 from explain.describe import describe_statement
 from inputs.gbnf import build_gbnf
 from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_ascii
-from core.rung import RungSyntaxError, format_rung, parse_rung, walk
+from core.rung import RungSyntaxError, format_rung, parse_rung
 from core.validator import errors, validate
 
 

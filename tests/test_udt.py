@@ -183,7 +183,7 @@ def test_zip_has_one_file_per_udt_and_changes(an):
     z = zipfile.ZipFile(io.BytesIO(zip_files(an, {"Pad_UDT", "Copy_UDT"})))
     assert sorted(z.namelist()) == sorted([file_name("Pad_UDT"), file_name("Copy_UDT"), "CHANGES.txt"])
     changes = z.read("CHANGES.txt").decode()
-    assert "Pad_UDT: 12 -> 8 bytes (4 saved per instance, 13 instance(s), 52 bytes in total)" in changes
+    assert "Pad_UDT: 12 -> 8 bytes (4 saved per instance, 13 instances, 52 bytes in total)" in changes
     assert "LAYOUT RISK: COP copies bytes of CopySrc" in changes
 
 
@@ -214,7 +214,7 @@ class FakeClient:
     def __init__(self, replies):
         self.replies, self.seen = list(replies), []
 
-    def chat(self, messages, grammar=None):
+    def chat(self, messages, grammar=None, **kw):
         self.seen.append(grammar)
         return self.replies.pop(0)
 

@@ -112,7 +112,7 @@ def parse_ascii_rung(text: str, catalog: Catalog | None = None, comment: str | N
             if k + n > len(toks):
                 raise AsciiSyntaxError(f"{t} needs {n} operands in: {text}")
             args = [_unquote(x) for x in toks[k:k + n]]
-            for a, raw in zip(args, toks[k:k + n]):
+            for raw in toks[k:k + n]:
                 if raw.upper() in BRANCH_TOKENS:
                     raise AsciiSyntaxError(f"{t} needs {n} operands, ran into {raw} in: {text}")
             k += n

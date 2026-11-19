@@ -171,7 +171,7 @@ def jsr_depth(ctx: Context, limit: int = 4) -> list[Finding]:
 @check("INF004")
 def rung_comment(ctx: Context) -> list[Finding]:
     return [Finding("INF004", "Rung has no comment.", r.location)
-            for r in ctx.rungs if not (r.comment or "").strip()]
+            for r in ctx.every_rung if not (r.comment or "").strip()]
 
 
 @check("INF005")
