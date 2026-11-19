@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from core.logicspec import Assign
+from core.logicspec import Assign, parse_spec
 from core.compiler import CompileError, Compiler, compile_spec, tag_name_problem
 from core.rung import format_rung
 from core.simulator import Simulator, preset_state
@@ -205,3 +205,10 @@ def test_reset_only_counter_or_timer_is_created_with_a_warning():
     assert any("Part_CTR is new and only reset here" in w for w in r.warnings)
     r = compile_spec("IF r THEN RESET_ACC Box;\nIF b THEN COUNT_UP(Box, 12);", comments=False)
     assert r.tags["Box"].preset == 12 and not r.warnings
+
+
+def test_v36_move_destination_gets_a_tag():
+    # MOVE (v36) accepts any type; typing must not lose the destination of a literal move
+    r = Compiler(revision="37.00").compile(parse_spec("IF A THEN Lane_No := 250, Total := Speed / 100;"))
+    assert {t.name: t.datatype for t in r.tags.values()}["Lane_No"] == "DINT"
+    assert "MOVE(250,Lane_No)" in format_rung(r.rungs[0])

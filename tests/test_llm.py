@@ -232,3 +232,18 @@ def test_ollama_gets_the_context_window(monkeypatch):
     monkeypatch.setattr(llm, "_post_json", lambda url, body, timeout: seen.update(body) or {"message": {"content": "A := B;"}})
     llm.make_client("ollama", context=32768).chat([{"role": "user", "content": "x"}])
     assert seen["options"]["num_ctx"] == 32768
+
+
+def test_guard_accepts_plain_names_written_in_the_request():
+    from inputs.llm import Generator
+
+    class Fake:
+        supports_grammar = False
+        calls = 0
+
+        def chat(self, messages, grammar=None, **kw):
+            Fake.calls += 1
+            return "IF Flow_Switch THEN RESET Beacon;"
+
+    r = Generator(Fake()).generate("When Flow_Switch is on, unlatch Beacon.", known_tags={"Beacon_Light": "BOOL"})
+    assert r.error is None and Fake.calls == 1
