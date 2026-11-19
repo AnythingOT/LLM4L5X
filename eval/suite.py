@@ -32,14 +32,19 @@ BOOL_IN = ["Start_PB", "Stop_PB", "Reset_PB", "Auto_Mode", "Manual_Mode", "Guard
            "Air_Pressure_OK", "Remote_Enable", "Batch_Request"]
 BOOL_OUT = ["Pump_Run", "Motor_Run", "Alarm_Horn", "Fill_Valve", "Ready_Light", "Fault_Latch",
             "Conveyor_Run", "Agitator_Run", "Drain_Valve", "Beacon", "Heater_On", "Batch_Done",
-            "Interlock_OK", "Cooling_Fan"]
+            "Interlock_OK", "Cooling_Fan", "Vent_Valve", "Siren", "Stack_Light_Red", "Stack_Light_Green",
+            "Feed_Motor", "Mixer_Run", "Steam_Valve", "Reject_Gate", "Cycle_Done", "Low_Level_Alarm"]
 NUM_REAL = ["PressurePV", "PressureSP", "PressHiLimit", "Tank_Level", "Level_SP", "FlowRate", "Temp_PV",
             "Temp_SP", "Speed_Ref", "Net_Weight", "Gross_Weight", "Tare_Weight", "Scaled_Value",
-            "Scale_Factor", "Offset_Value", "PT101_PV", "TT205_PV"]
+            "Scale_Factor", "Offset_Value", "PT101_PV", "TT205_PV", "FT110_PV", "LT120_PV", "Valve_Pos",
+            "Pump_Speed", "Dosing_Rate", "Mix_Ratio", "Steam_SP", "Cool_SP"]
 NUM_DINT = ["Batch_Count", "Recipe_No", "Step_No", "Reject_Total", "Shift_Total", "Cycle_Count",
-            "Product_Code", "Lane_No"]
-TIMERS = ["Start_Delay_TMR", "Alarm_TMR", "Purge_TMR", "Run_On_TMR", "Fill_TMR", "Settle_TMR"]
-COUNTERS = ["Part_CTR", "Bottle_CTR", "Batch_CTR", "Reject_CTR"]
+            "Product_Code", "Lane_No", "Fault_Code", "Order_No", "Pallet_Count", "Shift_No", "Zone_No",
+            "Retry_Count"]
+TIMERS = ["Start_Delay_TMR", "Alarm_TMR", "Purge_TMR", "Run_On_TMR", "Fill_TMR", "Settle_TMR",
+          "Drain_TMR", "Mix_TMR", "Heat_TMR", "Cool_TMR", "Flush_TMR", "Dwell_TMR"]
+COUNTERS = ["Part_CTR", "Bottle_CTR", "Batch_CTR", "Reject_CTR", "Case_CTR", "Cap_CTR", "Label_CTR",
+            "Pallet_CTR"]
 ARRAYS = [("Recipe_Buffer", "Active_Recipe"), ("Setpoint_Table", "Live_Setpoints"), ("Raw_Data", "Log_Data")]
 
 CMP_OP = {"EQ": "=", "NE": "<>", "GT": ">", "LT": "<", "GE": ">=", "LE": "<="}

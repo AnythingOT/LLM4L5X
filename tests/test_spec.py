@@ -160,6 +160,47 @@ def test_test_workbook_has_every_structure_and_an_expected_rung_per_row(tmp_path
     assert {s.routine for s in sheets} == set(counts)
 
 
+def test_test_workbook_gives_each_tag_one_owner(tmp_path):
+    # the sheets become routines of one program: a tag written on two sheets would be one
+    # timer with two owners and two presets, so the expected answers could not all hold
+    from core.catalog import default_catalog
+    from core.rung import parse_rung
+    from eval.rung_compare import Side, _refs
+    from eval.test_workbook import build
+    out = tmp_path / "t.xlsx"
+    counts = build(out, seed=3, rows=12)
+    assert counts["Multi_output"] == 12  # the name pools are big enough to fill every sheet
+    owner = {}  # tag -> sheet that writes it (Referenced latches and unlatches one alarm on purpose)
+    for sh in read_requirements(out.read_bytes()):
+        for r in sh.rows:
+            rungs = [parse_rung(t) for t in r.expected.splitlines()]
+            for w in {x.split(".")[0].split("[")[0] for x in _refs(Side(rungs, {}), default_catalog())[2]}:
+                assert owner.setdefault(w, sh.title) == sh.title, f"{w} written on {owner[w]} and {sh.title}"
+
+
+def test_a_row_asking_another_preset_for_an_earlier_timer_fails_clearly(monkeypatch):
+    class Two:
+        supports_grammar, url = False, "http://stub"
+
+        def chat(self, messages, grammar=None, **kw):
+            ask = messages[-1]["content"]
+            return ("IF Go_Cmd THEN ON_DELAY_TIMER(Wait_TMR, 5s);" if "5 second" in ask
+                    else "IF Run_Cmd THEN ON_DELAY_TIMER(Wait_TMR, 2s);")
+
+    monkeypatch.setattr(gui_state, "llm", lambda s: Two())
+    data = book({"A": [["Requirement"], ["Run Wait_TMR for 5 seconds while Go_Cmd is on."]],
+                 "B": [["Requirement"], ["Run Wait_TMR for 2 seconds while Run_Cmd is on."]]})
+    from gui.spec import _run
+    from gui.state import settings
+    job = jobs.Job("t", 2)
+    out = _run(job, read_requirements(data), settings({}), "req.xlsx")
+    bad = [e for e in job.events if not e["ok"]]
+    assert len(bad) == 1 and bad[0]["sheet"] == "B"
+    assert "already exists with preset 5000" in bad[0]["error"] and "asks for 2000" in bad[0]["error"]
+    report = zipfile.ZipFile(io.BytesIO(base64.b64decode(out["zip_b64"]))).read("Report.txt").decode()
+    assert "FAILED: Wait_TMR already exists" in report
+
+
 def test_sheets_share_one_tag_table(monkeypatch):
     # all sheets go into one program: a tag made on sheet A keeps its type on sheet B,
     # and the one-shot on each sheet gets its own storage bit

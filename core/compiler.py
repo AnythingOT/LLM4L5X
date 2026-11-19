@@ -58,6 +58,7 @@ class CompileResult:
     tags: dict[str, TagDef]  # new tags to create
     statements: list[Statement]
     warnings: list[str] = field(default_factory=list)
+    presets_asked: dict[str, int] = field(default_factory=dict)  # preset wanted for a timer/counter that exists
 
     @property
     def texts(self) -> list[str]:
@@ -93,6 +94,7 @@ class Compiler:
         self._counter: dict[str, int] = {}
         self.tags: dict[str, TagDef] = {}
         self.warnings: list[str] = []
+        self.presets_asked: dict[str, int] = {}
         self._helpers: list[Rung] = []
         self._user_names: set[str] = set()
 
@@ -117,6 +119,7 @@ class Compiler:
             self.warnings.append(
                 f"{name} already exists; its preset is set in the project, not by this import ({preset})"
             )
+            self.presets_asked[name] = preset
             return
         prev = self.tags.get(name)
         if prev:
@@ -257,7 +260,7 @@ class Compiler:
         self._type_tags(rungs)
         if self.major is not None and self.major >= 36:
             rungs = [Rung(_rename(r.body, self.cat), r.comment) for r in rungs]
-        return CompileResult(rungs, self.tags, stmts, self.warnings)
+        return CompileResult(rungs, self.tags, stmts, self.warnings, dict(self.presets_asked))
 
     # ------------------------------------------------------------ tag typing
 
