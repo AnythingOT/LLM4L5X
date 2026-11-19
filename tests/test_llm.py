@@ -247,3 +247,20 @@ def test_guard_accepts_plain_names_written_in_the_request():
 
     r = Generator(Fake()).generate("When Flow_Switch is on, unlatch Beacon.", known_tags={"Beacon_Light": "BOOL"})
     assert r.error is None and Fake.calls == 1
+
+
+def test_grammar_lets_the_model_write_plain_names_from_the_request():
+    from inputs.llm import Generator, plain_names
+    assert plain_names("D is on while A is on and B is off.") == {"A", "B", "D"}
+    assert plain_names("Turn on A_Lamp when a part arrives. Unlatch Beacon.") == {"Beacon"}
+
+    class G:
+        supports_grammar = True
+        grammar = ""
+
+        def chat(self, messages, grammar=None, **kw):
+            G.grammar = grammar
+            return "IF Flow_Switch THEN RESET Beacon;"
+
+    Generator(G()).generate("When Flow_Switch is on, unlatch Beacon.", known_tags={"Beacon_Light": "BOOL"})
+    assert '"Beacon"' in G.grammar

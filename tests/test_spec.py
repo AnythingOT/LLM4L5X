@@ -8,7 +8,7 @@ import pytest
 from openpyxl import Workbook
 
 import app as gui
-from gui import state as gui_state
+from gui import jobs, state as gui_state
 from gui.state import SESSION
 from inputs.spec_excel import SpecSheetError, read_requirements, routine_name, sample
 from l5x.reader import read_l5x
@@ -158,3 +158,48 @@ def test_test_workbook_has_every_structure_and_an_expected_rung_per_row(tmp_path
     sheets = read_requirements(out.read_bytes())
     assert all(r.expected for s in sheets for r in s.rows)
     assert {s.routine for s in sheets} == set(counts)
+
+
+def test_sheets_share_one_tag_table(monkeypatch):
+    # all sheets go into one program: a tag made on sheet A keeps its type on sheet B,
+    # and the one-shot on each sheet gets its own storage bit
+    class Edge:
+        supports_grammar, url = False, "http://stub"
+
+        def chat(self, messages, grammar=None, **kw):
+            ask = messages[-1]["content"]
+            return ("IF RISE(Go_Cmd) THEN SET Fill_Valve;" if "Go_Cmd" in ask
+                    else "IF RISE(Fill_Valve) THEN SET Lamp_Out;")
+
+    monkeypatch.setattr(gui_state, "llm", lambda s: Edge())
+    data = book({"A": [["Requirement"], ["Pulse Fill_Valve when Go_Cmd turns on."]],
+                 "B": [["Requirement"], ["Latch Lamp_Out when Fill_Valve turns on."]]})
+    from gui.spec import _run
+    from gui.state import settings
+    from inputs.spec_excel import read_requirements
+    out = _run(jobs.Job("t", 2), read_requirements(data), settings({}), "req.xlsx")
+    z = zipfile.ZipFile(io.BytesIO(base64.b64decode(out["zip_b64"])))
+    a, b = read_l5x(z.read("A.L5X")), read_l5x(z.read("B.L5X"))
+    ons_a = {n for n in a.tags if n.startswith("L4X_ONS")}
+    ons_b = {n for n in b.tags if n.startswith("L4X_ONS")} - ons_a
+    assert ons_a and ons_b                          # B made a new bit, not a second L4X_ONS_1
+    assert b.tags["Fill_Valve"].datatype == "BOOL"  # carried from sheet A
+    assert "Go_Cmd" not in b.tags                   # A's tag that B does not use stays out
+
+
+def test_sheets_known_tags_are_passed_on(monkeypatch):
+    seen = []
+    import gui.spec as spec_mod
+    real = spec_mod._row
+
+    def spy(client, row, s, project_types, new_tags, catalog):
+        seen.append(set(new_tags))
+        return real(client, row, s, project_types, new_tags, catalog)
+
+    monkeypatch.setattr(spec_mod, "_row", spy)
+    data = book({"A": [["Rung text"], ["XIC(Go)OTE(Fill_Valve);"]],
+                 "B": [["Rung text"], ["XIC(Fill_Valve)OTE(Lamp);"]]})
+    from gui.state import settings
+    from inputs.spec_excel import read_requirements
+    spec_mod._run(jobs.Job("t", 2), read_requirements(data), settings({}), "req.xlsx")
+    assert "Fill_Valve" in seen[1]

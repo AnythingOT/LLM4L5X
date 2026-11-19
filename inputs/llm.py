@@ -278,6 +278,30 @@ def request_identifiers(request: str) -> set[str]:
     return {m for m in _TAGLIKE.findall(request) if m.upper() not in KEYWORDS}
 
 
+_PLAIN = re.compile(r"(?<![\w.])[A-Z][A-Za-z0-9]*(?![\w(])")
+_NOT_TAGS = {
+    "A", "AN", "THE", "IF", "WHEN", "WHILE", "THEN", "ELSE", "OTHERWISE", "AND", "OR", "NOT", "EITHER",
+    "BOTH", "IS", "ARE", "ON", "OFF", "TRUE", "FALSE", "TURN", "SWITCH", "SET", "RESET", "CLEAR", "STORE",
+    "COPY", "MOVE", "ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "RUN", "START", "STOP", "COUNT", "LATCH",
+    "UNLATCH", "ENERGIZE", "KEEP", "HOLD", "WAIT", "AFTER", "BEFORE", "FOR", "WITH", "TO", "IN", "AT", "OF",
+}
+
+
+def plain_names(request: str) -> set[str]:
+    """Capitalised words that may be tag names although they do not look like one: Beacon, D.
+    "A" counts only as a subject ("A is on"), since it is usually the article."""
+    from core.logicspec import KEYWORDS
+    out = set()
+    for m in _PLAIN.finditer(request):
+        w = m.group(0)
+        if w == "A" and not re.match(r"\s+(is|are|was)\b", request[m.end():]):
+            continue
+        if w.upper() in KEYWORDS or (w.upper() in _NOT_TAGS and w != "A"):
+            continue
+        out.add(w)
+    return out
+
+
 def _norm(name: str) -> str:
     return name.replace("_", "").lower()
 
@@ -377,7 +401,9 @@ class Generator:
         if getattr(self.client, "supports_grammar", False):
             from inputs.gbnf import build_gbnf
             types = dict(known_tags or {})
-            types.update({i: "ANY" for i in idents if i not in types})
+            # names the request writes but that do not look like tags (Beacon, A, D) must be writable too,
+            # or the grammar forces the model onto some other existing tag
+            types.update({i: "ANY" for i in idents | plain_names(request) if i not in types})
             grammar = build_gbnf(types, allow_new_tags=not allowed)
         for attempt in range(self.retries + 1):
             last = attempt == self.retries

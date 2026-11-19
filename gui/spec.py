@@ -16,7 +16,7 @@ from dataclasses import replace
 import lint
 from core.ascii import AsciiSyntaxError, format_ascii
 from core.compiler import CompileError, infer_tags
-from core.rung import format_rung, is_literal, walk
+from core.rung import base_tag, format_rung, is_literal, walk
 from core.simulator import SimError
 from core.validator import errors, validate
 from eval.rung_compare import Side, compare
@@ -40,6 +40,9 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
     catalog = proj.catalog() if proj else None
     client = state.llm(s)
     built, report = [], [f"Requirements: {filename}", ""]
+    # every sheet goes into the same program, so tags made by one sheet are known to the next:
+    # one Fill_Valve type, one L4X_ONS_1, not one per routine
+    earlier: dict = {}  # name -> TagDef, created by the sheets above
     for sheet in sheets:
         new_tags: dict = {}  # name -> TagDef, created by this sheet's rows
         rungs: list = []
@@ -50,12 +53,13 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                 break
             with job.lock:
                 job.label = f"{sheet.routine}: row {row.line}"
-            ev = _row(client, row, s, project_types, new_tags, catalog)
+            ev = _row(client, row, s, project_types, {**earlier, **new_tags}, catalog)
             ev.update(sheet=sheet.routine, line=row.line, ref=row.ref, request=row.request or row.logic)
             if ev["ok"]:
                 ok += 1
                 if row.expected:
-                    ev["match"], ev["match_why"] = _matches(row.expected, ev["_rungs"], {**new_tags, **ev["_tags"]}, catalog)
+                    ev["match"], ev["match_why"] = _matches(row.expected, ev["_rungs"],
+                                                            {**earlier, **new_tags, **ev["_tags"]}, catalog)
                 for r in ev.pop("_rungs"):
                     rungs.append(r)
                     ev["rungs"].append({"text": format_rung(r), "ascii": format_ascii(r),
@@ -79,11 +83,14 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                  "tags": len(new_tags), "lint": [], "file": None,
                  "expected": len(scored), "matched": sum(1 for e in scored if e.get("match"))}
         if rungs:
-            types = {**project_types, **{t.name: t.datatype for t in new_tags.values()}}
+            types = {**project_types, **{t.name: t.datatype for t in {**earlier, **new_tags}.values()}}
             # rules across rows: one timer used by two rows, one-shot storage shared ...
             entry["lint"] = [f.to_dict() for f in lint.check_rungs(rungs, types, catalog, disabled=s["disabled_rules"])]
             entry["file"] = f"{sheet.routine}.L5X"
-            entry["_l5x"] = write_routine(rungs, list(new_tags.values()), routine=sheet.routine,
+            # the routine carries its own new tags and those it uses from the sheets above
+            used = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
+            carried = [t for n, t in earlier.items() if n in used and n not in new_tags]
+            entry["_l5x"] = write_routine(rungs, carried + list(new_tags.values()), routine=sheet.routine,
                                           controller=s["controller"], program=s["program"],
                                           revision=s["revision"], scope=s["scope"])
         report.append(f"  {_n(ok, 'row')} built, {failed} failed, {_n(len(rungs), 'rung')}, "
@@ -93,6 +100,7 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                           f"(rows not built count as wrong)")
         report.append("")
         built.append(entry)
+        earlier.update(new_tags)
         if job.cancel.is_set():
             report.append("Stopped before the end.")
             break
