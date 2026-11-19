@@ -120,6 +120,11 @@ class DataTypeInfo:
     description: str | None
     members: list[MemberInfo]
     use: str | None = None  # "Target" in a single-UDT export
+    data_class: str | None = None  # User (or missing) for a UDT; ProductDefined, IO, System are Rockwell's
+
+    @property
+    def is_user(self) -> bool:
+        return self.data_class in (None, "User")
 
 
 @dataclass
@@ -396,7 +401,8 @@ def read_l5x(source: str | bytes | Path) -> Project:
                         dim = 0
                     members.append(MemberInfo(m.get("Name") or "", m.get("DataType") or "", dim,
                                               m.get("Hidden") == "true", _desc(m)))
-                datatypes[dt.get("Name")] = DataTypeInfo(dt.get("Name"), dt.get("Family"), _desc(dt), members, dt.get("Use"))
+                datatypes[dt.get("Name")] = DataTypeInfo(dt.get("Name"), dt.get("Family"), _desc(dt), members, dt.get("Use"),
+                                                       dt.get("Class"))
         for a in ctrl.findall("AddOnInstructionDefinitions/AddOnInstructionDefinition"):
             params = [
                 AOIParam(

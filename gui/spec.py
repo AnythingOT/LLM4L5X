@@ -16,8 +16,10 @@ from dataclasses import replace
 import lint
 from core.ascii import AsciiSyntaxError, format_ascii
 from core.compiler import CompileError, infer_tags
-from core.rung import format_rung
+from core.rung import format_rung, is_literal, walk
+from core.simulator import SimError
 from core.validator import errors, validate
+from eval.rung_compare import Side, compare
 from explain.ladder import to_svg
 from gui import jobs, state
 from gui.logic import generate, parse_rung_text
@@ -52,6 +54,8 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
             ev.update(sheet=sheet.routine, line=row.line, ref=row.ref, request=row.request or row.logic)
             if ev["ok"]:
                 ok += 1
+                if row.expected:
+                    ev["match"], ev["match_why"] = _matches(row.expected, ev["_rungs"], {**new_tags, **ev["_tags"]}, catalog)
                 for r in ev.pop("_rungs"):
                     rungs.append(r)
                     ev["rungs"].append({"text": format_rung(r), "ascii": format_ascii(r),
@@ -61,13 +65,19 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                 failed += 1
                 ev.pop("_rungs", None)
                 ev.pop("_tags", None)
+            ev["has_expected"] = bool(row.expected)
+            verdict = ""
+            if row.expected and ev["ok"]:
+                verdict = ", matches expected" if ev["match"] else f", DIFFERS from expected: {ev['match_why']}"
             report.append(f"  row {row.line}{f' ({row.ref})' if row.ref else ''}: "
-                          + ("ok, " + _n(len(ev["rungs"]), "rung") if ev["ok"] else f"FAILED: {ev['error']}"))
+                          + ("ok, " + _n(len(ev["rungs"]), "rung") + verdict if ev["ok"] else f"FAILED: {ev['error']}"))
             with job.lock:
                 job.events.append(ev)
                 job.done += 1
+        scored = [e for e in job.events if e.get("sheet") == sheet.routine and row_has_expected(e)]
         entry = {"routine": sheet.routine, "title": sheet.title, "ok": ok, "failed": failed, "rungs": len(rungs),
-                 "tags": len(new_tags), "lint": [], "file": None}
+                 "tags": len(new_tags), "lint": [], "file": None,
+                 "expected": len(scored), "matched": sum(1 for e in scored if e.get("match"))}
         if rungs:
             types = {**project_types, **{t.name: t.datatype for t in new_tags.values()}}
             # rules across rows: one timer used by two rows, one-shot storage shared ...
@@ -78,6 +88,9 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                                           revision=s["revision"], scope=s["scope"])
         report.append(f"  {_n(ok, 'row')} built, {failed} failed, {_n(len(rungs), 'rung')}, "
                       f"{_n(len(new_tags), 'new tag')}, {_n(len(entry['lint']), 'rule finding')}")
+        if entry["expected"]:
+            report.append(f"  test score: {entry['matched']} of {entry['expected']} rows behave as expected "
+                          f"(rows not built count as wrong)")
         report.append("")
         built.append(entry)
         if job.cancel.is_set():
@@ -136,6 +149,31 @@ def _row(client, row, s, project_types, new_tags, catalog) -> dict:
         parsed = [replace(parsed[0], comment=comment), *parsed[1:]]
     ev.update(ok=True, _rungs=parsed, _tags={n: t for n, t in tags.items() if n not in project_types})
     return _done(ev, t0)
+
+
+def row_has_expected(ev: dict) -> bool:
+    return bool(ev.get("has_expected"))
+
+
+def _presets(rungs, tags: dict) -> dict[str, int]:
+    """Timer/counter presets: from the tags, and from literal operands (TON(T,5000,0))."""
+    out = {t.name: int(t.preset) for t in tags.values() if getattr(t, "preset", None)}
+    for r in rungs:
+        for ins in walk(r.body):
+            if ins.name.upper() in ("TON", "TOF", "RTO", "CTU", "CTD") and len(ins.args) > 1 and is_literal(ins.args[1]):
+                out[ins.args[0]] = int(float(ins.args[1]))
+    return out
+
+
+def _matches(expected_text: str, got, tags: dict, catalog) -> tuple[bool, str]:
+    """Does the built row behave like the expected rung text? Run both in the scan simulator."""
+    want = parse_rung_text(expected_text)
+    if want is None:
+        return False, "the Expected cell is not valid rung text"
+    try:
+        return compare(Side(want, _presets(want, {})), Side(list(got), _presets(got, tags)), catalog=catalog)
+    except SimError as e:
+        return False, f"cannot simulate: {e}"
 
 
 def _done(ev: dict, t0: float) -> dict:

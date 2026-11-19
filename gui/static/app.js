@@ -659,10 +659,13 @@ function specRow(e) {
     const head = el('div', { cls: 'spec-head' },
         el('span', { cls: 'finding-where', text: e.ref ? `Rung ${e.ref} (Excel row ${e.line})` : `Excel row ${e.line}` }),
         el('span', { cls: e.ok ? 'ok small' : 'err small', text: e.ok ? plural(e.rungs.length, 'rung') : 'Not built' }),
+        e.match === undefined ? null : el('span', { cls: `verdict ${e.match ? 'same' : 'differs'}`,
+            text: e.match ? 'Behaves as expected' : 'Differs from expected', title: e.match_why || '' }),
         el('span', { cls: 'meta', text: `${e.seconds.toFixed(1)} s` }));
     box.appendChild(head);
     box.appendChild(el('div', { cls: 'spec-request', text: e.request }));
     e.rungs.forEach((r) => box.appendChild(drawing(r.svg)));
+    if (e.match === false && e.match_why) box.appendChild(el('div', { cls: 'err small', text: `Expected: ${e.match_why}` }));
     if (e.error) box.appendChild(el('div', { cls: 'err small', text: e.error }));
     (e.warnings || []).forEach((w) => box.appendChild(el('div', { cls: 'warn small', text: w })));
     return box;
@@ -670,9 +673,17 @@ function specRow(e) {
 function specSummary(res, row) {
     const parts = [];
     if (res.cancelled) parts.push(el('div', { cls: 'warn', text: 'Stopped before the end: the files hold the rows built so far.' }));
-    const t = table(['Routine', 'Rows built', 'Failed', 'Rungs', 'New tags', 'Rule findings'],
-        res.sheets.map((x) => [x.routine, String(x.ok), String(x.failed), String(x.rungs), String(x.tags), String(x.lint.length)]), [0]);
+    const scored = res.sheets.some((x) => x.expected);
+    const head = ['Routine', 'Rows built', 'Failed', 'Rungs', 'New tags', 'Rule findings'].concat(scored ? ['Test score'] : []);
+    const t = table(head, res.sheets.map((x) => [x.routine, String(x.ok), String(x.failed), String(x.rungs), String(x.tags),
+        String(x.lint.length)].concat(scored ? [x.expected ? `${x.matched} of ${x.expected}` : ''] : [])), [0]);
     parts.push(t);
+    if (scored) {
+        const m = res.sheets.reduce((n, x) => n + x.matched, 0);
+        const n = res.sheets.reduce((k, x) => k + x.expected, 0);
+        parts.push(el('div', { cls: 'status-line', text: `Test score: ${m} of ${n} rows behave as expected (${Math.round((100 * m) / n)}%)` }));
+        parts.push(el('div', { cls: 'rung-comment', text: 'Rows are run in the scan simulator against the Expected column, so a different but equivalent rung counts as right. Rows not built count as wrong.' }));
+    }
     res.sheets.forEach((x) => {
         const cb = checksBlock([], x.lint);
         if (cb) { parts.push(title(`Rules on ${x.routine}`)); parts.push(cb); }

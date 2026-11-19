@@ -23,7 +23,7 @@ def summary() -> dict:
         "revision_major": major_version(p.software_revision),
         "target": p.target_type,
         "tags": len(p.tags),
-        "udts": sorted(p.udts),
+        "udts": sorted(n for n, d in p.datatypes.items() if d.is_user),  # not Rockwell's ALARM_*, module types
         "aois": sorted(p.aois),
         "programs": programs,
         "default_program": default_program(),

@@ -7,6 +7,8 @@ Columns (first row with a Requirement column is the header; names matched loosel
   model is not asked.
 - Rung comment: optional; empty = the requirement itself becomes the rung comment.
 - Rung: optional reference shown in the report (e.g. URS 4.2.1).
+- Expected rung: optional; makes the sheet a test. Each built row is run against it in the scan
+  simulator and marked as behaving the same or not (text may differ).
 Sheets named "How to fill", "Instructions", "README" or "Notes" are skipped.
 """
 
@@ -22,6 +24,8 @@ _COLS = {
                 "functional description", "what it does", "plain english", "english"},
     "comment": {"rung comment", "comment", "comments"},
     "logic": {"rung text", "logic", "ladder", "neutral text", "ascii text", "rung"},
+    "expected": {"expected", "expected rung", "expected rung text", "expected answer", "expected result",
+                 "expected answer (old tool)", "answer"},
 }
 _SKIP = {"how to fill", "instructions", "readme", "read me", "notes"}
 
@@ -37,6 +41,7 @@ class Row:
     request: str
     comment: str
     logic: str
+    expected: str = ""  # optional rung text the row should behave like (a test sheet)
 
 
 @dataclass
@@ -102,7 +107,7 @@ def read_requirements(data: bytes) -> list[Sheet]:
         sheet = Sheet(ws.title, name)
 
         for line, row in enumerate(rows, n + 1):
-            r = Row(line, *(_cell(row, header, k) for k in ("ref", "request", "comment", "logic")))
+            r = Row(line, *(_cell(row, header, k) for k in ("ref", "request", "comment", "logic", "expected")))
             if r.request or r.logic:
                 sheet.rows.append(r)
         if sheet.rows:

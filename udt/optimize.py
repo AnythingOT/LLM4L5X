@@ -152,7 +152,7 @@ def analyse(data: bytes | str) -> Analysis:
     for name, (a, b) in spans.items():
         block = text[a:b]
         head = dict(_ATTR.findall(block.split(">", 1)[0]))
-        if head.get("Class", "User") == "System":
+        if head.get("Class", "User") != "User":  # System, ProductDefined, IO: Rockwell's, not editable
             continue
         families[name] = head.get("Family", "NoFamily")
         members[name] = _parse_members(block)
