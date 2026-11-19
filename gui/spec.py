@@ -75,6 +75,7 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                 verdict = ", matches expected" if ev["match"] else f", DIFFERS from expected: {ev['match_why']}"
             report.append(f"  row {row.line}{f' ({row.ref})' if row.ref else ''}: "
                           + ("ok, " + _n(len(ev["rungs"]), "rung") + verdict if ev["ok"] else f"FAILED: {ev['error']}"))
+            report += [f"      warning: {w}" for w in ev["warnings"]]
             with job.lock:
                 job.events.append(ev)
                 job.done += 1
@@ -139,6 +140,15 @@ def _row(client, row, s, project_types, new_tags, catalog) -> dict:
                 raise CompileError(f"the model could not produce valid logic: {r.error}")
             parsed, tags = r.compiled.rungs, r.compiled.tags
             ev["warnings"] += r.compiled.warnings
+            # a timer or counter made by an earlier row has one preset; a row asking for another
+            # cannot be met by the same tag, so say so instead of quietly keeping the old preset
+            made = {t.name: t for t in new_tags.values()}
+            for name, want in r.compiled.presets_asked.items():
+                have = made.get(name)
+                if have is not None and have.preset is not None and have.preset != want:
+                    raise CompileError(f"{name} already exists with preset {have.preset} (made by an earlier row); "
+                                       f"this row asks for {want}. One timer or counter has one preset: "
+                                       f"give this row its own tag")
     except (CompileError, AsciiSyntaxError, LLMError) as e:
         ev["error"] = str(e)
         return _done(ev, t0)

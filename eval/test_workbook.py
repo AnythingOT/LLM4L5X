@@ -101,13 +101,20 @@ def buildable(spec: str) -> bool:
     return not errors(validate(res.rungs, {t.name: t.datatype for t in res.tags.values()}))
 
 
-def suite_sheet(rng: random.Random, structure: str, want: int) -> list[tuple]:
-    """Rows of one structure, every instruction family represented, no tag written by two rows."""
+def _writes(rungs) -> set[str]:
+    return {w.split(".")[0].split("[")[0] for w in _refs(Side(list(rungs), {}), default_catalog())[2]}
+
+
+def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str] | None = None) -> list[tuple]:
+    """Rows of one structure, every instruction family represented, no tag written by two rows.
+
+    `written` is shared by the whole workbook: every sheet goes into one program, so a timer
+    run on two sheets would be one timer with two owners (and two presets)."""
     from eval.suite import INSTRUCTIONS
-    rows, written, n = [], set(), 0
+    rows, n = [], 0
+    written = set() if written is None else written
     feats = INSTRUCTIONS[:]
     rng.shuffle(feats)
-    cat = default_catalog()
     while len(rows) < want and n < 400:
         feat = feats[n % len(feats)]
         n += 1
@@ -116,7 +123,7 @@ def suite_sheet(rng: random.Random, structure: str, want: int) -> list[tuple]:
             continue
         main = [parse_rung(t) for t in case.rungs if t not in case.context]
         ctx = [parse_rung(t) for t in case.context]
-        writes = {w.split(".")[0].split("[")[0] for w in _refs(Side(ctx + main, {}), cat)[2]}
+        writes = _writes(ctx + main)
         if writes & written:
             continue
         written |= writes
@@ -127,7 +134,7 @@ def suite_sheet(rng: random.Random, structure: str, want: int) -> list[tuple]:
     return rows
 
 
-def real_world_sheet(folder: Path, rng: random.Random, want: int) -> list[tuple]:
+def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[str] | None = None) -> list[tuple]:
     from explain.decompiler import try_decompile
     from explain.describe import describe_statement
     from l5x.reader import read_l5x
@@ -150,16 +157,18 @@ def real_world_sheet(folder: Path, rng: random.Random, want: int) -> list[tuple]
                     pool.append((f.name, x.rung, stmts, pre))
     rng.shuffle(pool)
     rows, seen = [], set()
+    written = set() if written is None else written
     for name, rung, stmts, pre in pool:
         exp = with_presets(Rung(rung.body), pre)
         key = format_rung(exp)
-        if key in seen:
+        if key in seen or _writes([exp]) & written:
             continue
         spec = format_spec(stmts)
         ok, _ = behaves_like(spec, [exp])
         if not ok or not buildable(spec):  # e.g. T.DN of a timer the sheet never creates
             continue
         seen.add(key)
+        written |= _writes([exp])
         rows.append((" ".join(describe_statement(s) for s in stmts), "", key, f"from {name}", spec))
         if len(rows) >= want:
             break
@@ -170,11 +179,13 @@ def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None) 
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     rng = random.Random(seed)
-    sheets = {s.title(): suite_sheet(rng, s, rows) for s in ("series", "parallel", "nested")}
-    sheets["Multi_output"] = suite_sheet(rng, "multi_output", rows)
+    # one program: each tag is written by one row of the whole workbook (Referenced's names are fixed, so first)
+    written = _writes(parse_rung(e) for _, e, _ in REFERENCED)
+    sheets = {s.title(): suite_sheet(rng, s, rows, written) for s in ("series", "parallel", "nested")}
+    sheets["Multi_output"] = suite_sheet(rng, "multi_output", rows, written)
     sheets["Referenced"] = [(r, "", e, "uses earlier rows of this sheet", s) for r, e, s in REFERENCED]
     if corpus:
-        sheets["Real_world"] = real_world_sheet(corpus, rng, rows)
+        sheets["Real_world"] = real_world_sheet(corpus, rng, rows, written)
     # every expected answer must be reachable: its LogicSpec compiles to the same behaviour
     for title, rs in sheets.items():
         for req, logic, exp, _, spec in rs:
