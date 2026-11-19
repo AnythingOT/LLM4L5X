@@ -70,6 +70,13 @@ def test_project_tags_in_prompt_and_near_miss_warning():
     assert r.spec and any("did you mean Pump_Run" in w for w in r.warnings)
 
 
+def test_no_near_miss_warning_for_a_name_the_request_writes():
+    known = {"Cooker1_Enabled01": "BOOL", "Pump_Run": "BOOL"}
+    m = FakeModel("Cooker2_Enabled01 := Pump_Run;")
+    r = Generator(m).generate("Cooker2_Enabled01 is on while Pump_Run is on.", known_tags=known)
+    assert r.spec and not any("did you mean" in w for w in r.warnings)  # the user named Cooker2_ on purpose
+
+
 def test_tag_names_snapped_to_the_request():
     m = FakeModel("IF Press_Hi_Limit > 5 THEN SPEED_REF := FLOW_RATE * 2;")
     r = Generator(m).generate("When PressHiLimit is above 5, store FlowRate times 2 in Speed_Ref.")
@@ -264,3 +271,12 @@ def test_grammar_lets_the_model_write_plain_names_from_the_request():
 
     Generator(G()).generate("When Flow_Switch is on, unlatch Beacon.", known_tags={"Beacon_Light": "BOOL"})
     assert '"Beacon"' in G.grammar
+
+
+def test_a_dropped_condition_is_sent_back():
+    m = FakeModel("IF Cool_SP <= Temp_SP OR NOT Guard_Closed THEN COUNT_UP(Pallet_CTR, 100);",
+                  "IF (Cool_SP <= Temp_SP OR NOT Guard_Closed) AND Batch_Request THEN COUNT_UP(Pallet_CTR, 100);")
+    r = Generator(m).generate("Count up on Pallet_CTR with a preset of 100 if either Cool_SP is at most Temp_SP "
+                              "or Guard_Closed is off, and Batch_Request is on.")
+    assert "names Batch_Request but the logic does not use it" in m.calls[1][-1]["content"]
+    assert "Batch_Request" in r.spec and len(r.attempts) == 2

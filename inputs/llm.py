@@ -449,6 +449,16 @@ class Generator:
                             if close:
                                 raise SpecError(f"tag {u} is not in the request; did you mean {close[0]}? "
                                                 "Use tag names exactly as written")
+                    # every tag the request names is a condition or an output; one left out is usually a
+                    # dropped interlock ("..., and Batch_Request is on"), which no other check would see
+                    have = {_norm(u) for u in used}
+                    missing = sorted(n for n in idents if _norm(n) not in have)
+                    if missing and not last:
+                        raise SpecError(f"the request names {', '.join(missing)} but the logic does not use "
+                                        f"{'it' if len(missing) == 1 else 'them'}; every condition and "
+                                        "output in the request must be in the logic")
+                    if missing:
+                        res.warnings.append(f"the request names {', '.join(missing)}, which the logic does not use")
                     stmts = parse_spec(spec)
                     compiled = Compiler(known_tags=known_tags, catalog=catalog,
                                         **(compiler_kw or {})).compile(stmts)
@@ -473,13 +483,16 @@ class Generator:
         else:
             res.error = f"no valid LogicSpec after {len(res.attempts)} attempts: {res.attempts[-1].error}"
         if res.compiled and known_tags:
-            res.warnings += near_miss_warnings(res.compiled, known_tags)
+            res.warnings += near_miss_warnings(res.compiled, known_tags, request)
         res.seconds = round(time.perf_counter() - t0, 2)
         return res
 
 
-def near_miss_warnings(compiled: CompileResult, known_tags: dict[str, str]) -> list[str]:
-    """A new tag that looks like an existing one is probably a typo by the model."""
+def near_miss_warnings(compiled: CompileResult, known_tags: dict[str, str], request: str = "") -> list[str]:
+    """A new tag that looks like an existing one is probably a typo by the model.
+
+    A name the request writes exactly is the user's choice, not a typo (Cooker2_... next to Cooker1_...),
+    so only the case clash is reported for it: Logix names ignore case."""
     out = []
     names = list(known_tags)
     lower = {n.lower(): n for n in names}
@@ -488,6 +501,8 @@ def near_miss_warnings(compiled: CompileResult, known_tags: dict[str, str]) -> l
             continue
         if t.name.lower() in lower:
             out.append(f"new tag {t.name} differs only in case from existing {lower[t.name.lower()]}")
+            continue
+        if re.search(rf"(?<![\w.]){re.escape(t.name)}(?!\w)", request):
             continue
         close = difflib.get_close_matches(t.name, names, n=2, cutoff=0.8)
         if close:
