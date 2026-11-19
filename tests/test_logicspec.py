@@ -89,8 +89,7 @@ def test_forms_small_models_write():
 @pytest.mark.parametrize("bad,hint", [
     ("SET X;", "needs a condition"),
     ("START_TIMER(T, 5s);", "needs a condition"),
-    ("X := A / 10;", "math and moves go inside IF"),
-    ("X := 5;", "math and moves go inside IF"),
+    ("X := 5;", "a move goes inside IF"),
     ("X = A;", "assign with :="),
     ("X := TRUE;", "IF condition THEN SET X"),
 ])
@@ -105,3 +104,9 @@ def test_delay_timer_keywords_and_old_aliases_are_the_same():
     old = parse_spec("IF a THEN START_TIMER(T1, 5s), START_OFF_TIMER(T2, 2s);")
     assert new == old
     assert format_statement(new[0]) == "IF a THEN ON_DELAY_TIMER(T1, 5s), OFF_DELAY_TIMER(T2, 2s);"
+
+
+def test_arithmetic_at_statement_level_runs_every_scan():
+    # "Add Flow_A and Flow_B into Total_Flow" has no condition; arithmetic cannot be a bit
+    assert parse_spec("Total_Flow := Flow_A + Flow_B;") == parse_spec("IF TRUE THEN Total_Flow := Flow_A + Flow_B;")
+    assert format_spec(parse_spec("X := A / 10;")) == "IF TRUE THEN X := A / 10;"

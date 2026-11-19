@@ -90,7 +90,8 @@ def build_gbnf(tags: dict[str, str], allow_new_tags: bool = False) -> str:
         actions.append('("ON_DELAY_TIMER" | "OFF_DELAY_TIMER") "(" ws timer-ref ws "," ws duration ws ")"')
     if has["data-ref"]:
         actions.append('"COPY(" ws data-ref ws "," ws data-ref ws "," ws operand ws ")"')
-    statements = (["assign"] if has["bool-out"] else []) + (["ifthen"] if actions else [])
+    statements = ((["assign"] if has["bool-out"] else []) + (["calc"] if has["num-ref"] else [])
+                  + (["ifthen"] if actions else []))
     if not statements:
         raise ValueError("no usable tags")
     lines = [
@@ -99,6 +100,8 @@ def build_gbnf(tags: dict[str, str], allow_new_tags: bool = False) -> str:
     ]
     if has["bool-out"]:
         lines.append('assign ::= bool-out ws ":=" ws expr ws ";"')
+    if has["num-ref"]:  # arithmetic every scan: Total := A + B;
+        lines.append('calc ::= num-ref ws ":=" ws operand ws arith-op ws operand ws ";"')
     if actions:
         lines.append('ifthen ::= "IF" ws1 cond ws1 "THEN" ws1 action (ws "," ws action)* ws ";"')
         lines.append(f"action ::= {' | '.join(actions)}")
