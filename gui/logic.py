@@ -12,6 +12,7 @@ from core.rung import RungSyntaxError, format_rung, parse_rung
 from core.validator import errors, validate
 from explain.decompiler import try_decompile
 from explain.describe import describe_statement
+from explain.ladder import to_svg
 from gui import state
 from gui.state import SESSION
 from inputs.llm import Generator, LLMError
@@ -94,7 +95,8 @@ def _compile(stmts, s: dict) -> dict:
     out = {
         "kind": "compiled",
         "readback": [describe_statement(st) for st in res.statements],
-        "rungs": [{"text": format_rung(r), "ascii": format_ascii(r), "comment": r.comment} for r in res.rungs],
+        "rungs": [{"text": format_rung(r), "ascii": format_ascii(r), "comment": r.comment,
+                   "svg": to_svg(r, catalog, number=n)} for n, r in enumerate(res.rungs)],
         "tags": [{"name": t.name, "type": t.datatype, "preset": t.preset, "auto": t.allocated}
                  for t in res.tags.values()],
         "warnings": res.warnings,
@@ -139,13 +141,13 @@ def _explain(parsed, source: str, s: dict) -> dict:
     """Rung ASTs -> the other text form, LogicSpec, English, checks, and an L5X."""
     proj = SESSION.project
     presets = proj.presets() if proj else {}
+    catalog = proj.catalog() if proj else None
     rungs = []
-    for r in parsed:
+    for n, r in enumerate(parsed):
         stmts, why = try_decompile(r, presets)
-        rungs.append({"text": format_rung(r), "ascii": format_ascii(r),
+        rungs.append({"text": format_rung(r), "ascii": format_ascii(r), "svg": to_svg(r, catalog, number=n),
                       "logicspec": format_spec(stmts) if stmts else None,
                       "english": [describe_statement(x) for x in stmts] if stmts else [], "why": why})
-    catalog = proj.catalog() if proj else None
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None
     issues = validate(parsed, all_tags, catalog=catalog, revision=proj.software_revision if proj else None,
                       string_types=proj.string_types if proj else None)

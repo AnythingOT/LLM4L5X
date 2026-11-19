@@ -12,6 +12,8 @@ from flask import Flask, Response, jsonify, render_template, request
 import lint
 from gui import logic, project, state, udts
 from gui.state import SESSION
+from core.rung import RungSyntaxError, parse_rung
+from explain.ladder import to_svg
 from inputs.llm import BACKENDS, LLMError
 from l5x.reader import read_l5x
 from udt.excel import read_excel, template
@@ -126,6 +128,19 @@ def create_app() -> Flask:
             return jsonify(ok=True, models=client.list_models(), **info)
         except LLMError as e:
             return jsonify(ok=False, models=[], error=str(e), **info)
+
+    @app.post("/api/ladder")
+    def ladder():
+        """Ladder diagrams for rung texts (the attached file's AOIs are known), drawn when asked for."""
+        texts = (request.get_json(silent=True) or {}).get("rungs") or []
+        catalog = SESSION.project.catalog() if SESSION.project else None
+        out = []
+        for item in texts[:200]:
+            try:
+                out.append(to_svg(parse_rung(item.get("text", "")), catalog, number=item.get("number")))
+            except RungSyntaxError:
+                out.append(None)
+        return jsonify(svgs=out)
 
     @app.get("/api/rules")
     def rules_list():

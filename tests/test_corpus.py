@@ -4,7 +4,7 @@
 
 The exports themselves are never committed (they can be confidential). What is checked per file:
 the GUI flows run without an error (attach, summary, explain, validate, optimize UDTs), no rule
-crashes, rungs survive our writer and reader unchanged, and a reordered whole-program file reads
+crashes, every rung draws as a ladder diagram, rungs survive our writer and reader unchanged, and a reordered whole-program file reads
 back with every selected UDT now in the best order and at the promised size.
 """
 import base64
@@ -16,9 +16,10 @@ from pathlib import Path
 import pytest
 
 import app as gui
-from gui import state as gui_state
 from gui.state import SESSION
 from core.rung import format_rung
+from explain.ladder import to_svg
+from lxml import etree
 from l5x.reader import read_l5x
 from l5x.writer import write_routine
 from udt import optimize
@@ -87,3 +88,13 @@ def test_rungs_survive_write_and_read(path):
             back = read_l5x(write_routine(rungs, [], routine="R", controller="C", program="P",
                                           revision="33.00", scope="controller").encode())
             assert [x.text for r in back.routines for x in r.rungs] == [format_rung(r) for r in rungs]
+
+
+@pytest.mark.parametrize("path", FILES, ids=[f.name for f in FILES])
+def test_every_rung_draws(path):
+    p = read_l5x(path.read_bytes())
+    cat = p.catalog()
+    for rt in p.routines:
+        for x in rt.rungs:
+            if x.rung is not None:
+                etree.fromstring(to_svg(x.rung, cat, number=x.number).encode())

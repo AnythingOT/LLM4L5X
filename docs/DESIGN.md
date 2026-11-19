@@ -414,3 +414,30 @@ UDTs that use types missing from the file; UDTs used in an AOI (AOI definitions 
 data); UDTs with a tag that has only L5K data. Flagged as a layout risk and not ticked by
 default: COP/CPS operands (rungs and ST), MSG local elements, produced/consumed tags, and the
 same through nesting.
+
+## GUI structure
+
+`app.py` only starts the server. `gui/__init__.py` holds the routes, which stay thin;
+`gui/logic.py` (English, LogicSpec, rung text), `gui/project.py` (the attached L5X) and
+`gui/udts.py` do the work. `gui/state.py` keeps the attached file and caches what is derived
+from it (UDT analysis, cross reference), so a download does not re-analyse the file.
+
+Ladder diagrams are drawn by `explain/ladder.py` on the server as SVG with CSS classes, so the
+drawing follows the theme and is testable in Python. Results with a few rungs carry their SVG;
+"explain all rungs" asks `/api/ladder` for 20 at a time.
+
+## Testing on real exports
+
+`tests/test_corpus.py` (set `LLM4L5X_CORPUS`) runs every GUI flow on every file. A differential
+run against the archived tools on 186 files:
+
+- Rules vs L5X_Lint (9 full controller exports; L5X_Lint refuses partial exports): identical per
+  rule after three fixes here (unparsed rungs count as tag use and still get INF004; bits used in
+  FBD count for INF003; RES in ST counts for ERR016). Remaining difference: INF007 here also
+  covers v36 `MOVE`.
+- UDT optimizer vs L5X_UDTOptimizer (62 UDTs): identical except 4, all where a nested UDT
+  shrinks and the parent's saving is carried up (checked by hand: Recipe saves 448 bytes =
+  37 x 12 from Recipe_Step + 4 of its own). Fixed here: STRING-family members were sized as
+  4 bytes; UDTs that nest an unsizable type are now skipped rather than guessed.
+- Speed (20,000 rungs, 15,000 tags): attach 0.7 s, validate 2.4 s (was 5.3 s before INF003 was
+  indexed), explain 0.2 s.

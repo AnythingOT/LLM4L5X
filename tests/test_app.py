@@ -245,3 +245,10 @@ def test_plain_english_udt_goes_through_the_model(client, monkeypatch):
     d = client.post("/api/process", json={"text": "a pump with speed and running", "mode": "udt"}).get_json()
     assert d["kind"] == "udt_created" and d["grammar"] and d["filename"] == "Pump.L5X"
     assert [m["name"] for m in d["udts"][0]["members"]] == ["Running", "Speed"]
+
+
+def test_ladder_endpoint_and_drawings_in_results(client):
+    d = client.post("/api/ladder", json={"rungs": [{"text": "XIC(A)OTE(B);", "number": 3}, {"text": "nonsense"}]}).get_json()
+    assert d["svgs"][0].startswith("<svg") and ">3<" in d["svgs"][0] and d["svgs"][1] is None
+    r = post(client, "XIC(A)OTE(B);")
+    assert r["rungs"][0]["svg"].startswith("<svg")

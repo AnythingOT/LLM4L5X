@@ -1,0 +1,10 @@
+# python -m ruff check .   (the checks this repo is kept clean against)
+target-version = "py310"
+line-length = 120
+
+[lint]
+select = ["F", "E9", "B", "UP035", "UP037"]
+ignore = ["B905"]  # zip() over lists of equal length by construction
+
+[lint.per-file-ignores]
+"tests/helpers.py" = ["B023"]  # inner parser functions run inside the loop that defines them

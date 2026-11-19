@@ -2,7 +2,7 @@
 {% block title %}Chat{% endblock %}
 {% block header_middle %}
 <span id="projectBadge" class="project-badge" hidden>
-    <span id="projectName"></span>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span id="projectName"></span>
     <button id="detachButton" title="Detach project">&times;</button>
 </span>
 {% endblock %}
@@ -10,7 +10,7 @@
 <a id="modelBadge" class="model-badge" href="/settings" title="Model connection - click to change">
     <span id="modelDot" class="dot"></span><span id="modelBadgeText">model</span>
 </a>
-<button id="helpButton" class="icon-btn" title="What can I do here?">?</button>
+<button id="helpButton" class="icon-btn" title="What can I do here?" aria-label="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><path d="M12 17.2h.01"/></svg></button>
 {% endblock %}
 
 {% block body %}
@@ -36,14 +36,14 @@
             <button class="chip project-only" data-send="optimize" hidden>optimize UDTs</button>
         </div>
         <div class="input-with-buttons">
-            <button id="attachButton" title="Attach an .L5X export, or an Excel sheet of UDTs">Attach</button>
+            <button id="attachButton" class="tool-btn" title="Attach an .L5X export, or an Excel sheet of UDTs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg><span class="label">Attach</span></button>
             <div id="modeToggle" class="mode-toggle" role="group" aria-label="What to create">
                 <button data-mode="logic" title="Describe logic, or paste rungs">Logic</button>
                 <button data-mode="udt" title="Describe a UDT (data type)">UDT</button>
             </div>
-            <textarea id="inputBox"></textarea>
-            <button id="examplesButton" title="Show examples and commands" aria-expanded="false">ⓘ</button>
-            <button id="enterButton" title="Send" disabled>Enter</button>
+            <textarea id="inputBox" rows="1" aria-label="Message"></textarea>
+            <button id="examplesButton" class="tool-btn" title="Examples and commands" aria-expanded="false" aria-label="Examples and commands"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg></button>
+            <button id="enterButton" class="tool-btn" title="Send (Enter)" disabled>Send</button>
         </div>
         <input type="file" id="fileInput" accept=".l5x,.L5X,.xlsx,.xlsm" hidden />
     </div>
@@ -56,36 +56,36 @@
         <p class="modal-description">Everything runs on this PC. Nothing is imported into Studio 5000 until you import the file yourself, so review every rung first.</p>
         <div class="help-grid">
             <section>
-                <h3>1 · Plain English → ladder</h3>
+                <h3>Plain English to ladder</h3>
                 <p>Describe the logic the way you would to a colleague: <em>"Start the pump with the start button and keep it running until stop is pressed."</em> A local model reads it; checked code builds the rungs.</p>
                 <p>You get the rungs, a plain-English read-back of what they do (check this first), the new tags, and the checks.</p>
                 <p><b>Export:</b> <code>Routine.L5X</code> (a new routine) or <code>Rung.L5X</code> (rungs to paste), chosen in Settings. <b>Copy</b> gives the rung text in neutral or ASCII form, also chosen in Settings.</p>
             </section>
             <section>
-                <h3>2 · Rung text: ASCII ↔ neutral</h3>
+                <h3>Rung text, ASCII or neutral</h3>
                 <p>Paste rungs in either form:</p>
                 <p><code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code> neutral text, as stored in L5X<br>
                    <code>XIC a BST XIC b NXB XIO c BND OTE d</code> ASCII text, as in the editor's ASCII mode</p>
                 <p>You get the other form, what each rung does in plain English, and the checks. <b>Copy</b> gives the other form; <b>Download</b> gives <code>Routine.L5X</code> or <code>Rung.L5X</code> with the tags it needs.</p>
             </section>
             <section>
-                <h3>3 · Attach your project</h3>
+                <h3>Attach your project</h3>
                 <p><b>Attach</b> (or drop a file on the input box) a Studio 5000 export: the whole controller, a program, a routine or rungs. New logic then uses your real tag names, data types and Add-On Instructions, and the Logix Designer version.</p>
-                <p><b>explain all rungs</b>: every rung in plain English. <b>validate</b>: see 4. <b>summary</b>: what the file holds. <b>xref TagName</b>: where a tag is used.</p>
+                <p><b>explain all rungs</b>: every rung in plain English. <b>validate</b>: see Validate. <b>summary</b>: what the file holds. <b>xref TagName</b>: where a tag is used.</p>
             </section>
             <section>
-                <h3>4 · Validate</h3>
+                <h3>Validate</h3>
                 <p>Two layers. <b>Import checks</b>: will Studio 5000 accept it (syntax, operands, data types, tags that exist, instruction names for your version).</p>
                 <p><b>Rules</b>: 49 programming rules with fixed codes: CRT critical, ERR error, WAR warning, INF info. Switch rules on or off on the <a href="/rules">Rules page</a>. Write <code>lint:disable=ERR010</code> in a rung comment or tag description to accept one case.</p>
                 <p>Generated and pasted rungs are checked with the rung rules too. Project rules (tasks, modules, descriptions) need a full controller export.</p>
             </section>
             <section>
-                <h3>5 · UDTs</h3>
-                <p>Switch the input to <b>UDT</b> and describe the data: <em>"A motor UDT with running and faulted bits, speed in rpm and 32 alarm bits."</em> Or attach an <b>Excel sheet</b> (template under ⓘ). Members are written in the order that wastes no memory; you get <code>Name.L5X</code> (one UDT) or a zip. Import with <i>Data Types → Import Data Type</i>.</p>
+                <h3>UDTs</h3>
+                <p>Switch the input to <b>UDT</b> and describe the data: <em>"A motor UDT with running and faulted bits, speed in rpm and 32 alarm bits."</em> Or attach an <b>Excel sheet</b> (template under the examples button, next to Send). Members are written in the order that wastes no memory; you get <code>Name.L5X</code> (one UDT) or a zip. Import with <i>Data Types → Import Data Type</i>.</p>
                 <p><b>Optimize</b>: attach a UDT export, or a whole program and press <b>optimize UDTs</b>. Each UDT shows the bytes saved per instance, how many instances there are, and anything that copies it by byte offset (COP/CPS, MSG, produced/consumed). Download one file, a zip, or the whole program. A UDT can only change offline, and the whole-program file needs a test import first.</p>
             </section>
             <section>
-                <h3>6 · The model</h3>
+                <h3>The model</h3>
                 <p>Set it up in <a href="/settings">Settings</a>: <b>Ollama</b>, or a <b>llama.cpp</b> server, which constrains every answer to valid logic. Turn <b>thinking off</b>: it is much faster on a CPU.</p>
                 <p>Tested: Qwen3.6-35B-A3B on llama.cpp got 99% of the built-in test suite right. Real requests are worded differently, which is why the read-back is there.</p>
             </section>

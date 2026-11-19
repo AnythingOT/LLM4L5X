@@ -50,7 +50,7 @@ def decompile() -> dict:
     rows, ok = [], 0
     for rt in p.routines:
         for x in rt.rungs:
-            row = {"where": f"{rt.program} / {rt.name} / Rung {x.number}", "text": x.text,
+            row = {"where": f"{rt.program} / {rt.name} / Rung {x.number}", "number": x.number, "text": x.text,
                    "ascii": format_ascii(x.rung) if x.rung is not None else None}
             if x.rung is None:
                 row["why"] = f"parse error: {x.parse_error}"

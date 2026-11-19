@@ -77,11 +77,11 @@ async function refreshModels() {
     showCustom(false);
     if (d.ok) {
         status.className = 'help full ok';
-        status.textContent = `● Connected to ${d.backend} at ${d.url}: ${d.models.length} model${d.models.length === 1 ? '' : 's'}`
-            + (d.grammar ? ' · answers are grammar-constrained' : '');
+        status.textContent = `Connected to ${d.backend} at ${d.url}: ${d.models.length} model${d.models.length === 1 ? '' : 's'}`
+            + (d.grammar ? '; answers are grammar-constrained' : '');
     } else {
         status.className = 'help full bad';
-        status.textContent = `○ ${d.error}`;
+        status.textContent = `Not reachable: ${d.error}`;
     }
 }
 

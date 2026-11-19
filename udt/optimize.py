@@ -412,17 +412,17 @@ def file_name(name: str, suffix: str = "_opt") -> str:
 
 
 def changes_text(an: Analysis, selected: set[str]) -> str:
-    lines = [f"UDT reorder: {len(selected)} UDT(s). Sizes are estimates from the layout rules; check them in Studio 5000.", ""]
+    lines = [f"UDT reorder: {_n(len(selected), 'UDT')}. Sizes are estimates from the layout rules; check them in Studio 5000.", ""]
     for n in sorted(selected):
         p = an.plans[n]
-        inst = "" if p.instances is None else f", {p.instances} instance(s), {p.total_saved} bytes in total"
+        inst = "" if p.instances is None else f", {_n(p.instances, 'instance')}, {p.total_saved} bytes in total"
         lines.append(f"{n}: {p.size_now} -> {p.size_best} bytes ({p.saved} saved per instance{inst})")
         lines.append("  before: " + ", ".join(p.before))
         lines.append("  after:  " + ", ".join(p.after))
         for r in p.risks:
             lines.append("  LAYOUT RISK: " + r)
         if p.in_aoi:
-            lines.append("  used in AOI(s): " + ", ".join(p.in_aoi))
+            lines.append("  used in AOIs: " + ", ".join(p.in_aoi))
         lines.append("")
     lines.append("Reordering moves byte offsets. Anything that copies these UDTs by offset (COP/CPS, MSG, "
                  "produced/consumed tags, an HMI or SCADA reading the raw block) must be checked. "
@@ -466,7 +466,7 @@ def full_program(an: Analysis, selected: set[str]) -> tuple[str, list[str]]:
                      + f". Left out: {', '.join(sorted(drop))}. Export again with Decorated data, or use the single files.")
         sel -= drop
     if sel:
-        notes.append(f"{len(sel)} UDT(s) reordered. For tags of the affected types the L5K copy of the values was "
+        notes.append(f"{_n(len(sel), 'UDT')} reordered. For tags of the affected types the L5K copy of the values was "
                      "removed and the Decorated copy (by member name) kept. Test the import on a copy of the project first.")
     else:
         notes.append("No UDT was changed.")
@@ -527,3 +527,7 @@ def _roots_of(an: Analysis, types: set[str]) -> set[str]:
         out.add(t)
         out.update(_nested_closure(an, t))
     return out
+
+
+def _n(count: int, word: str) -> str:
+    return f"{count} {word}{'' if count == 1 else 's'}"

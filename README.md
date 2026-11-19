@@ -86,10 +86,10 @@ python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a 
 
 ## GUI
 
-Three pages, AnythingOT look, light and dark. Press **?** on the chat page for the help popup; **ⓘ** in the input box shows examples and project commands.
+Three pages, light and dark. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** (rails, contacts, coils, instruction boxes with their operands, branches) next to its plain-English read-back. Press the help button in the header for what it can do; the list button next to **Send** shows examples and project commands.
 
 - **Chat** (`/`)
-  - **Plain English → ladder** (needs a model). Read-back, rungs, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
+  - **Plain English → ladder** (needs a model). Read-back, the rungs drawn as ladder, their text, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
   - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the other form, what each rung does in English, the checks, **Copy** (the other form) and **Download**.
   - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `xref TagName`.
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
@@ -175,7 +175,7 @@ python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ## Repo layout
 
 ```
-app.py              GUI server (python app.py)
+app.py              starts the GUI (python app.py)
 cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
@@ -184,19 +184,21 @@ lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, p
 udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
                     writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
                     an existing export, byte-preserving)
-explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), survey.py
+explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), ladder.py (rungs -> SVG
+                    ladder diagrams), survey.py
 inputs/             llm.py (Ollama/llama.cpp, English -> LogicSpec), examples.yaml (few-shot), gbnf.py,
                     udt_llm.py (English -> UDT text form)
 eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
                     instruction suite), rung_compare.py (behavioural oracle), mutation.py
-gui/                templates/ (base, index, settings, rules), static/ (style.css, common.js,
-                    app.js, settings.js, rules.js, favicon.ico)
-tests/              pytest (299 tests); fixtures/ are hand-written, except studio_single_udt.L5X (the public L5X_UDTOptimizer sample)
+gui/                __init__.py (routes), state.py (attached file, settings), logic.py (rungs),
+                    project.py (the attached L5X), udts.py; templates/ and static/ (pages, CSS, JS)
+tests/              pytest (305 tests, plus 3 per file with a corpus); fixtures/ are hand-written, except studio_single_udt.L5X (the public
+                    L5X_UDTOptimizer sample). test_corpus.py runs on a folder of your exports (below)
 examples/  docs/
-requirements.txt  start.bat  start.sh
+requirements.txt  ruff.toml  start.bat  start.sh
 ```
 
-Run the tests with `pytest` from the repo folder.
+Run the tests with `pytest` from the repo folder, and `ruff check .` for the code checks.
 
 ## Neutral text vs ASCII text
 
@@ -218,6 +220,20 @@ Run the same check on your own exports:
 ```
 python cli.py survey C:\path\to\your\exports
 ```
+
+**Every feature, on every file:** `tests/test_corpus.py` attaches each export in a folder and runs summary,
+explain, validate, every ladder drawing, the UDT plan and its downloads, and a write-and-read round trip
+of every routine. The exports are never committed:
+
+```
+set LLM4L5X_CORPUS=C:\path\to\your\exports
+pytest tests/test_corpus.py -q
+```
+
+Last run: 186 files (179 public exports, plus every L5X in the AnythingOT repositories), 558 checks, all
+passing. On the same files the rules agree with L5X_Lint rule for rule, except that INF007 also sees the
+v36 `MOVE` (L5X_Lint missed it), and the UDT optimizer agrees with L5X_UDTOptimizer except where a nested
+UDT shrinks (this repo carries the saving up to the parent; L5X_UDTOptimizer did not).
 
 **Import verified:** generated Rung and Routine L5X files import cleanly into Studio 5000.
 Still to confirm: a timer import keeps its preset.
