@@ -10,13 +10,14 @@ import time
 from flask import Flask, Response, jsonify, render_template, request
 
 import lint
-from gui import logic, project, state, udts
+from gui import jobs, logic, project, spec, state, udts
 from gui.state import SESSION
 from core.rung import RungSyntaxError, parse_rung
 from explain.ladder import to_svg
 from inputs.llm import BACKENDS, LLMError
 from l5x.reader import read_l5x
-from udt.excel import read_excel, template
+from inputs.spec_excel import SpecSheetError, read_requirements, sample
+from udt.excel import is_udt_sheet, read_excel, template
 from udt.model import UdtError
 
 MAX_UPLOAD = 50 * 1024 * 1024
@@ -64,13 +65,23 @@ def create_app() -> Flask:
         if not f or not f.filename:
             return jsonify(kind="error", message="No file received.")
         name = f.filename
-        if name.lower().endswith((".xlsx", ".xlsm")):  # a UDT sheet: build UDTs, the attached file stays
+        if name.lower().endswith((".xlsx", ".xlsm")):  # Excel: UDTs or requirements; the attached L5X stays
+            data = f.read()
+            s = state.settings(json.loads(request.form.get("settings") or "{}"))
+            if is_udt_sheet(data):
+                try:
+                    return jsonify(udts.created(read_excel(data), s, source=f"Excel sheet {name}"))
+                except UdtError as e:
+                    return jsonify(kind="error", message=f"{name}: {e}", hint="Compare with the UDT sample in the examples list.")
             try:
-                found = read_excel(f.read())
-            except UdtError as e:
-                return jsonify(kind="error", message=f"{name}: {e}", hint="Download the template: ⓘ in UDT mode.")
-            return jsonify(udts.created(found, state.settings(json.loads(request.form.get("settings") or "{}")),
-                                        source=f"Excel sheet {name}"))
+                sheets = read_requirements(data)
+            except SpecSheetError as e:
+                return jsonify(kind="error", message=f"{name} is neither a UDT sheet nor a requirements sheet: {e}",
+                               hint="Start from one of the samples in the examples list.")
+            job = spec.start(sheets, s, name)
+            return jsonify(kind="spec_started", job=job.id, filename=name, project=SESSION.filename,
+                           sheets=[{"routine": sh.routine, "title": sh.title, "rows": len(sh.rows),
+                                    "model_rows": sum(1 for r in sh.rows if not r.logic)} for sh in sheets])
         if not name.lower().endswith(".l5x"):
             return jsonify(kind="error", message="Attach an .L5X export from Studio 5000, or an Excel UDT sheet (.xlsx).")
         raw = f.read()
@@ -113,7 +124,27 @@ def create_app() -> Flask:
 
     @app.get("/api/udt/template")
     def udt_template():
-        return _file(template(), "UDT_template.xlsx", XLSX)
+        return _file(template(), "UDT_sample.xlsx", XLSX)
+
+    # ------------------------------------------------------------ requirements workbook (background job)
+
+    @app.get("/api/spec/sample")
+    def spec_sample():
+        return _file(sample(), "Requirements_sample.xlsx", XLSX)
+
+    @app.get("/api/jobs/<job_id>")
+    def job_status(job_id):
+        job = jobs.JOBS.get(job_id)
+        if job is None:
+            return jsonify(kind="error", message="That job is no longer known (the server was restarted?)."), 404
+        return jsonify(job.view(int(request.args.get("since", 0))))
+
+    @app.delete("/api/jobs/<job_id>")
+    def job_cancel(job_id):
+        job = jobs.JOBS.get(job_id)
+        if job is not None:
+            job.cancel.set()
+        return jsonify(ok=job is not None)
 
     # ------------------------------------------------------------ settings and rules pages
 

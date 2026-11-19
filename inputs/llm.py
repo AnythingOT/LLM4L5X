@@ -124,6 +124,7 @@ class OllamaClient:
     url: str = "http://127.0.0.1:11434"
     timeout: float = 300.0  # CPU-only machines can be slow
     think: bool | None = None  # None = model default; False = ask thinking models not to think
+    context: int = 16384  # Ollama's own default (2048-4096) can cut a prompt with a project's tags
     supports_grammar = False  # Ollama only constrains to JSON schemas
 
     def list_models(self) -> list[str]:
@@ -132,7 +133,7 @@ class OllamaClient:
 
     def chat(self, messages: list[dict], grammar: str | None = None, max_tokens: int = MAX_TOKENS) -> str:
         body = {"model": self.model, "messages": messages, "stream": False,
-                "options": {"temperature": 0, "num_predict": max_tokens}}
+                "options": {"temperature": 0, "num_predict": max_tokens, "num_ctx": self.context}}
         if self.think is not None:
             body["think"] = self.think
         try:
@@ -189,11 +190,13 @@ class OpenAICompatClient:
         return (choices[0].get("message") or {}).get("content", "") or ""
 
 
-def make_client(backend: str = "ollama", url: str | None = None, model: str = "", think: bool | None = None):
+def make_client(backend: str = "ollama", url: str | None = None, model: str = "", think: bool | None = None,
+                context: int = 16384):
+    """context: tokens the model may see (Ollama only; llama.cpp fixes it with -c at server start)."""
     backend = backend if backend in BACKENDS else "ollama"
     url = url or BACKENDS[backend]["url"]
     if backend == "ollama":
-        return OllamaClient(model=model or "phi4-mini", url=url, think=think)
+        return OllamaClient(model=model or "phi4-mini", url=url, think=think, context=context)
     if backend == "llamacpp" and think is None:
         think = False  # the grammar allows no thinking text, and forced think tags break it
     return OpenAICompatClient(model=model, url=url, grammar=(backend == "llamacpp"), think=think)

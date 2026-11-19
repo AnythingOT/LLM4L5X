@@ -75,6 +75,30 @@ def _neutral_rungs(text: str):
         return None
 
 
+def generate(client, text: str, s: dict, more_tags: dict[str, str] | None = None):
+    """Plain English -> the model -> compiled rungs, using the attached project's tags and AOIs
+    plus more_tags (e.g. tags created by earlier rows of a requirements sheet)."""
+    proj = SESSION.project
+    known = dict(proj.tag_types(s["program"])) if proj else {}
+    known.update(more_tags or {})
+    return Generator(client).generate(
+        text,
+        known_tags=known or None,
+        descriptions=proj.tag_descriptions(s["program"]) if proj else None,
+        catalog=proj.catalog() if proj else None,
+        compiler_kw={"revision": s["revision"], "prefix": s["prefix"],
+                     "display_operands": s["display"], "comments": s["comments"]},
+        string_types=proj.string_types if proj else None)
+
+
+def parse_rung_text(text: str):
+    """Neutral or ASCII rung text -> rungs, or None if it is neither."""
+    catalog = SESSION.project.catalog() if SESSION.project else None
+    if looks_like_ascii(text, catalog):
+        return parse_ascii(text, catalog)
+    return _neutral_rungs(text)
+
+
 # ---------------------------------------------------------------- the three inputs
 
 
@@ -112,17 +136,9 @@ def _compile(stmts, s: dict) -> dict:
 
 def _english(text: str, s: dict) -> dict:
     """Plain English -> local model -> LogicSpec -> compiled, checked rungs."""
-    proj = SESSION.project
     client = state.llm(s)
     try:
-        r = Generator(client).generate(
-            text,
-            known_tags=proj.tag_types(s["program"]) if proj else None,
-            descriptions=proj.tag_descriptions(s["program"]) if proj else None,
-            catalog=proj.catalog() if proj else None,
-            compiler_kw={"revision": s["revision"], "prefix": s["prefix"],
-                         "display_operands": s["display"], "comments": s["comments"]},
-            string_types=proj.string_types if proj else None)
+        r = generate(client, text, s)
     except LLMError as e:
         return {"kind": "error", "message": str(e), "hint": state.llm_hint(s, client)}
     attempts = [{"spec": a.spec, "error": a.error} for a in r.attempts]

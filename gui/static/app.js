@@ -206,12 +206,13 @@ function resultBody(d, { rungs, english, copyForm }) {
     }
     parts.push(title(rungs.length > 1 ? 'Rungs' : 'Rung', rungs.length > 1 ? rungs.length : undefined));
     rungs.forEach((r) => parts.push(drawing(r.svg, r.comment)));
+    const pasted = d.kind === 'rungs';  // the person already has the text they pasted: no text, no Copy
     const shown = rungs.map((r) => (copyForm === 'ascii' ? r.ascii : r.text)).join('\n');
     const txt = el('details');
     txt.appendChild(el('summary', { text: `${fmtName(copyForm) === 'ASCII' ? 'ASCII' : 'Neutral'} text` }));
     txt.appendChild(code(shown));
     txt.open = true;
-    parts.push(txt);
+    if (!pasted) parts.push(txt);
     if (d.tags && d.tags.length) {
         parts.push(title('Tags in the download', d.tags.length));
         parts.push(table(['Tag', 'Type', 'Preset', ''],
@@ -231,7 +232,7 @@ function resultBody(d, { rungs, english, copyForm }) {
         dl.classList.add('primary');
         row.appendChild(dl);
     }
-    row.appendChild(copyButton(() => shown, `Copy ${fmtName(copyForm)} text`));
+    if (!pasted) row.appendChild(copyButton(() => shown, `Copy ${fmtName(copyForm)} text`));
     const dur = duration(d.seconds); if (dur) row.appendChild(dur);
     parts.push(row);
     return parts;
@@ -500,6 +501,52 @@ const render = {
         return addBot(...parts);
     },
 
+    spec_started(d) {
+        // a requirements workbook: rows are built in the background; poll and show them as they come
+        const total = d.sheets.reduce((n, x) => n + x.rows, 0);
+        const modelRows = d.sheets.reduce((n, x) => n + x.model_rows, 0);
+        const head = el('div', { cls: 'status-line', text: `${d.filename}: ${plural(d.sheets.length, 'routine')}, ${plural(total, 'row')}` });
+        const sub = el('div', { cls: 'meta', text: `${d.sheets.map((x) => `${x.routine} (${x.rows})`).join(', ')}. `
+            + `${modelRows ? `${plural(modelRows, 'row')} go${modelRows === 1 ? 'es' : ''} to the model, about 10 to 60 s each on a CPU. ` : ''}`
+            + `${d.project ? `Tags of ${d.project} are used.` : 'No L5X attached: tag names are not checked against a project.'}` });
+        const bar = el('div', { cls: 'progress' }, el('span'));
+        const now = el('div', { cls: 'meta', text: 'Starting' });
+        const list = el('div', { cls: 'spec-rows' });
+        const row = el('div', { cls: 'btn-row' });
+        const stop = button('Stop after this row', async () => {
+            stop.disabled = true;
+            stop.textContent = 'Stopping after this row';
+            await fetch(`/api/jobs/${d.job}`, { method: 'DELETE' });
+        });
+        row.appendChild(stop);
+        const msg = addBot(head, sub, bar, now, list, row);
+        let since = 0;
+        let sheet = null;
+        const tick = async () => {
+            let v;
+            try { v = await (await fetch(`/api/jobs/${d.job}?since=${since}`)).json(); } catch { setTimeout(tick, 2000); return; }
+            if (v.kind === 'error') { row.replaceChildren(el('div', { cls: 'err', text: v.message })); return; }
+            since = v.next;
+            bar.firstChild.style.width = `${Math.round((100 * v.done) / Math.max(v.total, 1))}%`;
+            v.events.forEach((e) => {
+                if (e.sheet !== sheet) { sheet = e.sheet; list.appendChild(title(e.sheet)); }
+                list.appendChild(specRow(e));
+            });
+            if (v.status === 'running') {
+                now.textContent = `${v.done} of ${v.total} done. Working on ${v.label}`;
+                setTimeout(tick, 1000);
+                return;
+            }
+            stop.remove();
+            if (v.status === 'failed') { now.replaceWith(el('div', { cls: 'err', text: `Stopped by an error: ${v.error}` })); return; }
+            now.remove();
+            specSummary(v.result, row);
+            msg.scrollIntoView({ block: 'end', behavior: 'smooth' });
+        };
+        tick();
+        return msg;
+    },
+
     xref(d) {
         if (!d.refs.length) return addBot(el('div', { text: `${d.tag} is not used in any rung.` }));
         return addBot(
@@ -568,7 +615,7 @@ function setProject(name, programs, preferred) {
 async function upload(file) {
     addUser(`Attached ${file.name}`);
     const excel = /\.xls[xm]$/i.test(file.name);
-    const wait = loading(excel ? 'Reading the UDT sheet' : 'Reading the L5X');
+    const wait = loading(excel ? 'Reading the workbook' : 'Reading the L5X');
     const fd = new FormData();
     fd.append('file', file);
     fd.append('settings', JSON.stringify(loadSettings()));
@@ -578,6 +625,7 @@ async function upload(file) {
         if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
         const d = await res.json();
         if (excel && d.kind === 'udt_created') setMode('udt');
+        if (excel && d.kind === 'spec_started') setMode('logic');
         show(d);
     } catch (e) {
         wait.remove();
@@ -604,6 +652,43 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
     updateBadge();
     intro();
 })();
+
+// ---------------------------------------------------------------- requirements workbook
+function specRow(e) {
+    const box = el('div', { cls: `spec-row ${e.ok ? '' : 'failed'}` });
+    const head = el('div', { cls: 'spec-head' },
+        el('span', { cls: 'finding-where', text: e.ref ? `Rung ${e.ref} (Excel row ${e.line})` : `Excel row ${e.line}` }),
+        el('span', { cls: e.ok ? 'ok small' : 'err small', text: e.ok ? plural(e.rungs.length, 'rung') : 'Not built' }),
+        el('span', { cls: 'meta', text: `${e.seconds.toFixed(1)} s` }));
+    box.appendChild(head);
+    box.appendChild(el('div', { cls: 'spec-request', text: e.request }));
+    e.rungs.forEach((r) => box.appendChild(drawing(r.svg)));
+    if (e.error) box.appendChild(el('div', { cls: 'err small', text: e.error }));
+    (e.warnings || []).forEach((w) => box.appendChild(el('div', { cls: 'warn small', text: w })));
+    return box;
+}
+function specSummary(res, row) {
+    const parts = [];
+    if (res.cancelled) parts.push(el('div', { cls: 'warn', text: 'Stopped before the end: the files hold the rows built so far.' }));
+    const t = table(['Routine', 'Rows built', 'Failed', 'Rungs', 'New tags', 'Rule findings'],
+        res.sheets.map((x) => [x.routine, String(x.ok), String(x.failed), String(x.rungs), String(x.tags), String(x.lint.length)]), [0]);
+    parts.push(t);
+    res.sheets.forEach((x) => {
+        const cb = checksBlock([], x.lint);
+        if (cb) { parts.push(title(`Rules on ${x.routine}`)); parts.push(cb); }
+    });
+    const failed = res.sheets.reduce((n, x) => n + x.failed, 0);
+    parts.push(el('div', { cls: 'rung-comment', text: (failed ? `${plural(failed, 'row')} could not be built and ${failed === 1 ? 'is' : 'are'} left out (see above and Report.txt). ` : '')
+        + 'Import each routine with Import Routine in Studio 5000, and check the read-back of every rung first.' }));
+    row.before(...parts);
+    if (res.download) {
+        const dl = button(`Download ${res.download}`, () => (res.l5x ? download(res.download, res.l5x) : downloadBase64(res.download, res.zip_b64)));
+        dl.classList.add('primary');
+        row.appendChild(dl);
+    } else {
+        row.appendChild(el('div', { cls: 'err', text: 'No rows were built, so there is nothing to download.' }));
+    }
+}
 
 // ---------------------------------------------------------------- first screen
 const EXAMPLE = {

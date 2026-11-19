@@ -9,10 +9,10 @@
 </head>
 <body class="{% block bodyclass %}{% endblock %}">
     <header class="header">
-        <a class="brand" href="/" title="Back to the chat">
+        <span class="brand">
             <span class="logo"><span class="logo-anything">Anything</span><span class="logo-ot">OT</span></span>
-            <span class="app-name">LLM4L5X</span>
-        </a>
+            <a class="app-name {% if page == 'chat' %}active{% endif %}" href="/" title="The chat: logic, UDTs and attached files">LLM4L5X</a>
+        </span>
         {% block header_middle %}{% endblock %}
         <nav class="header-right">
             {% block header_right %}{% endblock %}
@@ -22,7 +22,7 @@
         </nav>
     </header>
     {% block body %}{% endblock %}
-    <footer>Runs on this PC. Review every rung before you import it.</footer>
+    <footer>Runs locally with a local model, completely offline. Test before it runs in production.</footer>
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

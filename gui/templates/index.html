@@ -28,7 +28,8 @@
             <button class="chip udt-only" data-text="A motor UDT: running and faulted bits, speed in rpm, run hours, the last fault code and 32 alarm bits." hidden>motor UDT</button>
             <button class="chip udt-only" data-text="A tank with level and temperature, a high level alarm, and two pumps that each have a run command, a running feedback and a speed setpoint." hidden>tank with pumps</button>
             <button class="chip udt-only" data-text='UDT Valve "On/off valve";&#10;Open_Cmd BOOL "Open command";&#10;Opened_LS BOOL "Open limit switch";&#10;Travel_TMR TIMER "Travel time";' hidden>UDT text form</button>
-            <a class="chip udt-only" href="/api/udt/template" hidden>Excel template ⤓</a>
+            <a class="chip logic-only" href="/api/spec/sample" download>Requirements Excel sample</a>
+            <a class="chip udt-only" href="/api/udt/template" download hidden>UDT Excel sample</a>
             <span class="chips-label project-only" hidden>Attached file:</span>
             <button class="chip project-only" data-send="summary" hidden>summary</button>
             <button class="chip project-only" data-send="decompile" hidden>explain all rungs</button>
@@ -53,41 +54,86 @@
     <div class="modal-content help-content">
         <button class="close-button" title="Close">&times;</button>
         <h2 id="helpTitle">What LLM4L5X does</h2>
-        <p class="modal-description">Everything runs on this PC. Nothing is imported into Studio 5000 until you import the file yourself, so review every rung first.</p>
+        <p class="modal-description">Runs locally with a local model, completely offline. Nothing reaches Studio 5000 until you import a file yourself: test it before it runs in production.</p>
         <div class="help-grid">
             <section>
                 <h3>Plain English to ladder</h3>
-                <p>Describe the logic the way you would to a colleague: <em>"Start the pump with the start button and keep it running until stop is pressed."</em> A local model reads it; checked code builds the rungs.</p>
-                <p>You get the rungs, a plain-English read-back of what they do (check this first), the new tags, and the checks.</p>
-                <p><b>Export:</b> <code>Routine.L5X</code> (a new routine) or <code>Rung.L5X</code> (rungs to paste), chosen in Settings. <b>Copy</b> gives the rung text in neutral or ASCII form, also chosen in Settings.</p>
+                <dl>
+                    <dt>Input</dt>
+                    <dd><em>Start the pump with the start button and keep it running until stop is pressed.</em></dd>
+                    <dt>Output</dt>
+                    <dd>The rungs drawn as ladder, what they do in plain English, and the checks.
+                        <code>Routine.L5X</code> or <code>Rung.L5X</code>, as chosen in <a href="/settings">Settings</a>.
+                        <b>Copy</b> gives the rung text in neutral or ASCII form, also chosen in Settings.</dd>
+                </dl>
             </section>
             <section>
-                <h3>Rung text, ASCII or neutral</h3>
-                <p>Paste rungs in either form:</p>
-                <p><code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code> neutral text, as stored in L5X<br>
-                   <code>XIC a BST XIC b NXB XIO c BND OTE d</code> ASCII text, as in the editor's ASCII mode</p>
-                <p>You get the other form, what each rung does in plain English, and the checks. <b>Copy</b> gives the other form; <b>Download</b> gives <code>Routine.L5X</code> or <code>Rung.L5X</code> with the tags it needs.</p>
+                <h3>Plain English to UDT</h3>
+                <dl>
+                    <dt>Input</dt>
+                    <dd>Switch the input to <b>UDT</b>: <em>A motor with running and faulted bits, speed in rpm and 32 alarm bits.</em></dd>
+                    <dt>Output</dt>
+                    <dd><code>Name.L5X</code> for one UDT, a zip for several, members in the order that wastes no memory.
+                        In Studio 5000: Data Types, Import Data Type.</dd>
+                </dl>
             </section>
             <section>
-                <h3>Attach your project</h3>
-                <p><b>Attach</b> (or drop a file on the input box) a Studio 5000 export: the whole controller, a program, a routine or rungs. New logic then uses your real tag names, data types and Add-On Instructions, and the Logix Designer version.</p>
-                <p><b>explain all rungs</b>: every rung in plain English. <b>validate</b>: see Validate. <b>summary</b>: what the file holds. <b>xref TagName</b>: where a tag is used.</p>
+                <h3>Rung text to ladder</h3>
+                <dl>
+                    <dt>Input</dt>
+                    <dd>Neutral text, as stored in L5X:<br><code class="line">XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code><br>
+                        ASCII text, as in the editor:<br><code class="line">XIC a BST XIC b NXB XIO c BND OTE d</code></dd>
+                    <dt>Output</dt>
+                    <dd>The rungs drawn as ladder, in plain English, with the checks. <code>Routine.L5X</code> or
+                        <code>Rung.L5X</code>, as chosen in Settings.</dd>
+                </dl>
             </section>
             <section>
-                <h3>Validate</h3>
-                <p>Two layers. <b>Import checks</b>: will Studio 5000 accept it (syntax, operands, data types, tags that exist, instruction names for your version).</p>
-                <p><b>Rules</b>: 49 programming rules with fixed codes: CRT critical, ERR error, WAR warning, INF info. Switch rules on or off on the <a href="/rules">Rules page</a>. Write <code>lint:disable=ERR010</code> in a rung comment or tag description to accept one case.</p>
-                <p>Generated and pasted rungs are checked with the rung rules too. Project rules (tasks, modules, descriptions) need a full controller export.</p>
+                <h3>Attach an L5X</h3>
+                <dl>
+                    <dt>Input</dt>
+                    <dd>A Studio 5000 export: the whole controller, a program, a routine, rungs or a UDT.
+                        New logic then uses its tags, AOIs and version.</dd>
+                    <dt>Output</dt>
+                    <dd><b>Explain all rungs</b>: every rung drawn and in plain English. <b>xref TagName</b>: where a tag is used.<br>
+                        <b>Validate</b>: will Studio 5000 import it, and the coding rules, UDT rules included
+                        (padding, member order, unused, descriptions). Switch rules on or off on the <a href="/rules">Rules</a> page.<br>
+                        <b>Optimize UDTs</b>: reorder members to save memory; one file, a zip or the whole program.</dd>
+                </dl>
             </section>
             <section>
-                <h3>UDTs</h3>
-                <p>Switch the input to <b>UDT</b> and describe the data: <em>"A motor UDT with running and faulted bits, speed in rpm and 32 alarm bits."</em> Or attach an <b>Excel sheet</b> (template under the examples button, next to Send). Members are written in the order that wastes no memory; you get <code>Name.L5X</code> (one UDT) or a zip. Import with <i>Data Types → Import Data Type</i>.</p>
-                <p><b>Optimize</b>: attach a UDT export, or a whole program and press <b>optimize UDTs</b>. Each UDT shows the bytes saved per instance, how many instances there are, and anything that copies it by byte offset (COP/CPS, MSG, produced/consumed). Download one file, a zip, or the whole program. A UDT can only change offline, and the whole-program file needs a test import first.</p>
+                <h3>Attach a requirements Excel</h3>
+                <dl>
+                    <dt>Input</dt>
+                    <dd>Each sheet is one routine, each row one requirement in plain English. A row may give rung
+                        text instead, which is used as written. Sample in the examples list, next to Send.</dd>
+                    <dt>Output</dt>
+                    <dd>Rows are built one by one, drawn as they finish. One <code>Routine.L5X</code> per sheet
+                        (a zip with a report when there are several), the requirement as the rung comment.</dd>
+                </dl>
+            </section>
+            <section>
+                <h3>Attach a UDT Excel</h3>
+                <dl>
+                    <dt>Input</dt>
+                    <dd>One row per member: UDT, UDT description, Member, Data type, Description.
+                        Sample in the examples list in UDT mode.</dd>
+                    <dt>Output</dt>
+                    <dd>The UDTs, checked and ordered, as <code>Name.L5X</code> or a zip.</dd>
+                </dl>
             </section>
             <section>
                 <h3>The model</h3>
-                <p>Set it up in <a href="/settings">Settings</a>: <b>Ollama</b>, or a <b>llama.cpp</b> server, which constrains every answer to valid logic. Turn <b>thinking off</b>: it is much faster on a CPU.</p>
-                <p>Tested: Qwen3.6-35B-A3B on llama.cpp got 99% of the built-in test suite right. Real requests are worded differently, which is why the read-back is there.</p>
+                <p>Set it up in <a href="/settings">Settings</a>: <b>Ollama</b>, or a <b>llama.cpp</b> server, which
+                    constrains every answer to valid logic. Turn <b>thinking off</b>: it is much faster on a CPU.</p>
+                <p>Tested: Qwen3.6-35B-A3B on llama.cpp got 99% of the built-in test suite right. Real requests are
+                    worded differently, which is why the read-back is there.</p>
+            </section>
+            <section>
+                <h3>Planned</h3>
+                <p><b>Documentation</b> written from an attached program: what each routine does, from its rungs.</p>
+                <p><b>Translate to English</b>: rung comments, tag descriptions and tag names of a project
+                    written in another language.</p>
             </section>
             <section class="help-tips">
                 <h3>Tips</h3>

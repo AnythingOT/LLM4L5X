@@ -56,6 +56,7 @@ DEFAULTS = {
     "llm_url": "",              # empty = the backend's usual local address
     "model": "phi4-mini",
     "think": "default",         # default | off
+    "context": 16384,           # tokens the model sees (Ollama); llama.cpp: -c at server start
     "rung_format": "neutral",   # neutral | ascii: how rungs are shown and copied
     "disabled_rules": [],       # lint rule codes switched off on the Rules page
 }
@@ -79,6 +80,10 @@ def settings(raw: dict | None) -> dict:
         if s[k] not in allowed:
             s[k] = DEFAULTS[k]
     s["comments"] = bool(s["comments"])
+    try:
+        s["context"] = min(max(int(s["context"]), 2048), 262144)
+    except (TypeError, ValueError):
+        s["context"] = DEFAULTS["context"]
     rules = raw.get("disabled_rules")
     s["disabled_rules"] = sorted({str(c).upper() for c in rules if str(c).upper() in lint.BY_CODE}) \
         if isinstance(rules, list) else []
@@ -89,7 +94,8 @@ def settings(raw: dict | None) -> dict:
 
 def llm(s: dict):
     """The model client the settings describe (tests replace this)."""
-    return make_client(s["backend"], s["llm_url"] or None, s["model"], think=False if s["think"] == "off" else None)
+    return make_client(s["backend"], s["llm_url"] or None, s["model"], think=False if s["think"] == "off" else None,
+                       context=s["context"])
 
 
 def model_info(s: dict, client) -> dict:

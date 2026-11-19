@@ -26,16 +26,16 @@ function ruleRow(r) {
     sw.onchange = () => {
         const d = disabled();
         if (sw.checked) d.delete(r.code); else d.add(r.code);
-        row.classList.toggle('off', !sw.checked);
         setDisabled(d);
+        draw();
     };
     row.classList.toggle('off', !sw.checked);
     row.appendChild(sw);
     row.appendChild(el('span', { cls: `code ${r.severity}`, text: r.code }));
+    const badge = el('span', { cls: `badge ${r.scope}`, text: r.scope, title: r.scope === 'rung'
+        ? 'Also checks new and pasted rungs' : 'Needs a full controller export' });
     const body = el('span', { cls: 'rule-body' },
-        el('span', { cls: 'rule-title', text: r.title }),
-        el('span', { cls: `badge ${r.scope}`, text: r.scope, title: r.scope === 'rung'
-            ? 'Also checks new and pasted rungs' : 'Needs a full controller export' }),
+        el('span', { cls: 'rule-title', text: r.title }, badge),
         el('span', { cls: 'rule-desc', text: r.description }));
     row.appendChild(body);
     return row;
@@ -48,9 +48,17 @@ function draw() {
     const groups = new Map();
     shown.forEach((r) => { if (!groups.has(r.group)) groups.set(r.group, []); groups.get(r.group).push(r); });
     const out = [];
+    const index = [];
+    const off = disabled();
     for (const [g, list] of groups) {
-        const sec = el('section', { cls: 'card rule-group' });
-        const head = el('div', { cls: 'rule-group-head' }, el('h2', { text: g }), el('span', { cls: 'muted', text: `${list.length}` }));
+        const id = `group-${g.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
+        const on = list.filter((r) => !off.has(r.code)).length;
+        const link = el('a', {}, el('span', { text: g }), el('span', { cls: 'muted', text: `${on}/${list.length}` }));
+        link.href = `#${id}`;
+        index.push(link);
+        const sec = el('section', { cls: 'rule-group' });
+        sec.id = id;
+        const head = el('div', { cls: 'rule-group-head' }, el('h2', { text: g }), el('span', { cls: 'muted', text: `${on} of ${list.length} on` }));
         const onBtn = el('button', { cls: 'btn small', text: 'On' });
         const offBtn = el('button', { cls: 'btn small', text: 'Off' });
         onBtn.onclick = () => { const d = disabled(); list.forEach((r) => d.delete(r.code)); setDisabled(d); draw(); };
@@ -62,6 +70,7 @@ function draw() {
     }
     if (!out.length) out.push(el('p', { cls: 'muted', text: 'No rule matches.' }));
     $('ruleGroups').replaceChildren(...out);
+    $('ruleIndex').replaceChildren(...index);
 }
 
 $('ruleSearch').oninput = draw;

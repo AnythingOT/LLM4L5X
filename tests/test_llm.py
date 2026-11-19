@@ -224,3 +224,11 @@ def test_extract_spec_joins_statements_split_over_lines():
     reply = ("Here you go:\nIF (A <= B) OR C THEN\n  P := S * T;\nIf you need more, ask.\n"
              "Lamp := Door;")
     assert extract_spec(reply) == "IF (A <= B) OR C THEN P := S * T;\nLamp := Door;"
+
+
+def test_ollama_gets_the_context_window(monkeypatch):
+    import inputs.llm as llm
+    seen = {}
+    monkeypatch.setattr(llm, "_post_json", lambda url, body, timeout: seen.update(body) or {"message": {"content": "A := B;"}})
+    llm.make_client("ollama", context=32768).chat([{"role": "user", "content": "x"}])
+    assert seen["options"]["num_ctx"] == 32768

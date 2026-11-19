@@ -41,6 +41,15 @@
                     <option value="default">Model default (always off on llama.cpp)</option>
                     <option value="off">Off: faster, recommended on a CPU</option>
                 </select>
+
+                <label for="setContext">Context window</label>
+                <select id="setContext">
+                    <option value="8192">8,192 tokens</option>
+                    <option value="16384">16,384 tokens (recommended)</option>
+                    <option value="32768">32,768 tokens: large projects</option>
+                    <option value="65536">65,536 tokens: more RAM</option>
+                </select>
+                <p class="help full" id="contextHelp">How much the model reads at once: instructions, examples, your project's tags and the request. Larger needs more RAM.</p>
             </div>
         </section>
 

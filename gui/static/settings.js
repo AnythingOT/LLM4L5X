@@ -3,7 +3,7 @@
 
 let settings = loadSettings();
 const fields = {
-    backend: 'setBackend', llm_url: 'setLlmUrl', think: 'setThink',
+    backend: 'setBackend', llm_url: 'setLlmUrl', think: 'setThink', context: 'setContext',
     rung_format: 'setRungFormat', output: 'setOutput', routine: 'setRoutine', program: 'setProgram',
     controller: 'setController', revision: 'setRevision', scope: 'setScope',
     display: 'setDisplay', prefix: 'setPrefix', comments: 'setComments',
@@ -32,6 +32,12 @@ function updateBackendUi() {
     const info = BACKEND_INFO[$('setBackend').value];
     $('backendHelp').textContent = info.help;
     $('setLlmUrl').placeholder = info.url;
+    // llama.cpp fixes the context when the server starts; the setting only reaches Ollama
+    const fixed = $('setBackend').value === 'llamacpp';
+    $('setContext').disabled = fixed;
+    $('contextHelp').textContent = fixed
+        ? 'Set when llama-server starts, with -c (32768 recommended). This setting is used with Ollama.'
+        : 'How much the model reads at once: instructions, examples, your project\'s tags and the request. Larger needs more RAM.';
 }
 $('setBackend').addEventListener('change', () => {
     // a default address of another backend would be wrong here
