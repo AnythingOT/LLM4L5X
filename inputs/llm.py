@@ -54,6 +54,7 @@ Rules:
   - "keeps running until", "stays on until" = seal-in: X := (Start OR X) AND NOT Stop;
   - "turn on"/"energize" with other actions = ENERGIZE; "latch"/"keep it set" = SET; "unlatch" = RESET.
   - "turn on"/"switch on X if C" with no other action = X := C; SET only for "latch"/"keep on"/"stays on".
+  - The words decide the instruction, never the tag's name: "turn on Alarm_Latch" is Alarm_Latch := C;
   - "on-delay timer" = ON_DELAY_TIMER; "off-delay timer" = OFF_DELAY_TIMER. Match the words.
   - "either A or B, and C" = (A OR B) AND C: the part after ", and" still applies.
   - "subtract/divide/... and store the result in C" changes ONLY C: C := B - A; never B := ...
