@@ -69,7 +69,7 @@ class Catalog:
     def add(self, instr: Instruction) -> None:
         self.instructions[instr.name.upper()] = instr
 
-    def copy(self) -> "Catalog":
+    def copy(self) -> Catalog:
         return Catalog(dict(self.instructions))
 
 

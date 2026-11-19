@@ -206,7 +206,7 @@ def test_grammar_rejected_falls_back(monkeypatch):
     class Picky(OpenAICompatClient):
         def chat(self, messages, grammar=None):
             if grammar:
-                raise LLMError("the server rejected the LogicSpec grammar: parse error")
+                raise LLMError("the server rejected the grammar: parse error")
             return "Motor_Run := Start_PB;"
     r = Generator(Picky(grammar=True)).generate("Turn on Motor_Run while Start_PB is on.")
     assert r.spec == "Motor_Run := Start_PB;" and any("continuing without it" in w for w in r.warnings)

@@ -2,7 +2,7 @@ import random
 
 import pytest
 
-from core.logicspec import Assign, parse_spec
+from core.logicspec import Assign
 from core.compiler import CompileError, Compiler, compile_spec, tag_name_problem
 from core.rung import format_rung
 from core.simulator import Simulator, preset_state

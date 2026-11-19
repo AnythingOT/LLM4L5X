@@ -114,7 +114,8 @@ def small_integers(ctx: Context) -> list[Finding]:
 
 
 def _used_operands(ctx: Context) -> set[str]:
-    return {re.sub(r"\s+", "", a).upper() for r in ctx.rungs for ins in walk(r.rung.body) for a in ins.args}
+    return ({re.sub(r"\s+", "", a).upper() for r in ctx.rungs for ins in walk(r.rung.body) for a in ins.args}
+            | ctx.usage_operands())
 
 
 @check("WAR019")
@@ -175,10 +176,18 @@ def loose_bools(ctx: Context, minimum: int = 1) -> list[Finding]:
     return out
 
 
+_BIT_REF = re.compile(r"([A-Z_][\w:]*)((?:\[\d+(?:,\d+)*\])?\.\d+)")
+
+
 @check("INF003")
 def tag_description(ctx: Context) -> list[Finding]:
     cache: dict = {}
-    ops = _used_operands(ctx)
+    # bits addressed one by one, by tag: "MOTOR.3" -> {"MOTOR": {".3"}}, "ARR[2].0" -> {"ARR": {"[2].0"}}
+    bits_of: dict[str, set[str]] = {}
+    for o in _used_operands(ctx):
+        m = _BIT_REF.fullmatch(o)
+        if m:
+            bits_of.setdefault(m.group(1), set()).add(m.group(2))
     out = []
     for t in _user_tags(ctx):
         dt = t.datatype.upper()
@@ -189,10 +198,7 @@ def tag_description(ctx: Context) -> list[Finding]:
             out.append(Finding("INF003", f"'{t.name}' has no description.", _where(t)))
         if dt in _BIT_CAPABLE:  # bits that logic addresses one by one need a comment
             comments = {re.sub(r"\s+", "", k).upper() for k in t.comments}
-            prefix = t.name.upper()
-            bits = sorted({o[len(prefix):] for o in ops if o.startswith(prefix)
-                           and re.fullmatch(r"(\[\d+(,\d+)*\])?\.\d+", o[len(prefix):])})
-            for b in bits:
+            for b in sorted(bits_of.get(t.name.upper(), ())):
                 if b not in comments:
                     out.append(Finding("INF003", f"'{t.name}{b}' has no comment.", _where(t)))
     return out

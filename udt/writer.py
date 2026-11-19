@@ -9,11 +9,11 @@ from datetime import datetime
 
 from lxml import etree
 
+from l5x.writer import serialize, skeleton
 from udt import layout
 from udt.layout import M
 from udt.model import UdtDef, UdtMember, dependency_order
 
-EXPORT_OPTIONS = "References NoRawData L5KData DecoratedData Context Dependencies ForceProtectedEncoding AllProjDocTrans"
 _STRUCT = {"STRING", "TIMER", "COUNTER", "CONTROL", "MESSAGE"}
 
 
@@ -33,14 +33,19 @@ def ordered(u: UdtDef, user_types: set[str]) -> list[UdtMember]:
     return sorted(u.members, key=lambda m: layout.sort_key(M(m.name, m.datatype, m.dim), user_types))
 
 
-def sizes(udts: list[UdtDef], known_sizes: dict[str, int] | None = None, optimal: bool = True) -> dict[str, int]:
-    """Byte size of each UDT (as written: optimal order unless optimal=False)."""
-    out = dict(known_sizes or {})
+def sizes(udts: list[UdtDef], known_sizes: dict[str, int] | None = None, optimal: bool = True,
+          ) -> dict[str, int | None]:
+    """Byte size of each UDT (optimal order unless optimal=False). None when it nests a type
+    whose size is not known (e.g. a project UDT that uses types missing from the export)."""
+    out: dict[str, int | None] = dict(known_sizes or {})
     user = {u.name for u in udts} | set(out)
     for u in dependency_order(udts):
         mem = ordered(u, user) if optimal else u.members
-        out[u.name] = layout.size_of([M(m.name, "BIT" if (m.datatype.upper() == "BOOL" and not m.dim) else m.datatype, m.dim)
-                                      for m in mem], out)
+        if any(m.datatype.upper() not in layout.SIZE and out.get(m.datatype) is None for m in mem):
+            out[u.name] = None
+            continue
+        out[u.name] = layout.size_of([M(m.name, "BIT" if (m.datatype.upper() == "BOOL" and not m.dim) else m.datatype,
+                                        m.dim) for m in mem], out)
     return out
 
 
@@ -92,15 +97,9 @@ def write_udt(target: UdtDef, batch: list[UdtDef], controller: str = "LLM4L5X", 
             if m.datatype in by and m.datatype not in need and m.datatype != target.name:
                 need.append(m.datatype)
                 stack.append(m.datatype)
-    date = date or datetime.now()
-    root = etree.Element("RSLogix5000Content", {
-        "SchemaRevision": "1.0", "SoftwareRevision": revision, "TargetName": target.name, "TargetType": "DataType",
-        "ContainsContext": "true", "ExportDate": date.strftime("%a %b %d %H:%M:%S %Y"), "ExportOptions": EXPORT_OPTIONS})
-    ctrl = etree.SubElement(root, "Controller", Use="Context", Name=controller)
-    dts = etree.SubElement(ctrl, "DataTypes", Use="Context")
+    root, ctrl = skeleton("DataType", controller, revision, date, TargetName=target.name)
+    dts = ctrl.find("DataTypes")
     dts.append(datatype_element(target, user, use="Target"))
     for u in dependency_order([by[n] for n in need]):
         dts.append(datatype_element(u, user))
-    etree.indent(root, space="")
-    return ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n'
-            + etree.tostring(root, encoding="unicode") + "\n")
+    return serialize(root)

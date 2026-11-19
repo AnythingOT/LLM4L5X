@@ -26,17 +26,17 @@ class Var:
 
 @dataclass(frozen=True)
 class Not:
-    expr: "Expr"
+    expr: Expr
 
 
 @dataclass(frozen=True)
 class And:
-    items: tuple["Expr", ...]
+    items: tuple[Expr, ...]
 
 
 @dataclass(frozen=True)
 class Or:
-    items: tuple["Expr", ...]
+    items: tuple[Expr, ...]
 
 
 @dataclass(frozen=True)
@@ -48,12 +48,12 @@ class Cmp:
 
 @dataclass(frozen=True)
 class Rise:
-    expr: "Expr"
+    expr: Expr
 
 
 @dataclass(frozen=True)
 class Delay:
-    expr: "Expr"
+    expr: Expr
     ms: int
     off: bool = False  # True = OFFDELAY (TOF)
     timer: str | None = None  # explicit timer tag name

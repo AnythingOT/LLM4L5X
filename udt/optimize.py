@@ -23,7 +23,8 @@ from l5x.reader import Project, read_l5x
 from lint.context import Context
 from udt import layout
 from udt.layout import HOST_PREFIX, M
-from udt.writer import EXPORT_OPTIONS, host_name
+from l5x.writer import EXPORT_OPTIONS
+from udt.writer import host_name
 
 _MEMBER = re.compile(r"<Member\b[^>]*?(?:/>|>.*?</Member>)", re.S)
 _ATTR = re.compile(r'(\w+)="([^"]*)"')
@@ -93,6 +94,7 @@ class Analysis:
     members: dict[str, list[Member]]  # original members per UDT
     spans: dict[str, tuple[int, int]]  # (start, end) of each <DataType> element in text
     families: dict[str, str]
+    sizes: dict[str, int] = field(default_factory=dict)  # current byte size of every type we can size
 
     @property
     def full_program(self) -> bool:
@@ -174,6 +176,19 @@ def analyse(data: bytes | str) -> Analysis:
                            "Export the whole controller.")
             continue
         types[name] = [M(x.name, _layout_type(x), x.dim) for x in real]
+    # a UDT that nests one we cannot size cannot be sized either (fixed-layout families excepted)
+    fixed = {n for n in members if families[n] != "NoFamily"
+             and all(x.datatype.upper() in layout.SIZE for x in members[n] if not x.is_host)}
+    changed = True
+    while changed:
+        changed = False
+        for name in list(types):
+            bad = sorted({m.type for m in types[name] if m.type in plans and m.type not in types and m.type not in fixed})
+            if bad:
+                plans[name].status = "skipped"
+                plans[name].reason = f"nests {', '.join(bad)}, which cannot be analysed"
+                del types[name]
+                changed = True
     # sizes: every analysable UDT as it is, then every one reordered
     try:
         order = layout.dependency_order(types)
@@ -181,7 +196,11 @@ def analyse(data: bytes | str) -> Analysis:
         for n in types:
             plans[n].status, plans[n].reason = "skipped", str(e)
         order, types = [], {}
-    now, best = dict(aoi_sizes), dict(aoi_sizes)
+    now = dict(aoi_sizes)
+    for n in fixed:  # STRING-family types: Studio's own layout, never reordered, but nested by size
+        now[n] = layout.size_of([M(x.name, _layout_type(x), x.dim) for x in members[n] if not x.is_host], {})
+        plans[n].size_now = plans[n].size_best = now[n]
+    best = dict(now)
     for n in order:
         now[n] = layout.size_of(types[n], now)
         new = sorted(types[n], key=lambda x: layout.sort_key(x, user))
@@ -190,14 +209,8 @@ def analyse(data: bytes | str) -> Analysis:
         p.size_now, p.size_best, p.after = now[n], best[n], [x.name for x in new]
         if p.after != p.before:
             p.status = "reordered"
-    for n, p in plans.items():
-        if p.status == "skipped" and not p.size_now:
-            try:
-                p.size_now = p.size_best = layout.size_of(
-                    [M(x.name, _layout_type(x), x.dim) for x in members[n] if not x.is_host], now)
-            except Exception:  # noqa: BLE001 - size of an unanalysable type is only informative
-                pass
-    an = Analysis(text, bom, project, target, plans, members, spans, families)
+
+    an = Analysis(text, bom, project, target, plans, members, spans, families, now)
     if project.target_type == "Controller":
         _count_instances(an)
         _find_risks(an)
@@ -262,7 +275,8 @@ def _find_risks(an: Analysis) -> None:
             if ins.name.upper() in ("COP", "CPS"):
                 for op in ins.args[:2]:
                     flag(udt_of(op, r.owner), f"{ins.name.upper()} copies bytes of {op.strip()} ({r.location})")
-    for name, (instr, src, dst) in [(None, m.groups()) for m in _COPY.finditer(ctx.usage_text)]:
+    for m in _COPY.finditer(ctx.usage_text):
+        instr, src, dst = m.groups()
         for op in (src, dst):
             flag(udt_of(op, ""), f"{instr.upper()} in an ST/FBD routine copies bytes of {op}")
     for t in p.tags.values():

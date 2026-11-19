@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterator, Union
+from typing import Union
+from collections.abc import Iterator
 
 
 # ---------------------------------------------------------------- AST
@@ -23,7 +24,7 @@ class Instr:
 
 @dataclass(frozen=True)
 class Series:
-    items: tuple["Elem", ...] = ()
+    items: tuple[Elem, ...] = ()
 
 
 @dataclass(frozen=True)

@@ -16,7 +16,7 @@ from __future__ import annotations
 import itertools
 import random
 
-from core.logicspec import (And, Assign, Cmp, Delay, Energize, IfThen, Not, Or, Rise, Var, format_action,
+from core.logicspec import (And, Assign, Cmp, Delay, Energize, Not, Or, Rise, Var, format_action,
                             format_expr, parse_spec)
 
 # a <op> b with op in {<=, <, <>} becomes NOT (a <op'> b), so N <= 5 and NOT N > 5 match

@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 
 from core.catalog import Catalog, default_catalog
-from core.rung import Instr, Rung, base_tag, format_rung, is_literal, is_placeholder, walk
+from core.rung import Rung, base_tag, format_rung, is_literal, is_placeholder, walk
 from core.simulator import SimError, Simulator, _num
 
 INTERNAL = re.compile(r"^(L4X_|REF_)")
@@ -128,7 +128,7 @@ def compare(expected: Side, got: Side, seed: int = 0, sequences: int = 80, scans
     rng = random.Random(seed)
     out_bools = {w for w in (ew | gw) if "." not in w and "[" not in w and w in (_bool_writes(expected, cat) |
                                                                                   _bool_writes(got, cat))}
-    for seq in range(sequences):
+    for _ in range(sequences):
         # outputs start at random values (same on both sides), so CLR on a value that is
         # already 0, or OTU on a bit that is already off, still shows a difference
         init = {}

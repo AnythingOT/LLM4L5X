@@ -57,26 +57,29 @@ def read_excel(data: bytes) -> list[UdtDef]:
         raise UdtError("no header row with UDT, Member and Data type columns in the first 10 rows "
                        "(download the template)")
     udts: list[UdtDef] = []
+    def cell(row, key):
+        i = header.get(key)
+        return _norm(row[i]) if i is not None and i < len(row) else ""
+
     for n, row in enumerate(rows, start + 1):
-        get = lambda k: _norm(row[header[k]]) if k in header and header[k] < len(row) else ""  # noqa: E731
-        name, member, dtype = get("udt"), get("member"), get("type")
+        name, member, dtype = cell(row, "udt"), cell(row, "member"), cell(row, "type")
         if not (name or member or dtype):
             continue
         if name and (not udts or udts[-1].name != name):
             if any(u.name == name for u in udts):
                 raise UdtError(f"row {n}: rows of UDT {name} must be together")
-            udts.append(UdtDef(name, get("udt_desc")))
+            udts.append(UdtDef(name, cell(row, "udt_desc")))
         elif not udts:
             raise UdtError(f"row {n}: the first row needs a UDT name")
-        if get("udt_desc") and not udts[-1].description:
-            udts[-1].description = get("udt_desc")
+        if cell(row, "udt_desc") and not udts[-1].description:
+            udts[-1].description = cell(row, "udt_desc")
         if not member:
             continue
         m = re.fullmatch(r"([A-Za-z_]\w*)\s*(?:\[\s*(\d+)\s*\])?", dtype)
         if not m:
             raise UdtError(f"row {n}: data type '{dtype}' is not like DINT, REAL[10] or a UDT name")
         t = m.group(1).upper() if m.group(1).upper() in NATIVE else m.group(1)
-        udts[-1].members.append(UdtMember(member, t, int(m.group(2) or 0), get("desc")))
+        udts[-1].members.append(UdtMember(member, t, int(m.group(2) or 0), cell(row, "desc")))
     if not udts:
         raise UdtError("the sheet has no UDT rows")
     return udts

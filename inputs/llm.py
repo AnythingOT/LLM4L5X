@@ -91,6 +91,26 @@ def _get_json(url: str, timeout: float = 5.0) -> dict:
         raise LLMError(f"cannot reach {url} ({getattr(e, 'reason', e)})") from None
 
 
+class _HTTPFailure(Exception):
+    def __init__(self, code: int, detail: str):
+        super().__init__(f"{code}: {detail}")
+        self.code, self.detail = code, detail
+
+
+def _post_json(url: str, body: dict, timeout: float) -> dict:
+    """POST JSON, return JSON. HTTP errors -> _HTTPFailure (the caller words them); no connection -> OSError."""
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        raise _HTTPFailure(e.code, e.read().decode("utf-8", "replace")[:300]) from None
+
+
+_UNREACHABLE = (urllib.error.URLError, TimeoutError, ConnectionError)
+MAX_TOKENS = 400  # one LogicSpec answer; UDTs ask for more
+
+
 BACKENDS = {
     "ollama": {"label": "Ollama", "url": "http://127.0.0.1:11434"},
     "llamacpp": {"label": "llama.cpp server (GGUF, grammar-constrained)", "url": "http://127.0.0.1:8080"},
@@ -110,22 +130,18 @@ class OllamaClient:
         data = _get_json(f"{self.url.rstrip('/')}/api/tags")
         return sorted(m.get("name") or m.get("model") for m in data.get("models", []))
 
-    def chat(self, messages: list[dict], grammar: str | None = None) -> str:
+    def chat(self, messages: list[dict], grammar: str | None = None, max_tokens: int = MAX_TOKENS) -> str:
         body = {"model": self.model, "messages": messages, "stream": False,
-                "options": {"temperature": 0, "num_predict": 400}}
+                "options": {"temperature": 0, "num_predict": max_tokens}}
         if self.think is not None:
             body["think"] = self.think
-        req = urllib.request.Request(f"{self.url.rstrip('/')}/api/chat", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                data = json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", "replace")[:300]
-            if e.code == 404 and "not found" in detail:
+            data = _post_json(f"{self.url.rstrip('/')}/api/chat", body, self.timeout)
+        except _HTTPFailure as e:
+            if e.code == 404 and "not found" in e.detail:
                 raise LLMError(f"Ollama has no model '{self.model}'. Run: ollama pull {self.model}") from None
-            raise LLMError(f"Ollama error {e.code}: {detail}") from None
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            raise LLMError(f"Ollama error {e.code}: {e.detail}") from None
+        except _UNREACHABLE as e:
             raise LLMError(f"Cannot reach Ollama at {self.url} ({e}). Is Ollama running?") from None
         return (data.get("message") or {}).get("content", "")
 
@@ -151,8 +167,8 @@ class OpenAICompatClient:
         data = _get_json(f"{self.url.rstrip('/')}/v1/models")
         return sorted(m.get("id", "") for m in data.get("data", []) if m.get("id"))
 
-    def chat(self, messages: list[dict], grammar: str | None = None) -> str:
-        body = {"messages": messages, "temperature": 0, "max_tokens": 400, "stream": False}
+    def chat(self, messages: list[dict], grammar: str | None = None, max_tokens: int = MAX_TOKENS) -> str:
+        body = {"messages": messages, "temperature": 0, "max_tokens": max_tokens, "stream": False}
         if self.model:
             body["model"] = self.model
         if grammar and self.grammar:
@@ -161,17 +177,13 @@ class OpenAICompatClient:
             # Qwen-style templates: skip the <think> block in the prompt itself, so the
             # server does not have to force-close it (forced tokens and grammars clash)
             body["chat_template_kwargs"] = {"enable_thinking": False}
-        req = urllib.request.Request(f"{self.url.rstrip('/')}/v1/chat/completions", data=json.dumps(body).encode(),
-                                     headers={"Content-Type": "application/json"})
         try:
-            with urllib.request.urlopen(req, timeout=self.timeout) as r:
-                data = json.loads(r.read().decode("utf-8"))
-        except urllib.error.HTTPError as e:
-            detail = e.read().decode("utf-8", "replace")[:300]
-            if grammar and e.code in (400, 500) and "grammar" in detail.lower():
-                raise LLMError(f"the server rejected the LogicSpec grammar: {detail}") from None
-            raise LLMError(f"server error {e.code}: {detail}") from None
-        except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+            data = _post_json(f"{self.url.rstrip('/')}/v1/chat/completions", body, self.timeout)
+        except _HTTPFailure as e:
+            if grammar and e.code in (400, 500) and "grammar" in e.detail.lower():
+                raise LLMError(f"the server rejected the grammar: {e.detail}") from None
+            raise LLMError(f"server error {e.code}: {e.detail}") from None
+        except _UNREACHABLE as e:
             raise LLMError(f"Cannot reach the model server at {self.url} ({e}). Is it running?") from None
         choices = data.get("choices") or [{}]
         return (choices[0].get("message") or {}).get("content", "") or ""
@@ -370,7 +382,7 @@ class Generator:
                 try:
                     reply = self.client.chat(msgs, grammar=grammar)
                 except LLMError as e:
-                    if "rejected the LogicSpec grammar" not in str(e):
+                    if "rejected the grammar" not in str(e):
                         raise
                     res.warnings.append(f"grammar not accepted by the server, continuing without it: {e}")
                     grammar = None

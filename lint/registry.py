@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from collections.abc import Callable
 
 CHECKS: list[tuple[tuple[str, ...], Callable]] = []
 

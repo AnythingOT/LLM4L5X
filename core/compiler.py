@@ -13,7 +13,7 @@ from dataclasses import dataclass, field
 from core.catalog import Catalog, default_catalog, major_version
 from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_plain_tag, walk
 from core.logicspec import (
-    And, Assign, Clear, Cmp, CMP_COMPLEMENT, Copy, Count, Energize, Delay, Expr, IfThen, Math, Not, Or,
+    And, Assign, Clear, Cmp, CMP_COMPLEMENT, Copy, Count, Energize, Delay, Expr, Math, Not, Or,
     ResetAcc, ResetBit, Rise, SetBit, SpecError, StartTimer, Statement, Var, format_statement,
     parse_spec,
 )

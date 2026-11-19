@@ -11,7 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from core.catalog import Catalog, default_catalog, major_version
-from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, is_placeholder, walk
+from core.rung import Branch, Rung, Series, base_tag, is_literal, is_placeholder, walk
 
 NUMERIC_TYPES = {"SINT", "INT", "DINT", "LINT", "REAL", "LREAL", "USINT", "UINT", "UDINT", "ULINT"}
 
@@ -47,86 +47,90 @@ def validate(
     reported only when tag_types is given. string_types: data types that are strings
     (STRING plus the project's custom string types)."""
     cat = catalog or default_catalog()
-    major = major_version(revision)
-    strings = {s.upper() for s in (string_types or set())} | {"STRING"}
-    types = {k: v.upper() for k, v in (tag_types or {}).items()}
+    ctx = _Ctx(cat, major_version(revision), {k: v.upper() for k, v in (tag_types or {}).items()},
+               tag_types is not None, {s.upper() for s in (string_types or set())} | {"STRING"})
     issues: list[Issue] = []
-
     for n, r in enumerate(rungs):
         if not _last_is_output(r.body, cat):
             issues.append(Issue("error", n, "rung (or a branch leg at its end) does not end in an output instruction"))
         for ins in walk(r.body):
-            spec = cat.get(ins.name)
-            if spec is None:
-                inst = types.get(base_tag(ins.args[0]) or "") if ins.args else None
-                if inst and inst.upper() == ins.name.upper():
-                    # the instance tag's type is the instruction name: an Add-On Instruction
-                    # whose definition is not in this export (or is source-protected)
-                    issues.append(Issue("warning", n, f"{ins.name} is an Add-On Instruction whose definition is "
-                                        "not in this export; its operands cannot be checked"))
-                else:
-                    issues.append(Issue("error", n, f"unknown instruction {ins.name}"))
-                continue
-            if not spec.available_in(major):
-                if spec.min_version and major < spec.min_version:
-                    old = next((i.name for i in cat.instructions.values() if i.renamed_to == spec.name), None)
-                    hint = f"; use {old}" if old else ""
-                    issues.append(Issue("error", n, f"{ins.name} needs v{spec.min_version}+, target is v{major}{hint}"))
-                else:
-                    issues.append(Issue("warning", n, f"{ins.name} was renamed {spec.renamed_to} in v{spec.max_version + 1}; target is v{major}"))
-            if not spec.arity_ok(len(ins.args)):
-                want = f"at least {len(spec.operands)}" if spec.variadic else str(len(spec.operands))
-                issues.append(Issue("error", n, f"{ins.name} takes {want} operands, got {len(ins.args)}"))
-                continue
-            for op, arg in zip(spec.operands, ins.args):
-                where = f"{ins.name} operand {op.name}"
-                if op.optional and (arg == "" or is_placeholder(arg)):
-                    continue
-                if arg == "":
-                    issues.append(Issue("error", n, f"{where} is empty"))
-                    continue
-                if is_placeholder(arg):
-                    if op.role != "display":
-                        issues.append(Issue("error", n, f"{where} is '?'"))
-                    continue
-                if op.role == "display":
-                    continue
-                if op.role in ("write", "struct") and is_literal(arg):
-                    issues.append(Issue("error", n, f"{where} writes to a literal {arg}"))
-                    continue
-                if op.type == "BOOL" and is_literal(arg):
-                    issues.append(Issue("warning", n, f"{where} is a constant {arg}"))
-                    continue
-                if is_literal(arg) or op.type in ("EXPR", "ROUTINE", "NAME"):
-                    continue
-                b = base_tag(arg)
-                # "Local:3:I", "S:FS": module-defined I/O and system tags are not <Tag> elements
-                if tag_types is not None and b and ":" not in b and b not in types:
-                    issues.append(Issue("error", n, f"{where}: tag {b} does not exist"))
-                    continue
-                t = types.get(arg) if arg in types else None  # only check plain tags
-                if t and t not in ("ALIAS", ""):  # alias target type is not resolved
-                    if op.type == "BOOL" and t != "BOOL":
-                        issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs BOOL"))
-                    elif op.type in ("TIMER", "COUNTER") and t != op.type:
-                        issues.append(Issue("error", n, f"{where}: {arg} is {t}, needs {op.type}"))
-                    elif op.type == "COMPARABLE" and t not in NUMERIC_TYPES and t.upper() not in strings:
-                        level = "error" if t in ("BOOL", "TIMER", "COUNTER") else "warning"
-                        issues.append(Issue(level, n, f"{where}: {arg} is {t}, expected a number or string"))
-                    elif op.type == "NUMERIC" and t not in NUMERIC_TYPES:
-                        # BOOL/TIMER/COUNTER in a numeric slot is wrong; strings and UDTs are
-                        # accepted by some instructions on some firmware, so only warn
-                        level = "error" if t in ("BOOL", "TIMER", "COUNTER") else "warning"
-                        issues.append(Issue(level, n, f"{where}: {arg} is {t}, expected a number"))
+            issues += [Issue(level, n, msg) for level, msg in _instruction(ins, ctx)]
     # one message per rung is enough when the same problem repeats inside it
-    seen, unique = set(), []
-    for i in issues:
-        if (i.level, i.rung, i.message) not in seen:
-            seen.add((i.level, i.rung, i.message))
-            unique.append(i)
-    issues[:] = unique
+    return list(dict.fromkeys(issues))
 
-    return issues
+
+@dataclass(frozen=True)
+class _Ctx:
+    cat: Catalog
+    major: int | None
+    types: dict[str, str]  # tag -> DATATYPE (upper case)
+    check_tags: bool  # report unknown tags (only when the caller gave the project's tags)
+    strings: set[str]
+
+
+def _instruction(ins, ctx: _Ctx):
+    """(level, message) for one instruction: known, available in this version, operands."""
+    spec = ctx.cat.get(ins.name)
+    if spec is None:
+        inst = ctx.types.get(base_tag(ins.args[0]) or "") if ins.args else None
+        if inst and inst == ins.name.upper():
+            # the instance tag's type is the instruction name: an Add-On Instruction whose
+            # definition is not in this export (or is source-protected)
+            yield "warning", (f"{ins.name} is an Add-On Instruction whose definition is not in this export; "
+                              "its operands cannot be checked")
+        else:
+            yield "error", f"unknown instruction {ins.name}"
+        return
+    if not spec.available_in(ctx.major):
+        if spec.min_version and ctx.major < spec.min_version:
+            old = next((i.name for i in ctx.cat.instructions.values() if i.renamed_to == spec.name), None)
+            yield "error", f"{ins.name} needs v{spec.min_version}+, target is v{ctx.major}" + (f"; use {old}" if old else "")
+        else:
+            yield "warning", f"{ins.name} was renamed {spec.renamed_to} in v{spec.max_version + 1}; target is v{ctx.major}"
+    if not spec.arity_ok(len(ins.args)):
+        want = f"at least {len(spec.operands)}" if spec.variadic else str(len(spec.operands))
+        yield "error", f"{ins.name} takes {want} operands, got {len(ins.args)}"
+        return
+    for op, arg in zip(spec.operands, ins.args):
+        found = _operand(f"{ins.name} operand {op.name}", op, arg, ctx)
+        if found:
+            yield found
+
+
+def _operand(where: str, op, arg: str, ctx: _Ctx) -> tuple[str, str] | None:
+    if op.optional and (arg == "" or is_placeholder(arg)):
+        return None
+    if arg == "":
+        return "error", f"{where} is empty"
+    if is_placeholder(arg):
+        return None if op.role == "display" else ("error", f"{where} is '?'")
+    if op.role == "display":
+        return None
+    if op.role in ("write", "struct") and is_literal(arg):
+        return "error", f"{where} writes to a literal {arg}"
+    if op.type == "BOOL" and is_literal(arg):
+        return "warning", f"{where} is a constant {arg}"
+    if is_literal(arg) or op.type in ("EXPR", "ROUTINE", "NAME"):
+        return None
+    b = base_tag(arg)
+    # "Local:3:I", "S:FS": module-defined I/O and system tags are not <Tag> elements
+    if ctx.check_tags and b and ":" not in b and b not in ctx.types:
+        return "error", f"{where}: tag {b} does not exist"
+    t = ctx.types.get(arg)  # only plain tags are type-checked
+    if not t or t == "ALIAS":  # alias target type is not resolved
+        return None
+    # BOOL/TIMER/COUNTER in a value slot is wrong; strings and UDTs are accepted by some
+    # instructions on some firmware, so they only warn
+    level = "error" if t in ("BOOL", "TIMER", "COUNTER") else "warning"
+    if op.type == "BOOL" and t != "BOOL":
+        return "error", f"{where}: {arg} is {t}, needs BOOL"
+    if op.type in ("TIMER", "COUNTER") and t != op.type:
+        return "error", f"{where}: {arg} is {t}, needs {op.type}"
+    if op.type == "COMPARABLE" and t not in NUMERIC_TYPES and t not in ctx.strings:
+        return level, f"{where}: {arg} is {t}, expected a number or string"
+    if op.type == "NUMERIC" and t not in NUMERIC_TYPES:
+        return level, f"{where}: {arg} is {t}, expected a number"
+    return None
 
 
 def errors(issues: list[Issue]) -> list[Issue]:

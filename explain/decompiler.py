@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from core.rung import Branch, Instr, Rung, Series, base_tag, is_literal, walk
+from core.rung import Branch, Instr, Rung, Series, is_literal, walk
 from core.logicspec import (
     And, Assign, Clear, Cmp, Copy, Count, Energize, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit, Rise,
     SetBit, StartTimer, Statement, Var,

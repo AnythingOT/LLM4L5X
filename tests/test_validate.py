@@ -1,5 +1,5 @@
 from core.rung import parse_rung
-from core.validator import errors, validate
+from core.validator import validate
 
 
 def msgs(*texts, tags=None):

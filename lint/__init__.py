@@ -80,7 +80,7 @@ def run(project: Project, disabled=(), catalog: Catalog | None = None) -> Report
     if protected or project.protected_aois:
         notes.append(f"{len(protected) + len(project.protected_aois)} protected routine(s)/AOI(s) cannot be read.")
     if ctx.unparsed:
-        notes.append(f"{ctx.unparsed} rung(s) did not parse and were skipped; see the syntax check.")
+        notes.append(f"{len(ctx.unparsed)} rung(s) did not parse: only their comments and tag names were checked; see the import checks.")
     return Report(kept, suppressed, ctx.not_verified, errors, notes, sorted(disabled))
 
 

@@ -5,7 +5,6 @@ everything would make the suite worthless."""
 from __future__ import annotations
 
 import random
-import re
 
 from core.rung import Branch, Instr, Rung, Series
 

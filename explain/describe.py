@@ -9,7 +9,7 @@ able to spot a wrong AND/OR at a glance.
 from __future__ import annotations
 
 from core.logicspec import (
-    And, Assign, Clear, Cmp, Copy, Count, Energize, Delay, Expr, IfThen, Math, Not, Or, ResetAcc, ResetBit,
+    And, Assign, Clear, Cmp, Copy, Count, Energize, Delay, Expr, Math, Not, Or, ResetAcc, ResetBit,
     Rise, SetBit, StartTimer, Statement, Var, fmt_ms,
 )
 

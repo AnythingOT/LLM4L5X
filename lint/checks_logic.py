@@ -6,7 +6,7 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 
-from core.rung import Branch, Instr, base_tag, is_literal, walk
+from core.rung import Instr, base_tag, is_literal, walk
 from lint.context import (COUNTERS, INT_TYPES, ONE_SHOTS, REAL_TYPES, TIMERS, Context, Finding, concrete,
                           guarded)
 from lint.paths import branches, fmt, key, sequences, walk_series
@@ -219,6 +219,9 @@ def reset_missing(ctx: Context) -> list[Finding]:
                 w = re.sub(r"\s+", "", w)
                 if w.upper().endswith(".ACC"):
                     resets.add(_array_base(w[:-4]))
+    # ST, FBD and unparsed rungs: RES(x) or a write to x.ACC
+    for m in re.finditer(r"\bRES\s*\(\s*([^,)]+?)\s*\)|([\w:\[\].,]+?)\.ACC\s*:=", ctx.usage_text, re.I):
+        resets.add(_array_base(m.group(1) or m.group(2)))
     out = []
     for (_scope, op), uses in _scoped(ctx, {"RTO", "RTOR"} | COUNTERS).items():
         if _array_base(op) not in resets:

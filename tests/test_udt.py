@@ -214,7 +214,7 @@ class FakeClient:
     def __init__(self, replies):
         self.replies, self.seen = list(replies), []
 
-    def chat(self, messages, grammar=None):
+    def chat(self, messages, grammar=None, **kw):
         self.seen.append(grammar)
         return self.replies.pop(0)
 
