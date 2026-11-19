@@ -49,7 +49,8 @@ Ollama works too: set *Thinking* to off in Settings. Details: [docs/GUIDE.md](do
 
 - Verified: generated routines and rungs import into Studio 5000; UDTs from Excel and routines from a requirements Excel work.
 - Not yet verified: a timer keeps its preset after import; tag values survive a whole-program UDT reorder (test on a copy).
-- Tested on 186 real exports. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+- Tested on 241 real exports. A requirements Excel with an *Expected rung* column scores the model row by row;
+  `python -m eval.test_workbook` makes one. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 Planned: documentation written from an attached program; translating comments, descriptions and tag names to English.
 

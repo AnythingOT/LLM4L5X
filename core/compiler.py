@@ -253,9 +253,10 @@ class Compiler:
             dt = "TIMER" if re.search(r"(TMR|TIMER|TON|TOF)", name, re.I) else "COUNTER"
             self.tags[name] = TagDef(name, dt, None)
             self.warnings.append(f"{name} is new and only reset here; created as a {dt} (check its preset)")
+        # type tags on the v35 names: v36 MOVE takes any type, so it would leave its destination untyped
+        self._type_tags(rungs)
         if self.major is not None and self.major >= 36:
             rungs = [Rung(_rename(r.body, self.cat), r.comment) for r in rungs]
-        self._type_tags(rungs)
         return CompileResult(rungs, self.tags, stmts, self.warnings)
 
     # ------------------------------------------------------------ tag typing

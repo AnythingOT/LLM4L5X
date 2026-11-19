@@ -10,8 +10,10 @@ from udt.layout import HOST_PREFIX, M, natural_key
 
 
 def _user_udts(ctx: Context):
-    """User data types; string types are laid out by Studio 5000 and left alone."""
-    return {n: d for n, d in ctx.project.datatypes.items() if (d.family or "NoFamily") != "StringFamily"}
+    """User data types; string types are laid out by Studio 5000 and left alone, and
+    ProductDefined / IO / System types (ALARM_ANALOG, module types) are Rockwell's."""
+    return {n: d for n, d in ctx.project.datatypes.items()
+            if d.is_user and (d.family or "NoFamily") != "StringFamily"}
 
 
 def _members(d) -> list[M]:

@@ -238,3 +238,18 @@ def test_generate_retries_with_the_problem_and_returns_checked_udts():
     assert r.udts and [m.name for m in r.udts[0].members] == ["Flags", "Speed"]
     assert len(r.attempts) == 2 and "multiple of 32" in r.attempts[0]["error"]
     assert c.seen[0] and "BOOL" in c.seen[0]  # grammar sent to a grammar-capable server
+
+
+def test_rockwell_types_are_not_treated_as_udts():
+    from l5x.reader import read_l5x
+    from udt import optimize
+    import lint
+    x = ('<?xml version="1.0"?><RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.00" TargetName="C" '
+         'TargetType="Controller"><Controller Name="C"><DataTypes>'
+         '<DataType Name="ALARM_X" Family="NoFamily" Class="ProductDefined"><Members><Member Name="A" DataType="BOOL" '
+         'Dimension="0"/><Member Name="E" DataType="EMPTY_T" Dimension="0"/></Members></DataType>'
+         '<DataType Name="EMPTY_T" Family="NoFamily" Class="IO"><Members/></DataType>'
+         '<DataType Name="Mine" Family="NoFamily" Class="User"><Members><Member Name="B" DataType="DINT" Dimension="0"/>'
+         '</Members></DataType></DataTypes><Tags/><Programs/><Tasks/></Controller></RSLogix5000Content>').encode()
+    assert set(optimize.analyse(x).plans) == {"Mine"}
+    assert not lint.run(read_l5x(x)).errors

@@ -114,6 +114,7 @@ Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes th
 - Rows run one by one in the background; each appears drawn as it finishes, and **Stop after this row** keeps what is done. Tags created by a row are known to the rows below it. A row that fails (no valid logic, a tag type clash, an import error) is reported and left out; the rest still build.
 - Output: `SheetName.L5X` (Import Routine), or `Routines.zip` with one routine per sheet and `Report.txt`. The rung rules run on each whole routine, so a timer used by two rows is caught.
 - Sample: *Requirements Excel sample* in the examples list (next to Send). Attach your project first so the rows use its tag names.
+- **As a test:** add an **Expected rung** column. Each built row is then run against it in the scan simulator and marked *Behaves as expected* or *Differs*, with the reason; the summary and `Report.txt` give a score per routine. A different but equivalent rung counts as right; a row that isn't built counts as wrong. A ready-made test workbook: [DEVELOPMENT.md](DEVELOPMENT.md#test-workbook).
 
 ## Validate: import checks and rules
 

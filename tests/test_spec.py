@@ -132,3 +132,29 @@ def test_udt_sheet_still_makes_udts(client):
 def test_samples_download(client):
     assert client.get("/api/spec/sample").mimetype.endswith("sheet")
     assert client.get("/api/jobs/nope").status_code == 404
+
+
+def test_expected_column_scores_rows_by_behaviour(client):
+    data = book({"T": [["Requirement", "Expected rung"],
+                       ["Latch Pump_Run from Start_PB until Stop_PB.", "[XIC(Pump_Run) ,XIC(Start_PB) ]XIO(Stop_PB)OTE(Pump_Run);"],
+                       ["Light Run_Lamp from Pump_Run.", "XIO(Pump_Run)OTE(Run_Lamp);"],
+                       ["Nonsense here.", "XIC(A)OTE(B);"]]})
+    _, v = run(client, data)
+    e = v["events"]
+    assert e[0]["match"] is True                      # same behaviour, branch legs in another order
+    assert e[1]["match"] is False and e[1]["match_why"]
+    assert "match" not in e[2] and not e[2]["ok"]     # not built: counts as wrong
+    (sheet,) = v["result"]["sheets"]
+    assert (sheet["expected"], sheet["matched"]) == (3, 1)
+    z = zipfile.ZipFile(io.BytesIO(base64.b64decode(v["result"]["zip_b64"]))) if "zip_b64" in v["result"] else None
+    assert z is None or "test score: 1 of 3" in z.read("Report.txt").decode()
+
+
+def test_test_workbook_has_every_structure_and_an_expected_rung_per_row(tmp_path):
+    from eval.test_workbook import build
+    out = tmp_path / "t.xlsx"
+    counts = build(out, seed=1, rows=4)
+    assert set(counts) == {"Series", "Parallel", "Nested", "Multi_output", "Referenced"}
+    sheets = read_requirements(out.read_bytes())
+    assert all(r.expected for s in sheets for r in s.rows)
+    assert {s.routine for s in sheets} == set(counts)

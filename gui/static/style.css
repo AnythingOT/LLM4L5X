@@ -223,6 +223,9 @@ svg.ladder .lad-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.
 .spec-row.failed { border-left-color: var(--err); }
 .spec-head { display: flex; gap: 12px; align-items: baseline; }
 .spec-request { font-size: .9rem; }
+.verdict { font-size: .74rem; font-weight: 600; padding: 0 8px; border-radius: 9px; border: 1px solid; }
+.verdict.same { color: var(--ok); }
+.verdict.differs { color: var(--err); }
 
 /* ---------- first screen ---------- */
 .intro { padding: 28px 4px 8px; display: flex; flex-direction: column; gap: 14px; }

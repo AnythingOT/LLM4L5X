@@ -416,7 +416,9 @@ class Generator:
                         raise SpecError(f"'{copied[0]}' is copied from the examples; "
                                         "write logic only for this request, using its tag names")
                     if allowed and not last:
-                        for u in sorted(used - allowed):
+                        # a name written in the request counts, even a plain word (Beacon) or a letter (D)
+                        written = {u for u in used if re.search(rf"(?<![\w.]){re.escape(u)}(?![\w])", request)}
+                        for u in sorted(used - allowed - written):
                             close = difflib.get_close_matches(u, sorted(allowed), n=1, cutoff=0.6)
                             if close:
                                 raise SpecError(f"tag {u} is not in the request; did you mean {close[0]}? "

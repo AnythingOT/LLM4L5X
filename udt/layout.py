@@ -56,7 +56,7 @@ def size_of(members: list[M], sizes: dict[str, int]) -> int:
         elif t in SIZE:
             sz, al = SIZE[t] * max(m.dim, 1), ALIGN[t]
         elif m.type in sizes:
-            sz, al = sizes[m.type] * max(m.dim, 1), min(sizes[m.type], 4)
+            sz, al = sizes[m.type] * max(m.dim, 1), max(1, min(sizes[m.type], 4))  # an empty type has size 0
         else:
             sz, al = 4 * max(m.dim, 1), 4
         max_align = max(max_align, al)
