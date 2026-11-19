@@ -6,7 +6,8 @@
 
 Rules that make it easy for a small model and impossible to misread:
   * AND and OR may not be mixed at one level; parentheses are mandatory.
-  * `tag := expr;` at statement level is always a boolean output (OTE).
+  * `tag := expr;` at statement level is a boolean output (OTE), except
+    `tag := a + b;` (+ - * /), which is arithmetic every scan (= IF TRUE THEN ...).
   * Inside IF ... THEN, `tag := a [+-*/ b]` is a move or arithmetic.
 """
 
@@ -263,9 +264,16 @@ class _P:
             self.err("assign with := not =")
         self.expect("OP", ":=")
         nxt = self.toks[self.k + 1] if self.k + 1 < len(self.toks) else None
-        if self.cur.kind == "NUM" or (self.cur.kind == "TAG" and nxt and nxt.kind == "OP"
-                                      and nxt.value in "+-*/" and nxt.value):
-            self.err(f"math and moves go inside IF: IF condition THEN {tgt} := ...; "
+        if self.cur.kind in ("TAG", "NUM") and nxt and nxt.kind == "OP" and nxt.value and nxt.value in "+-*/":
+            # "Add Flow_A and Flow_B into Total_Flow": arithmetic cannot be a bit, so it is meant every scan
+            a = self.operand()
+            op = self.cur.value
+            self.k += 1
+            m = Math(tgt, a, op, self.operand())
+            self.expect("OP", ";")
+            return IfThen(None, (m,))
+        if self.cur.kind == "NUM":
+            self.err(f"a move goes inside IF: IF condition THEN {tgt} := ...; (IF TRUE THEN for always); "
                      f"('{tgt} := condition;' is only for turning a bit on and off)")
         if self.cur.kind == "KW" and self.cur.value == "TRUE":
             self.err(f"write '{tgt} := condition;' (on while true), or IF condition THEN SET {tgt};")

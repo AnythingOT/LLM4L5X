@@ -22,6 +22,7 @@ def g():
     "OUT := DELAY(N1 > 5, 500ms);",
     "IF A THEN ENERGIZE OUT, COPY(Buf, Dst, 10), RESET_ACC C1;",
     "OUT := A;\nIF B THEN RESET OUT;",
+    "N1 := N1 + N2;",                # arithmetic every scan (= IF TRUE THEN)
 ])
 def test_accepts(g, ok):
     assert g.accepts(ok)
@@ -37,6 +38,8 @@ def test_accepts(g, ok):
     "IF A THEN COUNT_UP(T1, 5);",    # timer used as counter
     "Sure! OUT := A;",               # prose
     "OUT := A != B;",                # non-canonical operator
+    "OUT := A + B;",                 # arithmetic into a bool
+    "N1 := 5;",                      # a bare move needs IF
 ])
 def test_rejects(g, bad):
     assert not g.accepts(bad)
