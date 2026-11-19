@@ -594,7 +594,7 @@ function submit() {
     onInput();
     send(text);
 }
-document.querySelectorAll('.chip').forEach((c) => {
+document.querySelectorAll('button.chip').forEach((c) => {  // <a class="chip"> are plain downloads
     c.onclick = () => {
         if (c.dataset.send) send(c.dataset.send);
         else { inputBox.value = c.dataset.text; onInput(); inputBox.focus(); }

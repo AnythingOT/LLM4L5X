@@ -54,92 +54,36 @@
     <div class="modal-content help-content">
         <button class="close-button" title="Close">&times;</button>
         <h2 id="helpTitle">What LLM4L5X does</h2>
-        <p class="modal-description">Runs locally with a local model, completely offline. Nothing reaches Studio 5000 until you import a file yourself: test it before it runs in production.</p>
-        <div class="help-grid">
-            <section>
-                <h3>Plain English to ladder</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd><em>Start the pump with the start button and keep it running until stop is pressed.</em></dd>
-                    <dt>Output</dt>
-                    <dd>The rungs drawn as ladder, what they do in plain English, and the checks.
-                        <code>Routine.L5X</code> or <code>Rung.L5X</code>, as chosen in <a href="/settings">Settings</a>.
-                        <b>Copy</b> gives the rung text in neutral or ASCII form, also chosen in Settings.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>Plain English to UDT</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd>Switch the input to <b>UDT</b>: <em>A motor with running and faulted bits, speed in rpm and 32 alarm bits.</em></dd>
-                    <dt>Output</dt>
-                    <dd><code>Name.L5X</code> for one UDT, a zip for several, members in the order that wastes no memory.
-                        In Studio 5000: Data Types, Import Data Type.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>Rung text to ladder</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd>Neutral text, as stored in L5X:<br><code class="line">XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code><br>
-                        ASCII text, as in the editor:<br><code class="line">XIC a BST XIC b NXB XIO c BND OTE d</code></dd>
-                    <dt>Output</dt>
-                    <dd>The rungs drawn as ladder, in plain English, with the checks. <code>Routine.L5X</code> or
-                        <code>Rung.L5X</code>, as chosen in Settings.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>Attach an L5X</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd>A Studio 5000 export: the whole controller, a program, a routine, rungs or a UDT.
-                        New logic then uses its tags, AOIs and version.</dd>
-                    <dt>Output</dt>
-                    <dd><b>Explain all rungs</b>: every rung drawn and in plain English. <b>xref TagName</b>: where a tag is used.<br>
-                        <b>Validate</b>: will Studio 5000 import it, and the coding rules, UDT rules included
-                        (padding, member order, unused, descriptions). Switch rules on or off on the <a href="/rules">Rules</a> page.<br>
-                        <b>Optimize UDTs</b>: reorder members to save memory; one file, a zip or the whole program.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>Attach a requirements Excel</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd>Each sheet is one routine, each row one requirement in plain English. A row may give rung
-                        text instead, which is used as written. Sample in the examples list, next to Send.</dd>
-                    <dt>Output</dt>
-                    <dd>Rows are built one by one, drawn as they finish. One <code>Routine.L5X</code> per sheet
-                        (a zip with a report when there are several), the requirement as the rung comment.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>Attach a UDT Excel</h3>
-                <dl>
-                    <dt>Input</dt>
-                    <dd>One row per member: UDT, UDT description, Member, Data type, Description.
-                        Sample in the examples list in UDT mode.</dd>
-                    <dt>Output</dt>
-                    <dd>The UDTs, checked and ordered, as <code>Name.L5X</code> or a zip.</dd>
-                </dl>
-            </section>
-            <section>
-                <h3>The model</h3>
-                <p>Set it up in <a href="/settings">Settings</a>: <b>Ollama</b>, or a <b>llama.cpp</b> server, which
-                    constrains every answer to valid logic. Turn <b>thinking off</b>: it is much faster on a CPU.</p>
-                <p>Tested: Qwen3.6-35B-A3B on llama.cpp got 99% of the built-in test suite right. Real requests are
-                    worded differently, which is why the read-back is there.</p>
-            </section>
-            <section>
-                <h3>Planned</h3>
-                <p><b>Documentation</b> written from an attached program: what each routine does, from its rungs.</p>
-                <p><b>Translate to English</b>: rung comments, tag descriptions and tag names of a project
-                    written in another language.</p>
-            </section>
-            <section class="help-tips">
-                <h3>Tips</h3>
-                <p>Name tags exactly as they are in the project. Say "latch" when you mean OTL; "turn on" means a normal coil. Say "on-delay" or "off-delay" for timers. Put the condition first when there are several actions: <em>"When A is on, start the conveyor and reset the counter."</em></p>
-            </section>
-        </div>
+        <p class="modal-description">Runs offline on this PC.
+            <span class="by model">Model</span> the local model writes it.
+            <span class="by fixed">Fixed code</span> deterministic: same input, same result.</p>
+        <table class="help-table">
+            <thead><tr><th>Input</th><th>Output</th><th>By</th></tr></thead>
+            <tbody>
+                <tr><td><b>Plain English</b><span class="eg">Start the pump with the start button and keep it running until stop is pressed.</span></td>
+                    <td>Ladder rungs, read-back in English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
+                    <td><span class="by model">Model</span></td></tr>
+                <tr><td><b>Plain English</b>, UDT mode<span class="eg">A motor with run and fault bits, speed and 32 alarms.</span></td>
+                    <td>UDT in the order that wastes no memory; <code>Name.L5X</code></td>
+                    <td><span class="by model">Model</span></td></tr>
+                <tr><td><b>Rung text</b><span class="eg">Neutral <code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code><br>ASCII <code>XIC a BST XIC b NXB XIO c BND OTE d</code></span></td>
+                    <td>Ladder, English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
+                    <td><span class="by fixed">Fixed code</span></td></tr>
+                <tr><td><b>Requirements Excel</b><span class="eg">Sheet = routine, row = requirement</span></td>
+                    <td>One routine per sheet, requirement as rung comment; <code>.L5X</code> or zip</td>
+                    <td><span class="by model">Model</span><span class="eg">rows with rung text: fixed code</span></td></tr>
+                <tr><td><b>UDT Excel</b><span class="eg">Row = member</span></td>
+                    <td>UDTs, checked and ordered; <code>Name.L5X</code> or zip</td>
+                    <td><span class="by fixed">Fixed code</span></td></tr>
+                <tr><td><b>L5X export</b><span class="eg">Controller, program, routine, rungs or UDT</span></td>
+                    <td><b>Explain all rungs</b>, <b>xref</b> Tag, <b>Validate</b> (import checks and coding rules, UDT rules included), <b>Optimize UDTs</b>. New logic uses its tags.</td>
+                    <td><span class="by fixed">Fixed code</span></td></tr>
+            </tbody>
+        </table>
+        <p class="help-foot">The model only writes logic; fixed code draws, checks and writes every file, so check the read-back before you import.
+            Text form and download type: <a href="/settings">Settings</a>. Rules on or off: <a href="/rules">Rules</a>.
+            Samples: the list button next to Send.</p>
+        <p class="help-foot muted">Planned: documentation from an attached program; translating comments, descriptions and tag names to English.</p>
     </div>
 </div>
 {% endblock %}
