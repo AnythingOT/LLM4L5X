@@ -259,3 +259,24 @@ def test_test_workbook_refuses_a_missing_or_empty_corpus(tmp_path):
         build(tmp_path / "t.xlsx", corpus=tmp_path / "nope")
     with pytest.raises(SystemExit, match="no .L5X files"):
         build(tmp_path / "t.xlsx", corpus=tmp_path)
+
+
+@pytest.mark.parametrize("text, why", [
+    ("[XIC(B) ,XIC(B) ][OTE(B) ,OTU(B) ];", "ERR010"),          # a parser's test sample, not logic
+    ("XIC(A)[OTE(Lamp) ,OTU(Lamp) ];", "turned on and off in the same rung"),
+    ("XIC(A)[TON(T1,100,0) ,TON(T1,100,0) ];", "ERR"),
+])
+def test_real_world_skips_rungs_no_sentence_would_ask_for(text, why):
+    from core.rung import parse_rung
+    from eval.test_workbook import nonsense
+    assert why in (nonsense(parse_rung(text)) or "")
+
+
+@pytest.mark.parametrize("text", [
+    "[XIC(Start) ,XIC(Motor) ]XIO(Stop)OTE(Motor);",               # seal-in reads its own output: real logic
+    "[XIC(A) ,XIC(B) ]OTL(Alarm);",
+])
+def test_real_world_keeps_ordinary_rungs(text):
+    from core.rung import parse_rung
+    from eval.test_workbook import nonsense
+    assert nonsense(parse_rung(text)) is None
