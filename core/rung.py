@@ -137,7 +137,7 @@ class _Parser:
 
     def args(self) -> list[str]:
         """Split at depth-0 commas until the matching ')'. Keeps inner text verbatim."""
-        out, buf, depth, quote = [], [], 0, False
+        out, buf, opened, quote = [], [], [], False  # opened: a stack, so A(1] is caught
         while self.i < len(self.t):
             c = self.t[self.i]
             self.i += 1
@@ -149,17 +149,18 @@ class _Parser:
             if c == "'":
                 quote = True
             elif c in "([":
-                depth += 1
+                opened.append(c)
             elif c in ")]":
-                if depth == 0 and c == ")":
+                if not opened and c == ")":
                     a = "".join(buf).strip()
                     if a or out:
                         out.append(a)
                     return out
-                depth -= 1
-                if depth < 0:
+                if not opened:
                     self.err("unbalanced bracket in operand")
-            elif c == "," and depth == 0:
+                if opened.pop() != {")": "(", "]": "["}[c]:
+                    self.err(f"'{c}' closes a different bracket in operand")
+            elif c == "," and not opened:
                 out.append("".join(buf).strip())
                 buf = []
                 continue

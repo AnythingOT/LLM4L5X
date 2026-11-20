@@ -66,6 +66,17 @@ class CompileResult:
         return [format_rung(r) for r in self.rungs]
 
 
+DINT_MAX = 2_147_483_647  # .PRE is a DINT: about 596 hours in ms
+
+
+def _check_preset(name: str, datatype: str, preset: int) -> None:
+    """A preset Studio 5000 cannot store fails here, not at import."""
+    if not 0 <= preset <= DINT_MAX:
+        unit = " ms (about 596 hours)" if datatype == "TIMER" else ""
+        raise CompileError(f"{name}: preset {preset} is outside 0 to {DINT_MAX}{unit}; "
+                           f"a {datatype.lower()} preset is a DINT")
+
+
 class Compiler:
     def __init__(
         self,
@@ -111,6 +122,7 @@ class Compiler:
         return name
 
     def _struct_tag(self, name: str, datatype: str, preset: int) -> None:
+        _check_preset(name, datatype, preset)
         if not is_plain_tag(name):
             raise CompileError(f"{datatype.lower()} tag {name!r} must be a plain tag name")
         if name in self.known:
@@ -182,6 +194,7 @@ class Compiler:
             if name:
                 self._struct_tag(name, dtype, e.ms)
             else:
+                _check_preset("the delay", dtype, e.ms)
                 name = self._alloc("TMR", dtype, "On-delay timer" if not e.off else "Off-delay timer")
                 self.tags[name].preset = e.ms
             pre, acc = self._display(e.ms)
@@ -339,6 +352,7 @@ def infer_tags(rungs: list[Rung], known_tags: dict[str, str] | None = None,
                 pre = [a for o, a in zip(spec.operands, ins.args) if o.member == "PRE"]
                 if pre and is_literal(pre[0]):
                     tag.preset = int(float(pre[0]))
+                    _check_preset(tag.name, tag.datatype, tag.preset)
                 else:
                     comp.warnings.append(f"preset of new {tag.datatype.lower()} {tag.name} is unknown; "
                                          "it is created with PRE = 0, set it after import")

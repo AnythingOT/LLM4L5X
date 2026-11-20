@@ -5,7 +5,9 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import time
+from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, render_template, request
 
@@ -23,10 +25,42 @@ from udt.model import UdtError
 MAX_UPLOAD = 50 * 1024 * 1024
 XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+# Listening on 127.0.0.1 keeps other machines out, not other web pages: the user's own browser will
+# send a form post from any site to this app. So requests are refused unless they come from it.
+LOOPBACK = {"127.0.0.1", "localhost", "::1"}
+CHANGES = {"POST", "PUT", "PATCH", "DELETE"}
+
+
+def _allowed_hosts() -> set[str]:
+    extra = os.environ.get("LLM4L5X_ALLOWED_HOSTS", "")  # comma-separated, for a deliberate LAN setup
+    return LOOPBACK | {h.strip().lower() for h in extra.split(",") if h.strip()}
+
+
+def _foreign(req) -> str | None:
+    """Why a request may not come in, or None. Host stops DNS rebinding; Origin stops other sites."""
+    host = (urlsplit(f"//{req.host}").hostname or "").lower()
+    if host not in _allowed_hosts():
+        return f"host {req.host} is not this app"
+    if req.method in CHANGES:
+        origin = req.headers.get("Origin")
+        if origin and origin != "null":
+            o = urlsplit(origin)
+            if (o.hostname or "").lower() not in _allowed_hosts() or o.netloc.lower() != req.host.lower():
+                return f"request from another site ({origin})"
+        elif origin == "null" or req.headers.get("Sec-Fetch-Site") == "cross-site":
+            return "request from another site"
+    return None
+
 
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD
+
+    @app.before_request
+    def _only_this_app():
+        why = _foreign(request)
+        if why:
+            return jsonify(kind="error", message=f"Refused: {why}."), 403
 
     # ------------------------------------------------------------ pages
 

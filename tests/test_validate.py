@@ -1,5 +1,5 @@
 from core.rung import parse_rung
-from core.validator import validate
+from core.validator import errors, validate
 
 
 def msgs(*texts, tags=None):
@@ -109,3 +109,13 @@ def test_real_findings_still_reported():
     rungs = [parse_rung(r) for r in ("XIC(a)OTE(N.3);", "XIC(Flag)OTE(N.3);", "XIC(a)OTL(T.DN);")]
     codes = {f.code for f in check_rungs(rungs, TAGS)}
     assert {"ERR001", "ERR005"} <= codes
+
+
+def test_tag_names_ignore_case_like_logix():
+    assert not errors(validate([parse_rung("XIC(start_pb)OTE(Motor);")], {"Start_PB": "BOOL", "Motor": "BOOL"}))
+    assert errors(validate([parse_rung("XIC(Stop_PB)OTE(Motor);")], {"Start_PB": "BOOL", "Motor": "BOOL"}))
+
+
+def test_a_literal_preset_beyond_dint_is_an_error():
+    bad = errors(validate([parse_rung("XIC(A)TON(T9,5000000000,0);")], {"A": "BOOL", "T9": "TIMER"}))
+    assert bad and "2147483647" in str(bad[0])

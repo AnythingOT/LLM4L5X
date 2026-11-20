@@ -24,7 +24,7 @@ English ─> local model ─> LogicSpec ─> compiler ─> rungs ─> checks ─
        existing L5X ─> reader ─> decompiler ─> LogicSpec + plain English
 ```
 
-The app listens on `127.0.0.1` only, so nothing leaves your PC.
+The app listens on `127.0.0.1` only, so other machines cannot reach it. Other web pages in your own browser could still send it requests, so it refuses any request that changes something unless it comes from its own page, and any request addressed to a host name other than `127.0.0.1`, `localhost` or `::1`. To serve it on your network on purpose, list the extra names in `LLM4L5X_ALLOWED_HOSTS` (comma-separated).
 
 ## The model
 
