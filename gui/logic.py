@@ -116,11 +116,13 @@ def _compile(stmts, s: dict) -> dict:
     types.update({t.name: t.datatype for t in res.tags.values()})
     issues = validate(res.rungs, types if proj else None, catalog=catalog, revision=s["revision"],
                       string_types=proj.string_types if proj else None)
+    presets = {**(proj.presets() if proj else {}),
+               **{t.name: t.preset for t in res.tags.values() if t.preset is not None}}
     out = {
         "kind": "compiled",
         "readback": [describe_statement(st) for st in res.statements],
         "rungs": [{"text": format_rung(r), "ascii": format_ascii(r), "comment": r.comment,
-                   "svg": to_svg(r, catalog, number=n)} for n, r in enumerate(res.rungs)],
+                   "svg": to_svg(r, catalog, number=n, presets=presets)} for n, r in enumerate(res.rungs)],
         "tags": [{"name": t.name, "type": t.datatype, "preset": t.preset, "auto": t.allocated}
                  for t in res.tags.values()],
         "warnings": res.warnings,
@@ -161,7 +163,8 @@ def _explain(parsed, source: str, s: dict) -> dict:
     rungs = []
     for n, r in enumerate(parsed):
         stmts, why = try_decompile(r, presets)
-        rungs.append({"text": format_rung(r), "ascii": format_ascii(r), "svg": to_svg(r, catalog, number=n),
+        rungs.append({"text": format_rung(r), "ascii": format_ascii(r),
+                      "svg": to_svg(r, catalog, number=n, presets=presets),
                       "logicspec": format_spec(stmts) if stmts else None,
                       "english": [describe_statement(x) for x in stmts] if stmts else [], "why": why})
     all_tags = {t.name: t.datatype for t in proj.tags.values()} if proj else None

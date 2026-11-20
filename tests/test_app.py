@@ -252,3 +252,17 @@ def test_ladder_endpoint_and_drawings_in_results(client):
     assert d["svgs"][0].startswith("<svg") and ">3<" in d["svgs"][0] and d["svgs"][1] is None
     r = post(client, "XIC(A)OTE(B);")
     assert r["rungs"][0]["svg"].startswith("<svg")
+
+
+def test_ladder_shows_presets_from_the_attached_project(client):
+    from core.compiler import TagDef
+    from core.rung import parse_rung
+    from l5x.writer import write_routine
+    l5x = write_routine([parse_rung("XIC(Go)TON(Fill_TMR,?,?);")],
+                        [TagDef("Go", "BOOL"), TagDef("Fill_TMR", "TIMER", preset=5000)],
+                        routine="R", program="P", revision="37.00")
+    d = client.post("/api/project", data={"file": (io.BytesIO(l5x.encode()), "p.L5X")},
+                    content_type="multipart/form-data").get_json()
+    assert d["kind"] == "project"
+    svg = client.post("/api/ladder", json={"rungs": [{"text": "XIC(Go)TON(Fill_TMR,?,?);"}]}).get_json()["svgs"][0]
+    assert ">5000</text>" in svg

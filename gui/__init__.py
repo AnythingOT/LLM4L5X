@@ -165,10 +165,12 @@ def create_app() -> Flask:
         """Ladder diagrams for rung texts (the attached file's AOIs are known), drawn when asked for."""
         texts = (request.get_json(silent=True) or {}).get("rungs") or []
         catalog = SESSION.project.catalog() if SESSION.project else None
+        presets = SESSION.project.presets() if SESSION.project else {}
         out = []
         for item in texts[:200]:
             try:
-                out.append(to_svg(parse_rung(item.get("text", "")), catalog, number=item.get("number")))
+                out.append(to_svg(parse_rung(item.get("text", "")), catalog, number=item.get("number"),
+                                  presets=presets))
             except RungSyntaxError:
                 out.append(None)
         return jsonify(svgs=out)
