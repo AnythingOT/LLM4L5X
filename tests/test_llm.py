@@ -307,6 +307,58 @@ def test_move_of_one_that_is_asked_for_passes(spec, text):
     assert len(r.attempts) == 1 and not any("latch" in w for w in r.warnings)
 
 
+def test_latch_word_for_one_tag_does_not_excuse_another():
+    # hard seed 11, Multi_output row 10: "latch Divert_Gate" switched the latch check off for Motor_Run
+    m = FakeModel("IF NOT Auto_Mode AND Reset_PB THEN SET Divert_Gate, Motor_Run := 1;",
+                  "IF NOT Auto_Mode AND Reset_PB THEN SET Divert_Gate, ENERGIZE Motor_Run;")
+    r = Generator(m).generate("When Auto_Mode is false and Reset_PB is true, latch Divert_Gate and turn on Motor_Run.")
+    assert "does not ask to latch Motor_Run" in m.calls[1][-1]["content"]
+    assert "Divert_Gate" not in m.calls[1][-1]["content"].split("does not ask to latch")[1][:15]
+    assert len(r.attempts) == 2
+
+
+@pytest.mark.parametrize("text", [
+    "When Start_PB is on, set Pump_Run; it stays on until reset.",   # the latch words name no tag
+    "Keep Pump_Run on when Start_PB is pressed.",
+])
+def test_latch_asked_in_a_clause_still_passes(text):
+    r = Generator(FakeModel("IF Start_PB THEN SET Pump_Run;")).generate(text)
+    assert not any("latch" in w for w in r.warnings) and len(r.attempts) == 1
+
+
+def test_a_condition_split_over_two_statements_is_sent_back():
+    # hard seed 11, Parallel row 8: "(A or B), and C -> latch X" came back as two SETs, i.e. A OR B OR C
+    m = FakeModel("IF Temp_PV > 50 OR Flow_Switch THEN SET Shuttle_Fwd;\nIF Steam_SP >= 10 THEN SET Shuttle_Fwd;",
+                  "IF (Temp_PV > 50 OR Flow_Switch) AND Steam_SP >= 10 THEN SET Shuttle_Fwd;")
+    r = Generator(m).generate("Latch Shuttle_Fwd if either Temp_PV exceeds 50 or Flow_Switch is on, "
+                              "and Steam_SP is greater than or equal to 10.")
+    assert "turned on by 2 separate statements" in m.calls[1][-1]["content"]
+    assert len(r.attempts) == 2
+
+
+def test_two_statements_are_fine_when_the_request_names_the_tag_twice():
+    m = FakeModel("IF Start_PB THEN SET Lamp;\nIF Test_PB THEN SET Lamp;")
+    r = Generator(m).generate("Latch Lamp when Start_PB is on. Also latch Lamp when Test_PB is on.")
+    assert len(r.attempts) == 1
+
+
+def test_rise_without_an_edge_word_is_sent_back():
+    # hard seed 11, Multi_output row 12: a one-shot ran the timer and the heater for one scan
+    m = FakeModel("IF RISE(Cool_SP > 10 AND Jam_Sensor) THEN START_TIMER(Settle_TMR, 2s), ENERGIZE Glue_Heater;",
+                  "IF Cool_SP > 10 AND Jam_Sensor THEN START_TIMER(Settle_TMR, 2s), ENERGIZE Glue_Heater;")
+    r = Generator(m).generate("When Cool_SP exceeds 10 and Jam_Sensor is active, run the on-delay timer Settle_TMR "
+                              "with a 2 second preset and turn on Glue_Heater.")
+    assert "do not use RISE" in m.calls[1][-1]["content"]
+    assert "RISE" not in r.spec
+
+
+@pytest.mark.parametrize("text", ["Add 1 to Batch_Count each time Box_Eye turns on.",
+                                  "Add 1 to Batch_Count on the rising edge of Box_Eye."])
+def test_rise_with_an_edge_word_passes(text):
+    r = Generator(FakeModel("IF RISE(Box_Eye) THEN Batch_Count := Batch_Count + 1;")).generate(text)
+    assert len(r.attempts) == 1 and not any("RISE" in w for w in r.warnings)
+
+
 def test_set_and_reset_pair_is_a_latch_on_purpose():
     m = FakeModel("IF Level >= 95 THEN SET Drain_Valve;\nIF Level < 50 THEN RESET Drain_Valve;")
     r = Generator(m).generate("Open Drain_Valve when Level is at least 95, close it when Level drops below 50.")
