@@ -461,6 +461,10 @@ class Generator:
                     if missing:
                         res.warnings.append(f"the request names {', '.join(missing)}, which the logic does not use")
                     stmts = parse_spec(spec)
+                    for problem in output_problems(stmts, request, idents):
+                        if not last:
+                            raise SpecError(problem)
+                        res.warnings.append(problem)
                     compiled = Compiler(known_tags=known_tags, catalog=catalog,
                                         **(compiler_kw or {})).compile(stmts)
                     types = dict(known_tags or {})
@@ -487,6 +491,58 @@ class Generator:
             res.warnings += near_miss_warnings(res.compiled, known_tags, request)
         res.seconds = round(time.perf_counter() - t0, 2)
         return res
+
+
+_LATCH_WORDS = re.compile(r"\b(latch\w*|set|sets|keep\w*|kept|stay\w*|remain\w*|hold\w*|seal\w*|until)\b",
+                          re.IGNORECASE)
+
+
+def _written(stmts) -> tuple[list[str], list[str]]:
+    """(tags the logic writes, tags it latches and never unlatches), in order, each once."""
+    from core import logicspec as ls
+    out, latched, unlatched = [], [], set()
+    for st in stmts:
+        acts = [st.target] if isinstance(st, ls.Assign) else []
+        if isinstance(st, ls.IfThen):
+            for a in st.actions:
+                acts.append(getattr(a, "dest", None) or getattr(a, "tag", None))
+                if isinstance(a, ls.SetBit):
+                    latched.append(a.tag)
+                if isinstance(a, ls.ResetBit):
+                    unlatched.add(a.tag)
+        out += [t.split(".")[0].split("[")[0] for t in acts if t]
+    return list(dict.fromkeys(out)), [t for t in dict.fromkeys(latched) if t not in unlatched]
+
+
+def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
+    """Outputs the request did not ask for: checked in code because prompts did not stop them.
+
+    * SET (latch) with no RESET of the same tag, when the request never says latch/set/keep/
+      stay/until: "energize Fault_Latch" was latched in every run, pulled by the tag's name.
+      ("open X when A, close it when B" is a SET/RESET pair and passes.)
+    * A written tag the request does not name, when the request names its tags: a stray rung
+      "Batch_Request := Box_CTR.DN" for "the batch is done". A tag made of the request's words
+      ("run the pump" -> Pump_Run) is a fair pick from the project and passes."""
+    written, latched = _written(stmts)
+    problems = []
+    if not _LATCH_WORDS.search(request):
+        for t in latched:
+            problems.append(f"the request does not ask to latch {t}: for 'turn on'/'energize' write "
+                            f"{t} := condition; or ENERGIZE {t} (SET only for latch, keep or stay on)")
+    if idents:
+        said = {_norm(i) for i in idents}
+        rw = _words(request)
+        for t in written:
+            if t.startswith(("L4X_", "REF_")) or _norm(t) in said:
+                continue
+            if re.search(rf"(?<![\w.]){re.escape(t)}(?!\w)", request):
+                continue
+            tw = _words(t)
+            if tw and tw <= rw:
+                continue
+            problems.append(f"the logic writes {t}, which the request does not name; write only the "
+                            "outputs the request asks for")
+    return problems
 
 
 def near_miss_warnings(compiled: CompileResult, known_tags: dict[str, str], request: str = "") -> list[str]:
