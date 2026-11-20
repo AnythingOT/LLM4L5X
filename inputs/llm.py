@@ -513,6 +513,12 @@ def _written(stmts) -> tuple[list[str], list[str]]:
                     latched.append(a.tag)
                 if isinstance(a, ls.ResetBit):
                     unlatched.add(a.tag)
+                if isinstance(a, ls.Math) and a.op is None and a.a in ("0", "1"):
+                    # "IF c THEN X := 1;" compiles to MOVE(1,X): it holds like SET until a move of 0
+                    if a.a == "1" and st.cond is not None:
+                        latched.append(a.dest)
+                    else:
+                        unlatched.add(a.dest)
         out += [t.split(".")[0].split("[")[0] for t in acts if t]
     return list(dict.fromkeys(out)), [t for t in dict.fromkeys(latched) if t not in unlatched]
 
@@ -520,14 +526,16 @@ def _written(stmts) -> tuple[list[str], list[str]]:
 def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
     """Outputs the request did not ask for: checked in code because prompts did not stop them.
 
-    * SET (latch) with no RESET of the same tag, when the request never says latch/set/keep/
-      stay/until: "energize Fault_Latch" was latched in every run, pulled by the tag's name.
+    * SET (latch), or "IF c THEN X := 1;" (MOVE 1, which holds the same way), with no RESET or
+      move of 0 to the same tag, when the request never says latch/set/keep/stay/until: "energize Fault_Latch" was latched in every run, pulled by the tag's name.
       ("open X when A, close it when B" is a SET/RESET pair and passes.)
     * A written tag the request does not name, when the request names its tags: a stray rung
       "Batch_Request := Box_CTR.DN" for "the batch is done". A tag made of the request's words
       ("run the pump" -> Pump_Run) is a fair pick from the project and passes."""
     written, latched = _written(stmts)
     problems = []
+    if re.search(r"(?<![\w.])1(?![\w.])", request):
+        latched = []  # "move 1 to Mode": the value is asked for, not a latch
     if not _LATCH_WORDS.search(request):
         for t in latched:
             problems.append(f"the request does not ask to latch {t}: for 'turn on'/'energize' write "
