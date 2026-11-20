@@ -31,7 +31,7 @@ def where(found, code):
 def test_every_rule_has_a_check_and_every_check_a_rule():
     emitted = {c for codes, _ in CHECKS for c in codes}
     assert emitted == set(BY_CODE)
-    assert len(RULES) == 49 and len(BY_CODE) == 49
+    assert len(RULES) == 50 and len(BY_CODE) == 50
 
 
 def test_every_rule_fires_on_the_fixture(found):
@@ -41,6 +41,7 @@ def test_every_rule_fires_on_the_fixture(found):
 
 @pytest.mark.parametrize("code, hit, clean", [
     ("CRT002", "Main / R / Rung 0", None),
+    ("ERR018", "NoFault / M / Rung 1", "Main / R / Rung 35"),  # writes SFTY_Gate / only reads safety-mapped tags
     ("ERR001", "Main / R / Rung 1", None),
     ("ERR002", "Main / R / Rung 3", None),
     ("ERR003", "Main / R / Rung 5", None),
@@ -169,3 +170,12 @@ def test_a_crashing_check_is_reported_not_hidden(project, monkeypatch):
     r = lint.run(project)
     assert any(e.startswith("boom") for e in r.errors)
     assert "ERR001" in {f.code for f in r.findings}  # the other rules still ran
+
+
+def test_ERR018_safety_tag_written_by_standard_logic():
+    # attributes as in real GuardLogix exports: Program and Tag Class="Safety"
+    rep = lint.run(read_l5x(Path(__file__).parent / "fixtures" / "guardlogix_cell.L5X"))
+    hits = {f.location: f.message for f in rep.findings if f.code == "ERR018"}
+    assert set(hits) == {"Std / Main / Rung 1", "Std / Main / Rung 2", "Std / Main / Rung 4"}
+    assert "OTE(SafeOut)" in hits["Std / Main / Rung 1"] and "MOVE(StdVal,SafeVal)" in hits["Std / Main / Rung 2"]
+    # rung 0 reads a safety tag, rung 3 copies one into a standard tag, Sfty is safety logic: all allowed

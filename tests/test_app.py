@@ -182,7 +182,7 @@ def test_pages_and_rule_list(client):
     for page in ("/", "/settings", "/rules"):
         assert client.get(page).status_code == 200
     rules = client.get("/api/rules").get_json()["rules"]
-    assert len(rules) == 49 and {"code", "title", "description", "severity", "scope", "group"} <= set(rules[0])
+    assert len(rules) == 50 and {"code", "title", "description", "severity", "scope", "group"} <= set(rules[0])
 
 
 # ---------------------------------------------------------------- UDTs
