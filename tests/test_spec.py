@@ -280,3 +280,33 @@ def test_real_world_keeps_ordinary_rungs(text):
     from core.rung import parse_rung
     from eval.test_workbook import nonsense
     assert nonsense(parse_rung(text)) is None
+
+
+def test_report_shows_how_many_attempts_each_row_took(monkeypatch):
+    class Flaky(Stub):  # wrong once for Run_Lamp, then right
+        seen = 0
+
+        def chat(self, messages, grammar=None, **kw):
+            if "Run_Lamp from Pump_Run" in " ".join(m["content"] for m in messages):
+                Flaky.seen += 1
+                if Flaky.seen == 1:
+                    return "this is not LogicSpec"
+            return super().chat(messages, grammar, **kw)
+
+    monkeypatch.setattr(gui_state, "llm", lambda s: Flaky())
+    gui.app.config["TESTING"] = True
+    data = book({"A": [["Requirement", "Expected rung"],
+                       ["Latch Pump_Run from Start_PB until Stop_PB.", "[XIC(Pump_Run) ,XIC(Start_PB) ]XIO(Stop_PB)OTE(Pump_Run);"],
+                       ["Light Run_Lamp from Pump_Run.", "XIC(Pump_Run)OTE(Run_Lamp);"]],
+                 "B": [["Requirement", "Rung text"], ["", "XIC(X)OTE(Y);"]]})
+    with gui.app.test_client() as c:
+        _, v = run(c, data)
+    SESSION.detach()
+    lamp = v["events"][1]
+    assert (v["events"][0]["attempts"], lamp["attempts"]) == (1, 2) and lamp["match"]
+    report = zipfile.ZipFile(io.BytesIO(base64.b64decode(v["result"]["zip_b64"]))).read("Report.txt").decode()
+    assert "row 2: ok, 1 rung, matches expected\r\n" in report            # first try: nothing added
+    assert "row 3: ok, 1 rung, matches expected (2 attempts)" in report
+    assert "sent back: " in report
+    assert "model: 2 rows, 1 needed more than one attempt (1 extra attempt)" in report
+    assert "Total: 2 of 2 rows behave as expected; model: 2 rows, 1 needed more than one attempt" in report

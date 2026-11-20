@@ -76,8 +76,11 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
             verdict = ""
             if row.expected and ev["ok"]:
                 verdict = ", matches expected" if ev["match"] else f", DIFFERS from expected: {ev['match_why']}"
+            tries = f" ({ev['attempts']} attempts)" if ev.get("attempts", 1) > 1 else ""
             report.append(f"  row {row.line}{f' ({row.ref})' if row.ref else ''}: "
-                          + ("ok, " + _n(len(ev["rungs"]), "rung") + verdict if ev["ok"] else f"FAILED: {ev['error']}"))
+                          + ("ok, " + _n(len(ev["rungs"]), "rung") + verdict if ev["ok"] else f"FAILED: {ev['error']}")
+                          + tries)
+            report += [f"      sent back: {_short(e)}" for e in ev.get("retries", [])]
             report += [f"      warning: {w}" for w in ev["warnings"]]
             with job.lock:
                 job.events.append(ev)
@@ -99,6 +102,9 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                                           revision=s["revision"], scope=s["scope"])
         report.append(f"  {_n(ok, 'row')} built, {failed} failed, {_n(len(rungs), 'rung')}, "
                       f"{_n(len(new_tags), 'new tag')}, {_n(len(entry['lint']), 'rule finding')}")
+        mine = [e for e in job.events if e.get("sheet") == sheet.routine and "attempts" in e]
+        if mine:
+            report.append("  " + _effort(mine))
         if entry["expected"]:
             report.append(f"  test score: {entry['matched']} of {entry['expected']} rows behave as expected "
                           f"(rows not built count as wrong)")
@@ -108,6 +114,11 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
         if job.cancel.is_set():
             report.append("Stopped before the end.")
             break
+    scored_all = [e for e in job.events if row_has_expected(e)]
+    by_model = [e for e in job.events if "attempts" in e]
+    report.append("Total: " + (f"{sum(1 for e in scored_all if e.get('match'))} of {len(scored_all)} rows behave "
+                               f"as expected; " if scored_all else "") + (_effort(by_model) if by_model else
+                                                                         "no rows written by the model"))
     files = {e["file"]: e.pop("_l5x") for e in built if e["file"]}
     out = {"kind": "spec_done", "filename": filename, "sheets": built, "cancelled": job.cancel.is_set()}
     if len(files) == 1 and not job.cancel.is_set() and all(e["failed"] == 0 for e in built):
@@ -121,6 +132,21 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
             z.writestr("Report.txt", "\r\n".join(report).encode("utf-8"))
         out.update(download="Routines.zip", zip_b64=base64.b64encode(buf.getvalue()).decode("ascii"))
     return out
+
+
+def _short(text: str, n: int = 160) -> str:
+    text = " ".join(str(text).split())
+    return text if len(text) <= n else text[: n - 3] + "..."
+
+
+def _effort(events) -> str:
+    """How hard the model worked: a 100% score says nothing about the retries behind it."""
+    tries = [e["attempts"] for e in events]
+    extra = sum(t - 1 for t in tries)
+    again = sum(1 for t in tries if t > 1)
+    secs = sum(e.get("seconds", 0.0) for e in events)
+    return (f"model: {_n(len(tries), 'row')}, {again} needed more than one attempt "
+            f"({_n(extra, 'extra attempt')}), {secs:.0f} s")
 
 
 def _row(client, row, s, project_types, new_tags, catalog) -> dict:
@@ -139,6 +165,9 @@ def _row(client, row, s, project_types, new_tags, catalog) -> dict:
             r = generate(client, row.request, s, more_tags={t.name: t.datatype for t in new_tags.values()})
             ev["warnings"] += r.warnings
             ev["spec"] = r.spec
+            # a pass on the third try costs three times as long and is the first to fail on drift
+            ev["attempts"] = len(r.attempts)
+            ev["retries"] = [a.error for a in r.attempts if a.error]
             if r.spec is None:
                 raise CompileError(f"the model could not produce valid logic: {r.error}")
             parsed, tags = r.compiled.rungs, r.compiled.tags
