@@ -280,3 +280,38 @@ def test_a_dropped_condition_is_sent_back():
                               "or Guard_Closed is off, and Batch_Request is on.")
     assert "names Batch_Request but the logic does not use it" in m.calls[1][-1]["content"]
     assert "Batch_Request" in r.spec and len(r.attempts) == 2
+
+
+def test_latch_the_request_did_not_ask_for_is_sent_back():
+    m = FakeModel("IF Dosing_Rate <= 50 THEN SET Fault_Latch;", "IF Dosing_Rate <= 50 THEN ENERGIZE Fault_Latch;")
+    r = Generator(m).generate("When Dosing_Rate is at most 50, energize Fault_Latch.")
+    assert "does not ask to latch Fault_Latch" in m.calls[1][-1]["content"]
+    assert "ENERGIZE Fault_Latch" in r.spec
+
+
+def test_set_and_reset_pair_is_a_latch_on_purpose():
+    m = FakeModel("IF Level >= 95 THEN SET Drain_Valve;\nIF Level < 50 THEN RESET Drain_Valve;")
+    r = Generator(m).generate("Open Drain_Valve when Level is at least 95, close it when Level drops below 50.")
+    assert len(r.attempts) == 1 and not r.warnings
+
+
+def test_output_the_request_does_not_name_is_sent_back():
+    m = FakeModel("IF Box_Eye THEN COUNT_UP(Box_CTR, 12);\nBatch_Request := Box_CTR.DN;",
+                  "IF Box_Eye THEN COUNT_UP(Box_CTR, 12);")
+    r = Generator(m).generate("Count each box on Box_Eye with the up counter Box_CTR; the batch is done at 12 boxes.",
+                              known_tags={"Batch_Request": "BOOL"})
+    assert "writes Batch_Request, which the request does not name" in m.calls[1][-1]["content"]
+    assert "Batch_Request" not in r.spec
+
+
+def test_a_project_tag_made_of_the_request_words_passes():
+    # with a project attached, "run the pump" may rightly become Pump_Run
+    m = FakeModel("Pump_Run := Start_PB;")
+    r = Generator(m).generate("Run the pump while Start_PB is pressed.", known_tags={"Pump_Run": "BOOL", "Start_PB": "BOOL"})
+    assert len(r.attempts) == 1
+
+
+def test_output_check_warns_on_the_last_attempt_instead_of_failing():
+    m = FakeModel(*["IF Go_Cmd THEN SET Alarm_Latch;"] * 5)
+    r = Generator(m).generate("When Go_Cmd is on, turn on Alarm_Latch.")
+    assert r.spec and any("does not ask to latch" in w for w in r.warnings)
