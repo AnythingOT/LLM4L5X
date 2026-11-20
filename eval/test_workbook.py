@@ -134,6 +134,28 @@ def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str]
     return rows
 
 
+# Lint rules that judge one rung on its own: a rung with any of these is test data, not logic to
+# copy (the L5Sharp sample [XIC(B),XIC(B)][OTE(B),OTU(B)] checks a parser, and no sentence asks for it).
+# Rules that need the rest of the program (a counter reset in another rung) are left out.
+_SELF_CONTRADICTORY = {"ERR001", "ERR002", "ERR003", "ERR010", "ERR014"}
+
+
+def nonsense(rung: Rung, tag_types: dict[str, str] | None = None) -> str | None:
+    """Why a public rung is no fair test, or None.
+
+    A rung that reads its own output stays: that is a seal-in, [XIC(Start),XIC(Motor)]XIO(Stop)OTE(Motor)."""
+    import lint
+    for f in lint.check_rungs([rung], tag_types):
+        if f.code in _SELF_CONTRADICTORY:
+            return f"{f.code} {f.message}"
+    kinds: dict[str, set[str]] = {}
+    for i in walk(rung.body):
+        if i.name in ("OTE", "OTL", "OTU") and i.args:
+            kinds.setdefault(i.args[0], set()).add(i.name)
+    both = sorted(t for t, k in kinds.items() if len(k) > 1)
+    return f"{both[0]} is turned on and off in the same rung" if both else None
+
+
 def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[str] | None = None) -> list[tuple]:
     from explain.decompiler import try_decompile
     from explain.describe import describe_statement
@@ -151,6 +173,8 @@ def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[s
                 complex_ = any(isinstance(e, Branch) for e in x.rung.body.items) or len(ins) >= 4
                 if not complex_ or any(not plain.match(a) and not re.fullmatch(r"-?[\d.]+|\?", a)
                                        for i in ins for a in i.args):
+                    continue
+                if nonsense(x.rung, p.tag_types()):
                     continue
                 stmts, _ = try_decompile(x.rung, pre)
                 if stmts:
