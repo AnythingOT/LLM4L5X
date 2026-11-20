@@ -225,3 +225,20 @@ def test_a_preset_beyond_dint_is_refused(spec):
 def test_the_largest_dint_preset_is_accepted():
     r = Compiler().compile(parse_spec("Lamp := DELAY(Start, 596h);"))
     assert max(t.preset or 0 for t in r.tags.values()) == 596 * 3600000
+
+
+@pytest.mark.parametrize("name", ["Purge_Done", "Shuttle_Rev", "Step_No", "Batch_Count"])
+def test_reset_acc_on_a_tag_that_is_no_counter_or_timer_is_refused(name):
+    # hard holdout seed 17: "reset Purge_Done", "unlatch Shuttle_Rev" and "reset Step_No to zero"
+    # came back as RES, and each tag was quietly made a COUNTER
+    from core.compiler import CompileError, compile_spec
+    with pytest.raises(CompileError, match=f"RESET {name}.*CLEAR {name}"):
+        compile_spec(f"IF a THEN RESET_ACC {name};", comments=False)
+
+
+def test_reset_acc_on_a_project_counter_still_works():
+    from core.compiler import Compiler
+    from core.logicspec import parse_spec
+    r = Compiler(known_tags={"Box_Tally": "COUNTER"}).compile(parse_spec("IF a THEN RESET_ACC Box_Tally;"))
+    from core.rung import format_rung
+    assert format_rung(r.rungs[0]).endswith("RES(Box_Tally);") and not r.warnings
