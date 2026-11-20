@@ -52,3 +52,11 @@ def test_res_is_drawn_as_a_coil_like_studio_5000():
     svg = to_svg(parse_rung("XIC(Go)RES(Fill_Count);"))
     assert "lad-box" not in svg            # not an instruction box
     assert ">RES</text>" in svg and ">Fill_Count</text>" in svg
+
+
+def test_a_question_mark_preset_shows_the_tag_preset():
+    # exports write TON(T,?,?); the preset is in the tag's data
+    svg = to_svg(parse_rung("XIC(Go)TON(Fill_TMR,?,?);"), presets={"Fill_TMR": 5000})
+    assert ">5000</text>" in svg and ">?</text>" in svg      # preset filled, accum still '?'
+    assert ">?</text>" in to_svg(parse_rung("XIC(Go)TON(Other_TMR,?,?);"), presets={"Fill_TMR": 5000})
+    assert ">7</text>" in to_svg(parse_rung("XIC(Go)TON(Fill_TMR,7,0);"), presets={"Fill_TMR": 5000})  # written wins
