@@ -58,7 +58,9 @@ Rules:
   - "on-delay timer" = ON_DELAY_TIMER; "off-delay timer" = OFF_DELAY_TIMER. Match the words.
   - "either A or B, and C" = (A OR B) AND C: the part after ", and" still applies.
   - "subtract/divide/... and store the result in C" changes ONLY C: C := B - A; never B := ...
-  - RISE(X) only when the request says so: "rising edge", "the moment", "each time", "once".
+  - RISE(X) only when the request says so: "rising edge", "the moment", "each time", "once", "goes from off to on".
+  - RISE covers only the signal whose edge is meant: "when A goes from off to on and B is on" = RISE(A) AND B;
+    RISE(A AND B) would also fire when B turns on while A is already on.
   - "move A to B", "copy A into B", "store A in B" = B := A; (the destination is on the left).
   - Several actions under one condition: ONE IF with commas, IF c THEN a, b, c; (';' ends the IF).
   - COUNT_UP and COUNT_DOWN already count once per rising edge: do not wrap their condition in RISE.
