@@ -46,3 +46,9 @@ def test_long_tags_are_cut_but_kept_in_a_tooltip():
 
 def test_special_characters_are_escaped():
     etree.fromstring(to_svg(parse_rung('MOV(Arr[Idx+1],Dest);')).encode())
+
+
+def test_res_is_drawn_as_a_coil_like_studio_5000():
+    svg = to_svg(parse_rung("XIC(Go)RES(Fill_Count);"))
+    assert "lad-box" not in svg            # not an instruction box
+    assert ">RES</text>" in svg and ">Fill_Count</text>" in svg

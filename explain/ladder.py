@@ -21,7 +21,7 @@ RAIL = 6  # margin outside the rails
 MIN_WIDTH = 560
 LABEL_MAX = 24  # characters of a tag shown above a contact or coil
 _CONTACTS = {"XIC": "", "XIO": "/"}
-_COILS = {"OTE": "", "OTL": "L", "OTU": "U"}
+_COILS = {"OTE": "", "OTL": "L", "OTU": "U", "RES": "RES"}  # RES is a coil in Studio 5000: -(RES)-
 
 
 @dataclass
@@ -99,9 +99,11 @@ class _Layout:
             if _CONTACTS[name]:
                 parts.append(_line(c - 9, WIRE + 9, c + 9, WIRE - 9, "lad-sym"))
         else:
-            parts += [_line(0, WIRE, c - 11, WIRE), _line(c + 11, WIRE, w, WIRE),
-                      f'<path d="M{c - 6:.1f},{WIRE - 10} q-6,10 0,20 M{c + 6:.1f},{WIRE - 10} q6,10 0,20" class="lad-sym"/>']
-            if _COILS[name]:
+            mark = _COILS[name]
+            hw = 6 if len(mark) <= 1 else len(mark) * CHAR / 2 + 5  # brackets wide enough for the mark
+            parts += [_line(0, WIRE, c - hw - 5, WIRE), _line(c + hw + 5, WIRE, w, WIRE),
+                      f'<path d="M{c - hw:.1f},{WIRE - 10} q-6,10 0,20 M{c + hw:.1f},{WIRE - 10} q6,10 0,20" class="lad-sym"/>']
+            if mark:
                 parts.append(_text(c, WIRE + 4, _COILS[name], "lad-mark"))
         return Box(w, WIRE + 16, parts)
 
