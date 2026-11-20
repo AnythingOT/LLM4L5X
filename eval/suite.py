@@ -47,6 +47,24 @@ COUNTERS = ["Part_CTR", "Bottle_CTR", "Batch_CTR", "Reject_CTR", "Case_CTR", "Ca
             "Pallet_CTR"]
 ARRAYS = [("Recipe_Buffer", "Active_Recipe"), ("Setpoint_Table", "Live_Setpoints"), ("Raw_Data", "Log_Data")]
 
+# Level 2 rungs are bigger and Multi_output asks 3-4 outputs a row: with one owner per tag the
+# pools above run dry. These are added at level 2 only, so level-1 workbooks keep their rows.
+MORE = {
+    "BOOL_OUT": ["Hydraulic_Pump", "Clamp_Close", "Clamp_Open", "Gate_Lift", "Purge_Valve", "Dust_Fan",
+                 "Glue_Heater", "Labeler_Run", "Capper_Run", "Filler_Run", "Wrapper_Run", "Chiller_Run",
+                 "Boiler_Enable", "Lube_Pump", "Air_Knife", "Divert_Gate", "Brake_Release", "Horn_Short",
+                 "Stack_Light_Amber", "Recirc_Valve", "Inlet_Valve", "Outlet_Valve", "Crusher_Run",
+                 "Elevator_Up", "Elevator_Down", "Shuttle_Fwd", "Shuttle_Rev", "Pack_Done", "Purge_Done",
+                 "Hi_Temp_Alarm"],
+    "NUM_REAL": ["PT102_PV", "TT206_PV", "FT111_PV", "LT121_PV", "Flow_SP", "Speed_SP", "Torque_PV",
+                 "Torque_Limit", "Feed_Rate", "Line_Speed", "Draw_Ratio", "Zone1_Temp", "Zone2_Temp"],
+    "NUM_DINT": ["Lot_No", "Bin_No", "Station_No", "Alarm_Code", "Good_Count", "Bad_Count", "Hour_Count",
+                 "Mode_No", "Phase_No", "Tote_Count"],
+    "TIMERS": ["Clamp_TMR", "Purge_Delay_TMR", "Horn_TMR", "Restart_TMR", "Jam_TMR", "Prime_TMR"],
+    "COUNTERS": ["Tote_CTR", "Bag_CTR", "Cycle_CTR", "Lot_CTR"],
+}
+
+
 CMP_OP = {"EQ": "=", "NE": "<>", "GT": ">", "LT": "<", "GE": ">=", "LE": "<="}
 V35 = {"EQ": "EQU", "NE": "NEQ", "GT": "GRT", "LT": "LES", "GE": "GEQ", "LE": "LEQ", "MOVE": "MOV"}
 CMP_WORDS = {
@@ -84,10 +102,14 @@ class Case:
 # ---------------------------------------------------------------- atoms
 
 
+_POOLS = {"BOOL_OUT": BOOL_OUT, "NUM_REAL": NUM_REAL, "NUM_DINT": NUM_DINT, "TIMERS": TIMERS, "COUNTERS": COUNTERS}
+
+
 class Builder:
-    def __init__(self, rng: random.Random, version: int):
+    def __init__(self, rng: random.Random, version: int, level: int = 1):
         self.rng = rng
         self.version = version
+        self.level = level  # 1: the shapes above; 2: longer series, wider branches, two-group nests
         self.tags: dict[str, str] = {}
         self.used: set[str] = set()
         self.presets: dict[str, int] = {}
@@ -99,6 +121,8 @@ class Builder:
         return V35.get(name, name) if self.version < 36 else name
 
     def pick(self, pool, kind: str) -> str:
+        if self.level >= 2:
+            pool = list(pool) + next((MORE[k] for k, v in _POOLS.items() if v is pool), [])
         free = [x for x in pool if x not in self.used] or list(pool)
         x = self.rng.choice(free)
         self.used.add(x)
@@ -186,6 +210,8 @@ def condition(b: Builder, structure: str, feature: str | None):
     def atoms(ks):
         return [b.atom(k) for k in ks]
 
+    if b.level >= 2 and structure in ("series", "parallel", "nested", "multi_output"):
+        return _hard_condition(b, structure, feat)
     if structure in ("single", "multi_output"):
         ks = [feat or r.choice(COND_KINDS)]
         if structure == "multi_output" and r.random() < 0.5:
@@ -225,6 +251,42 @@ def condition(b: Builder, structure: str, feature: str | None):
         grp = _or(atoms(ks), True)
         return (f"{first[0]} and {grp[0]}", f"({first[1]} AND {grp[1]})", first[2] + grp[2])
     raise ValueError(structure)
+
+
+def _hard_condition(b: Builder, structure: str, feat: str | None):
+    """Level 2: bigger trees whose English still reads one way only.
+
+    Three-deep nests are left out on purpose: "either both A and either B or C, or D" tests the
+    sentence, not the model."""
+    r = b.rng
+
+    def atoms(n, put_feat=True):
+        ks = [r.choice(COND_KINDS) for _ in range(n)]
+        if feat and put_feat:
+            ks[0 if feat == "ONS" else r.randrange(n)] = feat
+        return [b.atom(k) for k in ks]
+
+    if structure == "series":  # A and B, C and D (and E)
+        return _and(atoms(r.randint(4, 5)), False)
+    if structure == "multi_output":  # two conditions, three or four outputs
+        return _and(atoms(2), False)
+    if structure == "parallel":  # either A or B or C (or D), and E (and F)
+        branch = _or(atoms(r.randint(3, 4)), False)
+        tail = [b.atom(r.choice(COND_KINDS)) for _ in range(r.randint(1, 2))]
+        t = _and(tail, False) if len(tail) > 1 else tail[0]
+        return (f"{branch[0]}, and {t[0]}", f"({branch[1]} AND {t[1]})", branch[2] + t[2])
+    shape = r.choice(("and_or_and", "or_and_or", "and_and_or"))
+    if shape == "and_or_and":  # (A AND B) OR (C AND D): either both A and B, or both C and D
+        left, right = _and(atoms(2), True), _and(atoms(2, put_feat=False), True)
+        legs = (Series(tuple(left[2])), Series(tuple(right[2])))
+        return (f"either {left[0]}, or {right[0]}", f"({left[1]} OR {right[1]})", [Branch(legs)])
+    if shape == "or_and_or":  # (A OR B) AND (C OR D)
+        left, right = _or(atoms(2), False), _or(atoms(2, put_feat=False), False)
+        return (f"{left[0]}, and {right[0]}", f"({left[1]} AND {right[1]})", left[2] + right[2])
+    head = atoms(2)  # A AND B AND (C OR D OR E)
+    grp = _or(atoms(3, put_feat=False), True)
+    h = _and(head, False)
+    return (f"{h[0]}, and {grp[0]}", f"({h[1]} AND {grp[1]})", h[2] + grp[2])
 
 
 # ---------------------------------------------------------------- actions
@@ -298,8 +360,8 @@ ACTION_KINDS = ["OTE", "OTE", "OTL", "OTU", "ADD", "SUB", "MUL", "DIV", "MOVE", 
 # ---------------------------------------------------------------- one case
 
 
-def make_case(rng: random.Random, feature: str, structure: str, n: int, version: int) -> Case:
-    b = Builder(rng, version)
+def make_case(rng: random.Random, feature: str, structure: str, n: int, version: int, level: int = 1) -> Case:
+    b = Builder(rng, version, level)
     if feature == "TON" and rng.random() < 0.4:  # timer done used as a condition
         cond = b.atom("DN_TMR")
         if structure != "single":
@@ -307,7 +369,7 @@ def make_case(rng: random.Random, feature: str, structure: str, n: int, version:
             cond = _and([cond, extra], False)
     else:
         cond = condition(b, structure, feature)
-    n_act = rng.randint(2, 3) if structure == "multi_output" else 1
+    n_act = (rng.randint(3, 4) if level >= 2 else rng.randint(2, 3)) if structure == "multi_output" else 1
     kinds = [feature if feature in ACTION_KINDS + ["RES"] else rng.choice(ACTION_KINDS)]
     while len(kinds) < n_act:
         k = rng.choice(ACTION_KINDS)

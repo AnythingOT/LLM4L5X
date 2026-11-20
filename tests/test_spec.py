@@ -280,3 +280,31 @@ def test_real_world_keeps_ordinary_rungs(text):
     from core.rung import parse_rung
     from eval.test_workbook import nonsense
     assert nonsense(parse_rung(text)) is None
+
+
+@pytest.mark.parametrize("seed", [11, 17])
+def test_level_2_fills_every_sheet_with_bigger_rungs(tmp_path, seed):
+    import openpyxl
+
+    from eval.test_workbook import build
+    counts = {lvl: build(tmp_path / f"l{lvl}.xlsx", seed=seed, rows=12, level=lvl) for lvl in (1, 2)}
+    assert all(v == 12 for v in counts[2].values()), counts[2]
+
+    def size(path):  # mean instructions per model row on the generated sheets
+        wb = openpyxl.load_workbook(path)
+        n = [r[3].value.count("(") for s in ("Series", "Parallel", "Nested", "Multi_output")
+             for r in wb[s].iter_rows(min_row=2) if r[1].value]
+        return sum(n) / len(n)
+    assert size(tmp_path / "l2.xlsx") > 1.3 * size(tmp_path / "l1.xlsx")
+
+
+def test_level_2_nests_two_groups_in_plain_english():
+    import random
+
+    from eval.suite import Builder, condition
+    seen = set()
+    for i in range(200):
+        eng, spec, _ = condition(Builder(random.Random(i), 35, level=2), "nested", None)
+        assert eng.count("either") <= 2  # never "either ... either ... either": three-deep reads two ways
+        seen.add(("OR (" in spec and spec.count("AND") >= 2) or ") AND (" in spec or spec.count("OR") >= 2)
+    assert seen == {True}  # every level-2 nest is a two-group or three-way shape, never a lone A AND (B OR C)
