@@ -252,3 +252,33 @@ def test_ladder_endpoint_and_drawings_in_results(client):
     assert d["svgs"][0].startswith("<svg") and ">3<" in d["svgs"][0] and d["svgs"][1] is None
     r = post(client, "XIC(A)OTE(B);")
     assert r["rungs"][0]["svg"].startswith("<svg")
+
+
+@pytest.mark.parametrize("headers", [
+    {"Origin": "https://evil.example"},                         # another site's page
+    {"Origin": "null"},                                         # sandboxed iframe, file:// page
+    {"Sec-Fetch-Site": "cross-site"},                           # cross-site without an Origin
+    {"Host": "127.0.0.1:5000", "Origin": "http://127.0.0.1:8000"},  # another app on this PC
+    {"Host": "attacker.example:5000"},                          # DNS rebinding
+])
+def test_other_sites_cannot_drive_the_app(client, headers):
+    # a page the user visits must not start a job that sends the project's tags elsewhere
+    xlsx = client.get("/api/spec/sample").data
+    settings = json.dumps({"backend": "ollama", "llm_url": "http://203.0.113.9:11434"})
+    r = client.post("/api/project", data={"file": (io.BytesIO(xlsx), "req.xlsx"), "settings": settings},
+                    content_type="multipart/form-data", headers=headers)
+    assert r.status_code == 403
+    assert client.delete("/api/project", headers=headers).status_code == 403
+
+
+def test_the_app_own_page_and_scripts_still_work(client):
+    same = {"Host": "127.0.0.1:5000", "Origin": "http://127.0.0.1:5000"}
+    assert client.post("/api/process", json={"text": "help"}, headers=same).status_code == 200
+    assert client.post("/api/process", json={"text": "help"}).status_code == 200  # curl, no browser headers
+    assert client.get("/").status_code == 200
+
+
+def test_extra_hosts_can_be_allowed_on_purpose(client, monkeypatch):
+    monkeypatch.setenv("LLM4L5X_ALLOWED_HOSTS", "plc-tools.lan")
+    assert client.post("/api/process", json={"text": "help"},
+                       headers={"Host": "plc-tools.lan:5000", "Origin": "http://plc-tools.lan:5000"}).status_code == 200

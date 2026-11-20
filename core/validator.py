@@ -36,6 +36,19 @@ def _last_is_output(s: Series, cat: Catalog) -> bool:
     return spec is None or spec.is_output  # unknown instructions are reported separately
 
 
+class _NoCase(dict):
+    """Tag names in Logix ignore case: start_pb is Start_PB."""
+
+    def __init__(self, d: dict):
+        super().__init__({k.upper(): v for k, v in d.items()})
+
+    def __contains__(self, k) -> bool:
+        return isinstance(k, str) and super().__contains__(k.upper())
+
+    def get(self, k, default=None):
+        return super().get(k.upper(), default) if isinstance(k, str) else default
+
+
 def validate(
     rungs: list[Rung],
     tag_types: dict[str, str] | None = None,
@@ -47,7 +60,7 @@ def validate(
     reported only when tag_types is given. string_types: data types that are strings
     (STRING plus the project's custom string types)."""
     cat = catalog or default_catalog()
-    ctx = _Ctx(cat, major_version(revision), {k: v.upper() for k, v in (tag_types or {}).items()},
+    ctx = _Ctx(cat, major_version(revision), _NoCase({k: v.upper() for k, v in (tag_types or {}).items()}),
                tag_types is not None, {s.upper() for s in (string_types or set())} | {"STRING"})
     issues: list[Issue] = []
     for n, r in enumerate(rungs):
@@ -105,6 +118,8 @@ def _operand(where: str, op, arg: str, ctx: _Ctx) -> tuple[str, str] | None:
     if is_placeholder(arg):
         return None if op.role == "display" else ("error", f"{where} is '?'")
     if op.role == "display":
+        if op.member == "PRE" and is_literal(arg) and not 0 <= float(arg) <= 2_147_483_647:
+            return "error", f"{where} {arg} is outside 0 to 2147483647 (.PRE is a DINT)"
         return None
     if op.role in ("write", "struct") and is_literal(arg):
         return "error", f"{where} writes to a literal {arg}"

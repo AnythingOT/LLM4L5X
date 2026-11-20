@@ -212,3 +212,16 @@ def test_v36_move_destination_gets_a_tag():
     r = Compiler(revision="37.00").compile(parse_spec("IF A THEN Lane_No := 250, Total := Speed / 100;"))
     assert {t.name: t.datatype for t in r.tags.values()}["Lane_No"] == "DINT"
     assert "MOVE(250,Lane_No)" in format_rung(r.rungs[0])
+
+
+@pytest.mark.parametrize("spec", ["Lamp := DELAY(Start, 1000h);", "IF A THEN ON_DELAY_TIMER(T1, 600h);",
+                                  "IF RISE(Btn) THEN COUNT_UP(Cnt, 3000000000);"])
+def test_a_preset_beyond_dint_is_refused(spec):
+    # .PRE is a DINT: 2,147,483,647 ms is about 596 hours
+    with pytest.raises(CompileError, match="outside 0 to 2147483647"):
+        Compiler().compile(parse_spec(spec))
+
+
+def test_the_largest_dint_preset_is_accepted():
+    r = Compiler().compile(parse_spec("Lamp := DELAY(Start, 596h);"))
+    assert max(t.preset or 0 for t in r.tags.values()) == 596 * 3600000

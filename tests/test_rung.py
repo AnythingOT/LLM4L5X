@@ -55,3 +55,14 @@ def test_tag_helpers():
     assert base_tag("Local:1:I.Data.0") == "Local:1:I"
     assert base_tag("5") is None and base_tag("?") is None
     assert is_literal("-2.5e3") and is_literal("16#0F") and not is_literal("A1")
+
+
+@pytest.mark.parametrize("text", ["MOV(A(1],B);", "MOV(A[1),B);"])
+def test_a_bracket_closed_by_the_other_kind_is_refused(text):
+    with pytest.raises(RungSyntaxError, match="closes a different bracket"):
+        parse_rung(text)
+
+
+def test_nested_brackets_still_parse():
+    assert format_rung(parse_rung("MOV(Arr[Idx[2]],X);")) == "MOV(Arr[Idx[2]],X);"
+    assert format_rung(parse_rung("MOV(Arr[(1+2)],X);")) == "MOV(Arr[(1+2)],X);"
