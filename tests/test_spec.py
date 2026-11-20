@@ -244,3 +244,18 @@ def test_sheets_known_tags_are_passed_on(monkeypatch):
     from inputs.spec_excel import read_requirements
     spec_mod._run(jobs.Job("t", 2), read_requirements(data), settings({}), "req.xlsx")
     assert "Fill_Valve" in seen[1]
+
+
+@pytest.mark.parametrize("seed", [1, 4, 5, 7])  # seeds whose last suite sheet used to come up short
+def test_test_workbook_fills_every_sheet(tmp_path, seed):
+    from eval.test_workbook import build
+    counts = build(tmp_path / "t.xlsx", seed=seed, rows=12)
+    assert all(v == 12 for v in counts.values()), counts
+
+
+def test_test_workbook_refuses_a_missing_or_empty_corpus(tmp_path):
+    from eval.test_workbook import build
+    with pytest.raises(SystemExit, match="no such folder"):
+        build(tmp_path / "t.xlsx", corpus=tmp_path / "nope")
+    with pytest.raises(SystemExit, match="no .L5X files"):
+        build(tmp_path / "t.xlsx", corpus=tmp_path)
