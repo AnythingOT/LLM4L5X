@@ -359,6 +359,14 @@ def test_rise_with_an_edge_word_passes(text):
     assert len(r.attempts) == 1 and not any("RISE" in w for w in r.warnings)
 
 
+def test_reset_of_a_bit_written_as_a_counter_reset_is_sent_back():
+    m = FakeModel("IF Valve_Open_LS AND NOT Cycle_Start THEN RESET_ACC Purge_Done;",
+                  "IF Valve_Open_LS AND NOT Cycle_Start THEN RESET Purge_Done;")
+    r = Generator(m).generate("When Valve_Open_LS is on and Cycle_Start is not active, reset Purge_Done.")
+    assert "RESET_ACC only resets a timer or counter" in m.calls[1][-1]["content"]
+    assert r.compiled.tags["Purge_Done"].datatype == "BOOL" and len(r.attempts) == 2
+
+
 def test_set_and_reset_pair_is_a_latch_on_purpose():
     m = FakeModel("IF Level >= 95 THEN SET Drain_Valve;\nIF Level < 50 THEN RESET Drain_Valve;")
     r = Generator(m).generate("Open Drain_Valve when Level is at least 95, close it when Level drops below 50.")

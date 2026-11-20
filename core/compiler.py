@@ -39,6 +39,11 @@ def tag_name_problem(name: str) -> str | None:
     return None
 
 
+
+# a tag only ever RESET_ACC'd is made a timer or counter only when its name says it is one.
+# Not "Count": Batch_Count and Pallet_Count are DINT totals, not COUNTERs.
+_COUNTER_OR_TIMER_NAME = re.compile(r"(CTR|COUNTER|CTU|CTD|TMR|TIMER|TON|TOF|RTO)(_?\d+)?$|^(CTR|TMR)_", re.I)
+
 class CompileError(SpecError):
     pass
 
@@ -264,9 +269,16 @@ class Compiler:
                 rungs += self.statement(s)
             except CompileError as e:
                 raise CompileError(f"{format_statement(s)}\n  -> {e}") from None
-        # RESET_ACC on a tag nothing else creates: it must be a counter or timer; guess from the name
+        # RESET_ACC on a tag nothing else creates: a counter or timer, if its name says so. Any other
+        # name is a model mistake ("reset Purge_Done" read as RES): making it a COUNTER hid the error
+        # and changed the tag's type for every later rung (Step_No became Step_No.ACC)
         for name in sorted(self._reset_only - set(self.tags)):
-            dt = "TIMER" if re.search(r"(TMR|TIMER|TON|TOF)", name, re.I) else "COUNTER"
+            if not _COUNTER_OR_TIMER_NAME.search(name):
+                raise CompileError(
+                    f"RESET_ACC {name}: RESET_ACC only resets a timer or counter, and {name} is neither "
+                    f"(nothing here counts or times it). To turn a bit off write RESET {name}; "
+                    f"to set a number to zero write CLEAR {name}")
+            dt = "TIMER" if re.search(r"(TMR|TIMER|TON|TOF|RTO)", name, re.I) else "COUNTER"
             self.tags[name] = TagDef(name, dt, None)
             self.warnings.append(f"{name} is new and only reset here; created as a {dt} (check its preset)")
         # type tags on the v35 names: v36 MOVE takes any type, so it would leave its destination untyped
