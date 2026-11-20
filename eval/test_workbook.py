@@ -115,7 +115,7 @@ def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str]
     written = set() if written is None else written
     feats = INSTRUCTIONS[:]
     rng.shuffle(feats)
-    while len(rows) < want and n < 400:
+    while len(rows) < want and n < 5000:
         feat = feats[n % len(feats)]
         n += 1
         case = make_case(rng, feat, structure, n, 35)
@@ -178,6 +178,11 @@ def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[s
 def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None) -> dict[str, int]:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
+    if corpus is not None:
+        if not corpus.is_dir():
+            raise SystemExit(f"--corpus {corpus}: no such folder")
+        if not any(f.suffix.lower() == ".l5x" for f in corpus.rglob("*")):
+            raise SystemExit(f"--corpus {corpus}: no .L5X files in it")
     rng = random.Random(seed)
     # one program: each tag is written by one row of the whole workbook (Referenced's names are fixed, so first)
     written = _writes(parse_rung(e) for _, e, _ in REFERENCED)
@@ -232,4 +237,9 @@ if __name__ == "__main__":
     ap.add_argument("--rows", type=int, default=12)
     ap.add_argument("--corpus", type=Path)
     a = ap.parse_args()
-    print(build(a.out, a.seed, a.rows, a.corpus))
+    counts = build(a.out, a.seed, a.rows, a.corpus)
+    print(counts)
+    short = {k: v for k, v in counts.items() if v < a.rows and k != "Referenced"}
+    if short:  # a short sheet is not the same test as a full one; say so instead of saving it quietly
+        print(f"warning: fewer than {a.rows} rows on {', '.join(f'{k} ({v})' for k, v in short.items())}"
+              + ("; Real_world needs more complex rungs in --corpus" if "Real_world" in short else ""))
