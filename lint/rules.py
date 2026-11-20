@@ -53,6 +53,7 @@ RULES: list[Rule] = [
     _R("ERR015", "One-shot storage reused", "An ONS/OSR/OSF storage bit is shared by several one-shots, or also written by other logic, so edges are missed.", "rung", "Logic"),
     _R("ERR016", "No reset for RTO/counter", "An RTO or counter accumulates but is never reset: no RES and no write to .ACC.", "rung", "Logic"),
     _R("ERR017", "Discontinued module", "A module's catalog number is Discontinued in the lifecycle list. Spares may be unobtainable.", "project", "Modules"),
+    _R("ERR018", "Safety tag written by standard logic", "A standard (non-safety) program writes a safety-class tag. GuardLogix lets standard logic read safety tags, not write them, so the project will not verify. Reports what the logic does; never rates safety.", "rung", "Logic"),
 
     _R("WAR001", "Safety map naming", "A standard tag mapped to safety tag SFTY_X must be named STD_X.", "project", "Tags"),
     _R("WAR002", "Produced/consumed naming", "A consumed tag must have the name of the produced tag it maps to, with PRO replaced by CON.", "project", "Tags"),

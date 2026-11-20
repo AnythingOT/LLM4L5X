@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content TargetType="Controller" SoftwareRevision="36.00" SchemaRevision="1.0">
+<Controller Name="Cell" ProcessorType="1756-L83ES" MajorRev="36" MinorRev="11">
+  <Tags>
+    <Tag Name="SafeOut" Class="Safety" TagType="Base" DataType="BOOL"/>
+    <Tag Name="SafeVal" Class="Safety" TagType="Base" DataType="DINT"/>
+    <Tag Name="SafeTmr" Class="Safety" TagType="Base" DataType="TIMER"/>
+    <Tag Name="StdOut" TagType="Base" DataType="BOOL"/>
+    <Tag Name="StdVal" TagType="Base" DataType="DINT"/>
+  </Tags>
+  <Programs>
+    <Program Name="Std" Class="Standard" MainRoutineName="Main"><Routines><Routine Name="Main" Type="RLL"><RLLContent>
+      <Rung Number="0" Type="N"><Text><![CDATA[XIC(SafeOut)OTE(StdOut);]]></Text></Rung>
+      <Rung Number="1" Type="N"><Text><![CDATA[XIC(StdOut)OTE(SafeOut);]]></Text></Rung>
+      <Rung Number="2" Type="N"><Text><![CDATA[XIC(StdOut)MOVE(StdVal,SafeVal);]]></Text></Rung>
+      <Rung Number="3" Type="N"><Text><![CDATA[XIC(StdOut)MOVE(SafeVal,StdVal);]]></Text></Rung>
+      <Rung Number="4" Type="N"><Text><![CDATA[XIC(StdOut)RES(SafeTmr);]]></Text></Rung>
+    </RLLContent></Routine></Routines></Program>
+    <Program Name="Sfty" Class="Safety" MainRoutineName="Main"><Routines><Routine Name="Main" Type="RLL"><RLLContent>
+      <Rung Number="0" Type="N"><Text><![CDATA[XIC(SafeOut)TON(SafeTmr,?,?);]]></Text></Rung>
+      <Rung Number="1" Type="N"><Text><![CDATA[XIC(SafeTmr.DN)OTE(SafeOut);]]></Text></Rung>
+    </RLLContent></Routine></Routines></Program>
+  </Programs>
+  <Tasks><Task Name="MainTask" Type="CONTINUOUS"><ScheduledPrograms><ScheduledProgram Name="Std"/></ScheduledPrograms></Task></Tasks>
+</Controller></RSLogix5000Content>

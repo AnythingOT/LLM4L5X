@@ -80,7 +80,7 @@ Three pages, light and dark. Every rung, generated, pasted or read from your fil
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
   - **Logic | UDT** switch in the input box. In UDT mode you create data types (below).
 - **Settings** (`/settings`): model (backend, address, model, thinking, context window), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
-- **Rules** (`/rules`): the 49 validation rules, grouped, with search and severity filter; switch each on or off.
+- **Rules** (`/rules`): the 50 validation rules, grouped, with search and severity filter; switch each on or off.
 
 ## UDTs: create and optimize
 
@@ -121,7 +121,7 @@ Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes th
 `validate` (GUI, or `python cli.py validate plant.L5X`) runs two layers:
 
 1. **Import checks** (`core/validator.py`): will Studio 5000 accept it. Syntax, operand count and types, tags that exist, instruction names for the target version (GRT before v36, GT from v36).
-2. **Rules** (`lint/`): 49 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Rules page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
+2. **Rules** (`lint/`): 50 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Rules page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
    - 19 *rung* rules (duplicate OTE, reused timer or one-shot, unguarded division, unchecked array index, writes to status bits ...) also check every generated or pasted rung. Two of them, a reused timer and a reused one-shot, send the model back for another attempt.
    - 30 *project* rules (fault handlers, task watchdogs and names, uncalled routines, unscheduled programs, I/O mapping and comments, aliases, electronic keying, module lifecycle, UDT padding and order, descriptions ...) need a full controller export; on a partial export only the rung rules run, and the report says so.
    - Accept one case by writing `lint:disable=ERR010` (or `lint:disable` for all rules) in that rung's comment or that tag's or AOI's description. Suppressed findings are listed separately, never dropped.

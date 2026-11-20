@@ -49,6 +49,27 @@ def coil_conflicts(ctx: Context) -> list[Finding]:
     return out
 
 
+@check("ERR018")
+def safety_std_write(ctx: Context) -> list[Finding]:
+    """A standard program writes a safety tag: GuardLogix will not verify it, so say so before import.
+    Reading a safety tag is allowed. Reports what the logic does; never rates safety."""
+    safety = {p.name for p in ctx.project.programs if p.program_class == "Safety"}
+    out = []
+    for r in ctx.rungs:
+        if r.owner.startswith("AOI:") or r.owner in safety:
+            continue
+        for ins in walk(r.rung.body):
+            for a, role in ctx.roles(ins):
+                if role not in ("write", "struct"):  # struct: RES, TON, CTU, ONS, MSG write their structure
+                    continue
+                tag = ctx.tag(base_tag(a) or "", r.owner)
+                if tag is not None and tag.tag_class == "Safety":
+                    out.append(Finding("ERR018", f"Standard program '{r.owner}' writes safety tag '{tag.name}' "
+                                                 f"with {fmt(ins)}. Only safety logic may write safety tags; "
+                                                 "Studio 5000 will not verify this.", r.location))
+    return out
+
+
 @check("ERR004", "ERR005")
 def protected_writes(ctx: Context) -> list[Finding]:
     out = []

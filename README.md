@@ -15,7 +15,7 @@ model gets wrong reaches a file unchecked. Check the plain-English read-back bef
 | Rung text: `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` or `XIC a BST XIC b NXB XIO c BND OTE d` | Ladder, read-back, checks; `Routine.L5X` or `Rung.L5X` | Fixed code |
 | Requirements Excel: sheet = routine, row = requirement | One routine per sheet | Model (rows with rung text: fixed code) |
 | UDT Excel: row = member | UDTs, checked and ordered | Fixed code |
-| An L5X export (controller, program, routine, rungs or UDT) | Explain every rung, cross reference, validate (import checks and 49 coding rules), optimize UDTs | Fixed code |
+| An L5X export (controller, program, routine, rungs or UDT) | Explain every rung, cross reference, validate (import checks and 50 coding rules), optimize UDTs | Fixed code |
 
 Samples of both Excel files are in the app: the list button next to **Send**.
 

@@ -73,6 +73,7 @@ class ProgramInfo:
     main_routine: str | None
     fault_routine: str | None
     children: list[str] = field(default_factory=list)
+    program_class: str = "Standard"  # GuardLogix: Safety / Standard (Class attribute)
 
 
 @dataclass
@@ -420,7 +421,8 @@ def read_l5x(source: str | bytes | Path) -> Project:
         for prog in ctrl.findall("Programs/Program"):
             pname = prog.get("Name")
             programs.append(ProgramInfo(pname, prog.get("MainRoutineName"), prog.get("FaultRoutineName"),
-                                        [c.get("Name") for c in prog.findall("ChildPrograms/ChildProgram")]))
+                                        [c.get("Name") for c in prog.findall("ChildPrograms/ChildProgram")],
+                                        prog.get("Class") or "Standard"))
             for t in _tags(prog.find("Tags"), pname):
                 tags[f"{pname}/{t.name}"] = t
             routines += _routines(prog, pname)

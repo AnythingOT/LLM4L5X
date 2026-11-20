@@ -8,7 +8,7 @@ cli.py              command line (python cli.py ...)
 core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
                     compiler.py, validator.py, simulator.py
 l5x/                reader.py, writer.py, xref.py
-lint/               rules.py (the 49-rule checklist), checks_*.py, context.py, paths.py, lifecycle.json
+lint/               rules.py (the 50-rule checklist), checks_*.py, context.py, paths.py, lifecycle.json
 udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
                     writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
                     an existing export, byte-preserving)
