@@ -282,3 +282,15 @@ def test_extra_hosts_can_be_allowed_on_purpose(client, monkeypatch):
     monkeypatch.setenv("LLM4L5X_ALLOWED_HOSTS", "plc-tools.lan")
     assert client.post("/api/process", json={"text": "help"},
                        headers={"Host": "plc-tools.lan:5000", "Origin": "http://plc-tools.lan:5000"}).status_code == 200
+def test_ladder_shows_presets_from_the_attached_project(client):
+    from core.compiler import TagDef
+    from core.rung import parse_rung
+    from l5x.writer import write_routine
+    l5x = write_routine([parse_rung("XIC(Go)TON(Fill_TMR,?,?);")],
+                        [TagDef("Go", "BOOL"), TagDef("Fill_TMR", "TIMER", preset=5000)],
+                        routine="R", program="P", revision="37.00")
+    d = client.post("/api/project", data={"file": (io.BytesIO(l5x.encode()), "p.L5X")},
+                    content_type="multipart/form-data").get_json()
+    assert d["kind"] == "project"
+    svg = client.post("/api/ladder", json={"rungs": [{"text": "XIC(Go)TON(Fill_TMR,?,?);"}]}).get_json()["svgs"][0]
+    assert ">5000</text>" in svg

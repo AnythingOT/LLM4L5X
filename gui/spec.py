@@ -60,10 +60,13 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                 if row.expected:
                     ev["match"], ev["match_why"] = _matches(row.expected, ev["_rungs"],
                                                             {**earlier, **new_tags, **ev["_tags"]}, catalog)
+                presets = {**(proj.presets() if proj else {}),
+                           **{t.name: t.preset for t in {**earlier, **new_tags, **ev["_tags"]}.values()
+                              if t.preset is not None}}
                 for r in ev.pop("_rungs"):
                     rungs.append(r)
                     ev["rungs"].append({"text": format_rung(r), "ascii": format_ascii(r),
-                                        "svg": to_svg(r, catalog, number=len(rungs) - 1)})
+                                        "svg": to_svg(r, catalog, number=len(rungs) - 1, presets=presets)})
                 new_tags.update(ev.pop("_tags"))
             else:
                 failed += 1

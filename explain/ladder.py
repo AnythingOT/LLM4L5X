@@ -50,8 +50,9 @@ def _shift(parts: list[str], dx: float, dy: float) -> str:
 
 
 class _Layout:
-    def __init__(self, catalog: Catalog):
+    def __init__(self, catalog: Catalog, presets: dict[str, int] | None = None):
         self.cat = catalog
+        self.presets = presets or {}
 
     def series(self, s: Series) -> Box:
         x, h, parts = 0.0, WIRE + 16, []
@@ -113,7 +114,11 @@ class _Layout:
         rows = []
         for k, arg in enumerate(i.args):
             label = names[k] if k < len(names) else ""
-            rows.append((label.replace("_", " ").capitalize(), _fit(arg or "?", 28), arg))
+            shown = arg or "?"
+            # exports write TON(T,?,?): the preset lives in the tag's data, so show it from there
+            if shown == "?" and label == "preset" and i.args and i.args[0] in self.presets:
+                shown = str(self.presets[i.args[0]])
+            rows.append((label.replace("_", " ").capitalize(), _fit(shown, 28), arg))
         lw = max((len(r[0]) for r in rows), default=0) * CHAR
         vw = max((len(r[1]) for r in rows), default=0) * CHAR
         bw = max(len(i.name) * CHAR + 24, lw + vw + 26, 70)
@@ -136,14 +141,15 @@ def _is_output(e, cat: Catalog) -> bool:
     return spec is None or spec.is_output
 
 
-def to_svg(rung: Rung, catalog: Catalog | None = None, number: int | None = None) -> str:
-    """One rung as a standalone <svg> element."""
+def to_svg(rung: Rung, catalog: Catalog | None = None, number: int | None = None,
+           presets: dict[str, int] | None = None) -> str:
+    """One rung as a standalone <svg> element. `presets` (tag -> PRE) fills a '?' preset."""
     cat = catalog or default_catalog()
     items = list(rung.body.items)
     split = len(items)
     while split > 0 and _is_output(items[split - 1], cat):
         split -= 1
-    lay = _Layout(cat)
+    lay = _Layout(cat, presets)
     cond, outs = lay.series(Series(tuple(items[:split]))), lay.series(Series(tuple(items[split:])))
     if not items[:split]:
         cond = Box(0, WIRE + 16, [])
