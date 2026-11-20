@@ -289,6 +289,24 @@ def test_latch_the_request_did_not_ask_for_is_sent_back():
     assert "ENERGIZE Fault_Latch" in r.spec
 
 
+def test_move_of_one_is_a_latch_too():
+    # MOVE(1,Fault_Latch) never writes 0, so it held the output on like SET did
+    m = FakeModel("IF Door_Open OR Motor_Overload THEN Fault_Latch := 1;",
+                  "Fault_Latch := Door_Open OR Motor_Overload;")
+    r = Generator(m).generate("When either Door_Open is on or Motor_Overload is on, turn on Fault_Latch.")
+    assert "does not ask to latch Fault_Latch" in m.calls[1][-1]["content"]
+    assert len(r.attempts) == 2
+
+
+@pytest.mark.parametrize("spec, text", [
+    ("IF Auto_Sel THEN Mode := 1;", "When Auto_Sel is on, move 1 to Mode."),  # the value is asked for
+    ("IF Run_PB THEN Lamp := 1;\nIF Stop_PB THEN Lamp := 0;", "Turn on Lamp with Run_PB, off with Stop_PB."),
+])
+def test_move_of_one_that_is_asked_for_passes(spec, text):
+    r = Generator(FakeModel(spec)).generate(text)
+    assert len(r.attempts) == 1 and not any("latch" in w for w in r.warnings)
+
+
 def test_set_and_reset_pair_is_a_latch_on_purpose():
     m = FakeModel("IF Level >= 95 THEN SET Drain_Valve;\nIF Level < 50 THEN RESET Drain_Valve;")
     r = Generator(m).generate("Open Drain_Valve when Level is at least 95, close it when Level drops below 50.")
