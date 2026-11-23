@@ -21,6 +21,7 @@ from scenario import SimBackend, parse_scenarios, report, run_scenarios, trace
 SKIPPED_ROUTINES = {"MAP_IN", "MAP_OUT"}
 _CALLS = {"JSR", "SBR", "RET"}
 _SUPPORTED = set(sim._HANDLERS) | set(sim._COMPARE) | set(sim._MATH) | set(sim._V36)
+_STRUCTS = {"TON", "TOF", "RTO", "CTU", "CTD"}
 _FIRST_ARG_WRITES = {"OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "ONS", "CLR"}
 
 
@@ -75,7 +76,7 @@ class Session:
         for tag, value in (writes or {}).items():
             if not be.has(tag):
                 raise EnergiseError(f"{tag} is not used by this program or plant")
-            if tag in self.outputs:
+            if tag in self.outputs or base_tag(tag) in {base_tag(o) for o in self.outputs}:
                 raise EnergiseError(f"{tag} is written by the logic; a value set here would be overwritten")
             be.write(tag, value)
         be.advance(ms)
@@ -128,8 +129,13 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
     if not rungs:
         raise EnergiseError("no ladder rungs to run")
     written = {base_tag(w) for r in rungs for i in walk(r.body) for w in _writes(i) if not is_literal(w)}
+    # a timer or counter is a structure: its elapsed/count and done bits are what a person watches
+    structs = {i.args[0] for r in rungs for i in walk(r.body)
+               if sim._V36.get(i.name.upper(), i.name.upper()) in _STRUCTS and i.args}
     read = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
-    s = Session(rungs, places, [], sorted(written), [], skipped, plant_text, scenarios_text, scan_ms)
+    outputs = sorted(t for t in written if t not in structs) + [f"{t}.{m}" for t in sorted(structs)
+                                                                for m in ("ACC", "DN")]
+    s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms)
     probe = s._new_backend()  # validates the plant and scenarios before the page shows anything
     if scenarios_text.strip():
         parse_scenarios(scenarios_text)

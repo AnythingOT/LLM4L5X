@@ -527,3 +527,23 @@ details.order > summary { cursor: pointer; color: var(--muted); font-size: .75re
 .remote-banner { position: sticky; top: 0; z-index: 50; padding: 8px 16px; font-weight: 600;
     background: #8a5a00; color: #fff; text-align: center; }
 .remote-banner.blocked { background: #9b1c1c; }
+
+/* Energise */
+.en-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 10px; }
+.en-cols h3 { font-size: .85rem; margin: 8px 0 4px; }
+.en-tags { border-collapse: collapse; width: 100%; font-size: .85rem; }
+.en-tags td { padding: 2px 6px; border-bottom: 1px solid var(--line); }
+.en-tags td.val { width: 5em; text-align: center; font-weight: 600; }
+.en-tags td.val.on { background: var(--ok); color: #fff; }
+.en-tags td.val.click { cursor: pointer; }
+.en-list { margin: 6px 0 0; padding-left: 18px; font-size: .82rem; }
+.en-report { white-space: pre-wrap; font-size: .8rem; background: var(--sunken); padding: 8px; border-radius: 6px; }
+.en-rungs { margin-top: 16px; }
+.en-rungs ol { margin: 0; padding-left: 0; list-style: none; font-size: .82rem; }
+.en-rungs li { padding: 3px 6px; border-left: 4px solid transparent; }
+.en-rungs li.lit { border-left-color: var(--ok); background: var(--sunken); }
+.warn-text { color: var(--err); }
+@media (max-width: 960px) { .en-cols { grid-template-columns: 1fr; } }
+#enLive h2 + .btn-row, .card label[for^="en"] { display: block; margin: 10px 0 4px; font-size: .85rem; }
+.card textarea[id^="en"], .card input[type="file"][id^="en"] { display: block; width: 100%; box-sizing: border-box;
+    font-family: ui-monospace, Consolas, monospace; font-size: .8rem; }

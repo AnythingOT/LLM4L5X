@@ -23,6 +23,7 @@ def test_whole_program_loads_with_mapping_and_calls_skipped():
     assert "Start_PB" in s.inputs and "Level_Low" in s.inputs
     assert "P101_Running" not in s.inputs and s.feedbacks == ["P101_Running"]     # the plant owns it
     assert "P101_Cmd" in s.outputs and "Sim_Mode" not in s.inputs
+    assert "P101_FTS_TMR.ACC" in s.outputs and "P101_FTS_TMR" not in s.outputs   # timers show ACC and DN
 
 
 def test_energise_runs_logic_and_plant_live():
@@ -67,3 +68,57 @@ def test_bad_plant_or_scenarios_fail_at_load():
         load(FILES, "devices: [")
     with pytest.raises(ScenarioError):
         load(FILES, PLANT, "SCENARIO T\n  PRESS A")
+
+
+@pytest.fixture
+def web():
+    import app as gui
+    from gui import ENERGISE
+    gui.app.config["TESTING"] = True
+    ENERGISE.clear()
+    with gui.app.test_client() as c:
+        yield c
+    ENERGISE.clear()
+
+
+def _upload(web, files, plant=PLANT, scenarios=SCENARIOS):
+    import io
+    data = {"files": [(io.BytesIO(f.encode()), f"R{i}.L5X") for i, f in enumerate(files)],
+            "plant": plant, "scenarios": scenarios}
+    return web.post("/api/energise/load", data=data, content_type="multipart/form-data")
+
+
+def test_energise_page_and_api(web):
+    assert web.get("/energise").status_code == 200
+    assert web.post("/api/energise/step", json={}).get_json()["error"] == "load a program first"
+    j = _upload(web, FILES).get_json()
+    assert len(j["rungs"]) == 9 and "Start_PB" in j["inputs"] and j["feedbacks"] == ["P101_Running"]
+    assert j["rungs"][3]["routine"] == "Tank" and j["has_scenarios"]
+    web.post("/api/energise/step", json={"ms": 50, "writes": {"Start_PB": 1}})
+    snap = web.post("/api/energise/step", json={"ms": 1200, "writes": {"Start_PB": 0, "Level_Low": 1}}).get_json()
+    assert snap["tags"]["P101_Running"] == 1 and snap["power"][3] is True
+    bad = web.post("/api/energise/step", json={"writes": {"P101_Cmd": 1}})
+    assert bad.status_code == 400 and "written by the logic" in bad.get_json()["error"]
+    out = web.post("/api/energise/scenarios").get_json()
+    assert (out["passed"], out["total"]) == (6, 6) and out["trace"]["R3"] == [["TC-07", True], ["TC-08", True]]
+    assert web.post("/api/energise/step", json={"reset": True}).get_json()["tags"]["Auto_Mode"] == 0
+
+
+def test_energise_takes_the_routines_zip_and_reports_bad_files(web):
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for i, f in enumerate(FILES):
+            z.writestr(f"R{i}.L5X", f)
+        z.writestr("Report.txt", "not a routine")
+    r = web.post("/api/energise/load", data={"files": [(io.BytesIO(buf.getvalue()), "Routines.zip")],
+                                             "plant": PLANT}, content_type="multipart/form-data")
+    assert r.status_code == 200 and len(r.get_json()["rungs"]) == 9
+    r = _upload(web, FILES, plant="devices: [")
+    assert r.status_code == 400 and "YAML" in r.get_json()["error"]
+
+
+def test_energise_refuses_requests_from_other_sites(web):
+    r = web.post("/api/energise/step", json={}, headers={"Origin": "https://evil.example"})
+    assert r.status_code == 403

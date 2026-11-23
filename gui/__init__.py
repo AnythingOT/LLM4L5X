@@ -4,9 +4,11 @@ logic.py (rungs), project.py (the attached L5X) and udts.py (UDTs)."""
 from __future__ import annotations
 
 import base64
+import io
 import json
 import os
 import time
+import zipfile
 from urllib.parse import urlsplit
 
 from flask import Flask, Response, jsonify, render_template, request
@@ -75,6 +77,56 @@ def create_app() -> Flask:
     @app.get("/rules")
     def rules_page():
         return render_template("rules.html", page="rules")
+
+    @app.get("/energise")
+    def energise_page():
+        return render_template("energise.html", page="energise")
+
+    # ------------------------------------------------------------ energise: whole program + plant, live
+
+    @app.post("/api/energise/load")
+    def energise_load():
+        from gui import energise
+        files = []
+        for f in request.files.getlist("files"):
+            data = f.read()
+            if f.filename.lower().endswith(".zip"):
+                with zipfile.ZipFile(io.BytesIO(data)) as z:  # a Routines.zip from a requirements run
+                    files += [z.read(n) for n in z.namelist() if n.lower().endswith(".l5x")]
+            else:
+                files.append(data)
+        try:
+            ses = energise.load(files, request.form.get("plant", ""), request.form.get("scenarios", ""),
+                                float(request.form.get("scan_ms") or 10))
+        except Exception as e:  # noqa: BLE001 - a bad file is the user's to fix: say what is wrong
+            return jsonify(error=str(e)), 400
+        ENERGISE["session"] = ses
+        return jsonify(inputs=ses.inputs, outputs=ses.outputs, feedbacks=ses.feedbacks, skipped=ses.skipped,
+                       rungs=[{"routine": p.routine, "number": p.number, "text": p.text} for p in ses.places],
+                       has_scenarios=bool(ses.scenarios_text.strip()), snapshot=ses.snapshot())
+
+    @app.post("/api/energise/step")
+    def energise_step():
+        ses = ENERGISE.get("session")
+        if ses is None:
+            return jsonify(error="load a program first"), 400
+        body = request.get_json(silent=True) or {}
+        try:
+            if body.get("reset"):
+                return jsonify(ses.reset())
+            ms = min(max(float(body.get("ms") or 0), 0), 60000)
+            return jsonify(ses.step(ms, body.get("writes") or {}))
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=str(e)), 400
+
+    @app.post("/api/energise/scenarios")
+    def energise_scenarios():
+        ses = ENERGISE.get("session")
+        if ses is None:
+            return jsonify(error="load a program first"), 400
+        out = ses.run_scenarios()
+        out["trace"] = {k: [list(x) for x in v] for k, v in out["trace"].items()}
+        return jsonify(out)
 
     # ------------------------------------------------------------ chat box
 
@@ -215,6 +267,9 @@ def create_app() -> Flask:
                                "severity": r.severity, "scope": r.scope, "group": r.group} for r in lint.RULES])
 
     return app
+
+
+ENERGISE: dict = {}  # one live session: the app serves one user on this PC
 
 
 def _dispatch(text: str, mode: str | None, s: dict) -> dict:

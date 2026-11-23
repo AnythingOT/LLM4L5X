@@ -184,3 +184,18 @@ python cli.py suite --backend llamacpp --per 1 --excel suite_llamacpp.xlsx   # g
 python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
+
+## Energise: run the whole program before any controller
+
+**Energise** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run,
+with an optional plant file ([PLANT.md](PLANT.md)) and scenarios ([SCENARIOS.md](SCENARIOS.md)).
+
+- Every routine runs once per scan with `Sim_Mode = 1`. MAP_IN and MAP_OUT are not run (the plant
+  gives the feedback, field outputs stay off), and rungs that only call a subroutine are skipped.
+- An instruction the simulator does not have (PID, MSG ...) stops the load with a list: skipping it
+  would make the program look like it works.
+- Click an input to switch it 0/1 (Shift+click to type a number). Outputs and plant feedback update
+  live; timers and counters show `.ACC` and `.DN`. Rungs that are true this scan are lit.
+- **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again.
+- **Run scenarios** runs every scenario on a fresh copy and shows the verdict per requirement; the
+  live session is not touched.
