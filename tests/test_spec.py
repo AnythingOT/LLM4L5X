@@ -310,3 +310,41 @@ def test_report_shows_how_many_attempts_each_row_took(monkeypatch):
     assert "sent back: " in report
     assert "model: 2 rows, 1 needed more than one attempt (1 extra attempt)" in report
     assert "Total: 2 of 2 rows behave as expected; model: 2 rows, 1 needed more than one attempt" in report
+
+
+def test_req_ids_are_their_own_column_and_parse():
+    from inputs.spec_excel import parse_reqs
+    assert parse_reqs("R1, R3") == (("R1", "R3"), False)
+    assert parse_reqs("URS 4.2.1; R1\nR1") == (("URS 4.2.1", "R1"), False)
+    assert parse_reqs("INFRA") == ((), True) and parse_reqs("") == ((), False)
+    sheets = read_requirements(book({"S": [["Rung", "Req ID", "Requirement"], ["4", "R2, R5", "Run the fan."]]}))
+    row = sheets[0].rows[0]
+    assert (row.ref, row.reqs, row.infra) == ("4", ("R2", "R5"), False)
+
+
+def test_report_gives_a_verdict_per_requirement(client):
+    data = book({"A": [["Rung", "Req ID", "Requirement", "Rung text", "Expected rung"],
+                       ["1", "R1", "", "XIC(A)OTE(B);", "XIC(A)OTE(B);"],
+                       ["2", "R1, R2", "", "XIC(B)OTE(C);", "XIO(B)OTE(C);"],     # behaves differently
+                       ["3", "R3", "", "XIC(D)OTE(E);", ""],
+                       ["4", "INFRA", "", "XIC(F)OTE(G);", ""],
+                       ["5", "", "", "XIC(H)OTE(J);", ""],
+                       ["6", "R4", "", "XIC(K OTE(L);", ""]]})                   # does not parse
+    _, v = run(client, data)
+    z = zipfile.ZipFile(io.BytesIO(base64.b64decode(v["result"]["zip_b64"])))
+    report = z.read("Report.txt").decode()
+    assert "row 2 (1) [R1]: ok" in report
+    lines = report.split("Traceability:")[1]
+    assert "R1: FAILS TEST, 2 rows (A row 2, 3)" in lines       # one bad rung fails the whole requirement
+    assert "R2: FAILS TEST, 1 row (A row 3)" in lines
+    assert "R3: built, not tested, 1 row (A row 4)" in lines
+    assert "R4: NOT BUILT" in lines
+    assert "INFRA: 1 row serve" in lines
+    assert "1 row trace to no requirement" in lines and "A row 6" in lines
+    assert "[R1]" in z.read("A.L5X").decode()                   # the ID is on the rung in Studio 5000
+
+
+def test_no_req_column_no_requirements_section(client):
+    _, v = run(client, book({"A": [["Requirement", "Rung text"], ["", "XIC(A)OTE(B);"]]}))
+    assert "Traceability:" not in (v["result"].get("zip_b64") and zipfile.ZipFile(io.BytesIO(
+        base64.b64decode(v["result"]["zip_b64"]))).read("Report.txt").decode() or "")
