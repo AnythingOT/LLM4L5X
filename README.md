@@ -61,6 +61,7 @@ controller. Keep safety routines out of scope.
 
 ## More
 
+- [docs/HANDOVER.md](docs/HANDOVER.md) and [docs/ROADMAP.md](docs/ROADMAP.md): start here when picking the work up: how the code fits, working rules, results so far, and what is next.
 - [docs/GUIDE.md](docs/GUIDE.md): every feature in detail, rules, LogicSpec, command line.
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): repo layout, tests, the instruction test suite.
 - [docs/DESIGN.md](docs/DESIGN.md): how it works inside.
