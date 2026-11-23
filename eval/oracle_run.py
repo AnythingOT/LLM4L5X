@@ -5,8 +5,8 @@
 Every answer is right by construction, so anything that goes wrong is the tool's fault: a check that
 sends a correct answer back, a compile or simulation difference, a row the decompiler cannot express.
 Run it after changing a check, the compiler or the simulator, before trusting a real-model score.
-RETRIED must be 0; rows listed under NO SPEC are rows the decompiler cannot turn back into LogicSpec
-(known: a one-shot inside an OR branch), not tool failures.
+RETRIED must be 0; rows listed under NO SPEC are rows the decompiler cannot turn back into LogicSpec,
+not tool failures (none known in generated workbooks).
 """
 
 from __future__ import annotations

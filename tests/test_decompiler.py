@@ -32,6 +32,9 @@ def test_ote_in_output_branch_becomes_energize():
     ("XIC(A)[,XIC(B) ]OTE(C);", "empty"),
     ("XIC(A)TON(T1,?,?);", "preset"),
     ("XIC(A)JSR(Sub,0);", "outputs only"),
+    ("XIC(A)[XIC(B) ONS(S) ,XIC(C) ]OTE(X);", "start of the power path"),
+    ("XIC(A)ONS(S)ONS(T)OTE(X);", "more than one ONS"),
+    ("[ONS(S) ,XIC(C) ]OTE(X);", "nothing to its left"),
 ])
 def test_not_convertible(text, why):
     stmts, reason = try_decompile(parse_rung(text))
@@ -53,3 +56,15 @@ def test_recompile_is_identical():
     src = "[XIC(a) [XIC(b) ,XIO(c) ] ,GRT(n,5) ]XIO(d)OTE(q);"
     spec = dec(src)
     assert compile_spec(spec, comments=False).texts == [src]
+
+
+def test_ons_at_start_of_or_leg():
+    # the shape the compiler writes for RISE as the first item of an OR leg (test workbook "Parallel" rows)
+    src = "[LEQ(PT,Cycles) ,XIC(Manual) ONS(S) ,NEQ(SP,5) ]TOF(T1,2000,0);"
+    assert dec(src, {"T1": 2000}) == "IF PT <= Cycles OR RISE(Manual) OR SP <> 5 THEN OFF_DELAY_TIMER(T1, 2s);"
+    assert dec("[XIC(A) XIC(B) ONS(S) XIO(C) ,XIC(D) ]OTE(X);") == "X := (RISE(A AND B) AND NOT C) OR D;"
+
+
+def test_ons_in_or_leg_recompiles_to_the_same_shape():
+    back = compile_spec(dec("[XIC(a) ONS(s) ,XIC(b) ]OTE(q);"), comments=False).texts
+    assert len(back) == 1 and back[0].startswith("[XIC(a) ONS(") and back[0].endswith(",XIC(b) ]OTE(q);")
