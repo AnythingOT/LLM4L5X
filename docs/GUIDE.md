@@ -104,13 +104,13 @@ This replaces two archived repos: [LLM4UDT](https://github.com/AnythingOT/LLM4UD
 
 Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes the routine name) and **each row one requirement**:
 
-| Rung | Requirement | Rung comment | Rung text |
-|---|---|---|---|
-| 1 | Start the pump with the start button and keep it running until the stop button is pressed or the pump faults. | | |
-| 2 | Turn on the pump running lamp while the pump runs. | Running lamp | |
-| 5 | | Hand-written | `XIC(Pump_Run)XIO(Pump_Fault)OTE(Pump_Healthy);` |
+| Rung | Req ID | Requirement | Rung comment | Rung text |
+|---|---|---|---|---|
+| 1 | R1 | Start the pump with the start button and keep it running until the stop button is pressed or the pump faults. | | |
+| 2 | R1 | Turn on the pump running lamp while the pump runs. | Running lamp | |
+| 5 | INFRA | | Hand-written | `XIC(Pump_Run)XIO(Pump_Fault)OTE(Pump_Healthy);` |
 
-- **Requirement** goes to the model, like the chat box. **Rung text** (neutral or ASCII), when filled, is used as written and the model is not asked. **Rung comment** empty = the requirement becomes the rung comment. **Rung** is your reference for the report. Header names are matched loosely (*Description*, *Functional description*, *No.* ...).
+- **Requirement** goes to the model, like the chat box. **Rung text** (neutral or ASCII), when filled, is used as written and the model is not asked. **Rung comment** empty = the requirement becomes the rung comment. **Rung** is your row reference for the report. **Req ID** (optional) links the row to the requirement(s) it implements: `R1`, or `R1, R3`; several rows may share one ID, and `INFRA` marks a row that serves no requirement on its own (I/O mapping, first scan). The IDs go into the rung comment, so Studio 5000 shows them, and Report.txt ends with a **Traceability** section: one verdict per requirement (*passes test*, *FAILS TEST*, *built, not tested*, *NOT BUILT*; one bad rung fails the whole requirement) and a warning listing rows that trace to none. Header names are matched loosely (*Description*, *Functional description*, *No.* ...).
 - Rows run one by one in the background; each appears drawn as it finishes, and **Stop after this row** keeps what is done. Tags created by a row are known to the rows below it. A row that fails (no valid logic, a tag type clash, an import error) is reported and left out; the rest still build.
 - Output: `SheetName.L5X` (Import Routine), or `Routines.zip` with one routine per sheet and `Report.txt`. The rung rules run on each whole routine, so a timer used by two rows is caught.
 - Sample: *Requirements Excel sample* in the examples list (next to Send). Attach your project first so the rows use its tag names.

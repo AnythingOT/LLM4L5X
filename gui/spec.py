@@ -54,7 +54,8 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
             with job.lock:
                 job.label = f"{sheet.routine}: row {row.line}"
             ev = _row(client, row, s, project_types, {**earlier, **new_tags}, catalog)
-            ev.update(sheet=sheet.routine, line=row.line, ref=row.ref, request=row.request or row.logic)
+            ev.update(sheet=sheet.routine, line=row.line, ref=row.ref, request=row.request or row.logic,
+                      reqs=list(row.reqs), infra=row.infra)
             if ev["ok"]:
                 ok += 1
                 if row.expected:
@@ -77,7 +78,8 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
             if row.expected and ev["ok"]:
                 verdict = ", matches expected" if ev["match"] else f", DIFFERS from expected: {ev['match_why']}"
             tries = f" ({ev['attempts']} attempts)" if ev.get("attempts", 1) > 1 else ""
-            report.append(f"  row {row.line}{f' ({row.ref})' if row.ref else ''}: "
+            report.append(f"  row {row.line}{f' ({row.ref})' if row.ref else ''}"
+                          f"{' [' + ', '.join(row.reqs) + ']' if row.reqs else ''}: "
                           + ("ok, " + _n(len(ev["rungs"]), "rung") + verdict if ev["ok"] else f"FAILED: {ev['error']}")
                           + tries)
             report += [f"      sent back: {_short(e)}" for e in ev.get("retries", [])]
@@ -119,6 +121,7 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
     report.append("Total: " + (f"{sum(1 for e in scored_all if e.get('match'))} of {len(scored_all)} rows behave "
                                f"as expected; " if scored_all else "") + (_effort(by_model) if by_model else
                                                                          "no rows written by the model"))
+    report += trace_report(job.events)
     files = {e["file"]: e.pop("_l5x") for e in built if e["file"]}
     out = {"kind": "spec_done", "filename": filename, "sheets": built, "cancelled": job.cancel.is_set()}
     if len(files) == 1 and not job.cancel.is_set() and all(e["failed"] == 0 for e in built):
@@ -131,6 +134,39 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
                 z.writestr(name, text.encode("utf-8"))
             z.writestr("Report.txt", "\r\n".join(report).encode("utf-8"))
         out.update(download="Routines.zip", zip_b64=base64.b64encode(buf.getvalue()).decode("ascii"))
+    return out
+
+
+def trace_report(events: list[dict]) -> list[str]:
+    """Verdict per requirement, worst row first: a requirement built from five rungs is only as good as
+    its worst rung. Empty when the workbook has no Req ID column in use."""
+    rows = [e for e in events if "line" in e and "ok" in e]
+    if not any(e.get("reqs") or e.get("infra") for e in rows):
+        return []
+    by_req: dict[str, list[dict]] = {}
+    for e in rows:
+        for r in e.get("reqs") or []:
+            by_req.setdefault(r, []).append(e)
+    out = ["", "Traceability:"]
+    for req, es in by_req.items():
+        if not all(e["ok"] for e in es):
+            verdict = "NOT BUILT"
+        elif any(row_has_expected(e) and not e.get("match") for e in es):
+            verdict = "FAILS TEST"
+        elif all(row_has_expected(e) for e in es):
+            verdict = "passes test"
+        else:
+            verdict = "built, not tested"
+        where = "; ".join(f"{s} row {', '.join(str(e['line']) for e in es if e['sheet'] == s)}"
+                          for s in dict.fromkeys(e["sheet"] for e in es))
+        out.append(f"  {req}: {verdict}, {_n(len(es), 'row')} ({where})")
+    infra = [e for e in rows if e.get("infra") and not e.get("reqs")]
+    if infra:
+        out.append(f"  INFRA: {_n(len(infra), 'row')} serve no requirement on their own")
+    orphans = [e for e in rows if not e.get("reqs") and not e.get("infra")]
+    if orphans:
+        out.append(f"  warning: {_n(len(orphans), 'row')} trace to no requirement (give a Req ID or mark INFRA): "
+                   + "; ".join(f"{e['sheet']} row {e['line']}" for e in orphans))
     return out
 
 
@@ -195,6 +231,8 @@ def _row(client, row, s, project_types, new_tags, catalog) -> dict:
         ev["error"] = "; ".join(f"rung {i.rung + 1}: {i.message}" for i in errors(issues))
         return _done(ev, t0)
     comment = row.comment or (row.request if not row.logic else None)
+    if row.reqs:  # Studio 5000 shows it on the rung: trace a rung back to its requirement without the workbook
+        comment = f"[{', '.join(row.reqs)}] {comment or ''}".rstrip()
     if comment:
         parsed = [replace(parsed[0], comment=comment), *parsed[1:]]
     ev.update(ok=True, _rungs=parsed, _tags={n: t for n, t in tags.items() if n not in project_types})
