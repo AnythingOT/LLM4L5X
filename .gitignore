@@ -2,3 +2,11 @@ __pycache__/
 .pytest_cache/
 .venv/
 *.L5X.out
+
+# generated output: client logic and requirements, never committed
+/output/
+/*.L5X
+/*.zip
+/*.xlsx
+/Report.txt
+.env
