@@ -18,6 +18,7 @@ if not exist ".venv\Scripts\python.exe" (
 )
 
 echo Starting LLM4L5X at http://127.0.0.1:5000  (close this window to stop)
+echo Keep the model server on this PC: never start llama-server or Ollama with --host 0.0.0.0
 start "" http://127.0.0.1:5000
 ".venv\Scripts\python.exe" app.py
 exit /b 0

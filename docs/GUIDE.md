@@ -36,6 +36,8 @@ Pick where the model runs on the ⚙️ Settings page (or click the model badge 
 | **llama.cpp server**, direct GGUF | `llama-server -m model.gguf --port 8080` (Windows CPU build from llama.cpp's GitHub releases, GGUF from Hugging Face) | **grammar-constrained**: every answer is valid LogicSpec using only allowed tag names |
 | OpenAI-compatible (LM Studio, Jan, vLLM) | start its local server | free text, as Ollama |
 
+Keep the model server on this PC. llama-server and Ollama listen on `127.0.0.1` by default: do not add `--host 0.0.0.0` (or set `OLLAMA_HOST=0.0.0.0`). That opens the model to the whole network, and every request carries your tag names and requirements.
+
 ### The setup that worked for us
 
 **Qwen3.6-35B-A3B, `UD-Q4_K_M` GGUF ([unsloth/Qwen3.6-35B-A3B-GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF), about 22 GB) on llama.cpp's `llama-server`, CPU only, 64 GB RAM, no GPU.**
