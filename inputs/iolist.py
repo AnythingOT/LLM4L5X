@@ -233,3 +233,68 @@ def plant_yaml(iol: IOList) -> str:
     if rest:
         lines.append(f"# not recognised, add by hand if they need simulating: {', '.join(rest)}")
     return "\n".join(lines) + "\n"
+
+
+# ---------------------------------------------------------------- mapping routines
+
+SIM_MODE = "Sim_Mode"
+CALLS = ("XIO(Sim_Mode)JSR(MAP_IN,0);  first rung of MainRoutine: field inputs, skipped in simulation",
+         "JSR(MAP_OUT,0);  last rung of MainRoutine: field outputs, forced off in simulation")
+
+
+@dataclass
+class Mapping:
+    map_in: list = field(default_factory=list)  # Rungs: raw input -> mapped tag
+    map_out: list = field(default_factory=list)  # Rungs: mapped tag -> raw output
+    tags: list = field(default_factory=list)  # TagDefs: mapped tags + Sim_Mode
+    skipped: list[str] = field(default_factory=list)  # points with no address
+
+
+def mapping(iol: IOList) -> Mapping:
+    """Logic uses only mapped tags; two routines connect them to the field.
+
+    MAP_IN is called with XIO(Sim_Mode)JSR(MAP_IN,0): while it is not scanned it writes nothing, so a
+    plant model (or a test) owns the mapped inputs. An OTE inside it would write 0 every scan in
+    simulation instead. MAP_OUT always runs and forces every physical output off in Sim_Mode, so a
+    simulation on real hardware cannot move a field device. Analog values are moved as they arrive:
+    scale on the card or add the scaling in MAP_IN by hand.
+    """
+    from core.compiler import TagDef
+    from core.rung import parse_rung
+    if iol.errors:
+        raise IOListError(f"fix the I/O list first ({len(iol.errors)} errors), e.g. {iol.errors[0]}")
+    m = Mapping()
+    m.tags.append(TagDef(SIM_MODE, "BOOL", description="1 = simulation: field inputs not read, outputs off"))
+    for p in iol.points:
+        if not p.address:
+            m.skipped.append(p.tag)
+            continue
+        analog = p.type in ("AI", "AO")
+        rng = f" {p.lo:g}..{p.hi:g} {p.units}".rstrip() if p.lo is not None and p.hi is not None else ""
+        m.tags.append(TagDef(p.tag, "REAL" if analog else "BOOL", description=(p.desc + rng).strip() or None))
+        note = f"{p.desc or p.tag} ({p.address}){' NC: 1 = healthy' if p.nc else ''}"
+        if p.type == "DI":
+            text, target = f"XIC({p.address})OTE({p.tag});", m.map_in
+        elif p.type == "AI":
+            text, target = f"MOV({p.address},{p.tag});", m.map_in
+        elif p.type == "DO":
+            text, target = f"XIC({p.tag})XIO({SIM_MODE})OTE({p.address});", m.map_out
+        else:
+            text, target = (f"[XIO({SIM_MODE}) MOV({p.tag},{p.address}) ,XIC({SIM_MODE}) CLR({p.address}) ];",
+                            m.map_out)
+        target.append(parse_rung(text, note))
+    return m
+
+
+def mapping_l5x(iol: IOList, **routine_kw) -> dict[str, str]:
+    """{"MAP_IN.L5X": ..., "MAP_OUT.L5X": ...}; each routine carries the tags it uses."""
+    from core.rung import base_tag, is_literal, walk
+    from l5x.writer import write_routine
+    m = mapping(iol)
+    out = {}
+    for name, rungs in (("MAP_IN", m.map_in), ("MAP_OUT", m.map_out)):
+        if rungs:
+            used = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
+            out[f"{name}.L5X"] = write_routine(rungs, [t for t in m.tags if t.name in used], routine=name,
+                                               **routine_kw)
+    return out
