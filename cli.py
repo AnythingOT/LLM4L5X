@@ -172,7 +172,8 @@ def cmd_validate(a) -> int:
 
 def _client(a):
     from inputs.llm import make_client
-    return make_client(a.backend, a.url, a.model, think=False if a.no_think else None)
+    return make_client(a.backend, a.url, a.model, think=False if a.no_think else None,
+                       allow_remote=getattr(a, "allow_remote", False))
 
 
 def cmd_ask(a) -> int:
@@ -225,7 +226,8 @@ def cmd_probe(a) -> int:
     import urllib.error
     import urllib.request
     from inputs.gbnf import build_gbnf
-    url = (a.url or "http://127.0.0.1:8080").rstrip("/") + "/v1/chat/completions"
+    from inputs.llm import check_url
+    url = check_url((a.url or "http://127.0.0.1:8080").rstrip("/"), a.allow_remote) + "/v1/chat/completions"
     ask = [{"role": "user", "content": "Write LogicSpec: turn on Motor_Run while Start_PB is on."}]
     spec_grammar = build_gbnf({"Motor_Run": "BOOL", "Start_PB": "BOOL"}, allow_new_tags=False)
     off = {"chat_template_kwargs": {"enable_thinking": False}}
@@ -345,6 +347,8 @@ def main(argv: list[str] | None = None) -> int:
                        help="ollama | llamacpp (llama-server, grammar-constrained) | openai (LM Studio etc.)")
         p.add_argument("--model", default="phi4-mini", help="model name (default phi4-mini; llama-server ignores it)")
         p.add_argument("--url", "--ollama", dest="url", help="server address (default: the backend's usual port)")
+        p.add_argument("--allow-remote", action="store_true",
+                       help="allow a model server on another computer (your tags and requests are sent there)")
         p.add_argument("--no-think", action="store_true", help="ask thinking models (Qwen3 etc.) not to think")
 
     ak = sub.add_parser("ask", help="plain English -> LogicSpec -> rungs, with a local model via Ollama")
@@ -366,6 +370,7 @@ def main(argv: list[str] | None = None) -> int:
 
     pr = sub.add_parser("probe", help="check grammar-constrained answers on a llama-server (5 short requests)")
     pr.add_argument("--url", help="default http://127.0.0.1:8080")
+    pr.add_argument("--allow-remote", action="store_true", help="allow a server on another computer")
     pr.set_defaults(fn=cmd_probe)
 
     su = sub.add_parser("suite", help="instruction suite (series/parallel/nested): --self-test or --model")

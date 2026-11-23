@@ -5,10 +5,12 @@ Single-user local tool: the attached file lives in memory and is forgotten when 
 
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 from dataclasses import dataclass, field
 
 import lint
-from inputs.llm import BACKENDS, make_client
+from inputs.llm import BACKENDS, is_local_url, make_client
 from l5x.reader import Project
 from l5x.xref import cross_reference
 
@@ -54,6 +56,7 @@ DEFAULTS = {
     "prefix": "L4X",
     "backend": "ollama",        # ollama | llamacpp | openai
     "llm_url": "",              # empty = the backend's usual local address
+    "allow_remote_model": False,  # a model server on another computer: only when ticked on purpose
     "model": "phi4-mini",
     "think": "default",         # default | off
     "context": 16384,           # tokens the model sees (Ollama); llama.cpp: -c at server start
@@ -80,6 +83,7 @@ def settings(raw: dict | None) -> dict:
         if s[k] not in allowed:
             s[k] = DEFAULTS[k]
     s["comments"] = bool(s["comments"])
+    s["allow_remote_model"] = s["allow_remote_model"] is True  # "false", 1, "yes" do not opt in
     try:
         s["context"] = min(max(int(s["context"]), 2048), 262144)
     except (TypeError, ValueError):
@@ -95,7 +99,7 @@ def settings(raw: dict | None) -> dict:
 def llm(s: dict):
     """The model client the settings describe (tests replace this)."""
     return make_client(s["backend"], s["llm_url"] or None, s["model"], think=False if s["think"] == "off" else None,
-                       context=s["context"])
+                       context=s["context"], allow_remote=s["allow_remote_model"])
 
 
 def model_info(s: dict, client) -> dict:
@@ -105,4 +109,14 @@ def model_info(s: dict, client) -> dict:
 
 
 def llm_hint(s: dict, client) -> str:
-    return f"{BACKENDS[s['backend']]['label']}, model '{s['model'] or 'default'}' at {client.url} (change in ⚙️ Settings)."
+    hint = f"{BACKENDS[s['backend']]['label']}, model '{s['model'] or 'default'}' at {client.url} (change in ⚙️ Settings)."
+    return f"{hint} {remote_note(client)}".rstrip()
+
+
+def remote_note(client) -> str:
+    """Said wherever the model is named, when it is not on this PC: data leaving must never be silent."""
+    url = getattr(client, "url", "") or ""
+    if not url or is_local_url(url):
+        return ""
+    plain = " unencrypted (http)" if url.startswith("http:") else ""
+    return f"⚠ Model server on another computer: project data is sent to {urlsplit(url).hostname}{plain}."

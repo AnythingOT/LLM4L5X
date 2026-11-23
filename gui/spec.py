@@ -40,6 +40,8 @@ def _run(job: jobs.Job, sheets: list[Sheet], s: dict, filename: str) -> dict:
     catalog = proj.catalog() if proj else None
     client = state.llm(s)
     built, report = [], [f"Requirements: {filename}", ""]
+    if (note := state.remote_note(client)):
+        report[1:1] = [note]
     # every sheet goes into the same program, so tags made by one sheet are known to the next:
     # one Fill_Valve type, one L4X_ONS_1, not one per routine
     earlier: dict = {}  # name -> TagDef, created by the sheets above

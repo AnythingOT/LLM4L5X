@@ -362,9 +362,18 @@ def _float(v) -> float | None:
         return None
 
 
-def read_l5x(source: str | bytes | Path) -> Project:
+# huge_tree lifts lxml's own limits so big real exports load; this cap keeps a corrupt or hostile file
+# from taking all memory. A full export of a large controller is tens of MB.
+MAX_L5X_BYTES = 200 * 1024 * 1024
+
+
+def read_l5x(source: str | bytes | Path, max_bytes: int = MAX_L5X_BYTES) -> Project:
     parser = etree.XMLParser(resolve_entities=False, no_network=True, huge_tree=True, remove_blank_text=True)
-    if isinstance(source, Path) or (isinstance(source, str) and not source.lstrip().startswith("<")):
+    is_path = isinstance(source, Path) or (isinstance(source, str) and not source.lstrip().startswith("<"))
+    size = Path(source).stat().st_size if is_path else len(source)
+    if size > max_bytes:
+        raise ValueError(f"L5X file is {size / 1048576:.0f} MB, above the {max_bytes / 1048576:.0f} MB limit")
+    if is_path:
         root = etree.parse(str(source), parser).getroot()
     else:
         data = source.encode("utf-8") if isinstance(source, str) else source

@@ -26,6 +26,8 @@ English ─> local model ─> LogicSpec ─> compiler ─> rungs ─> checks ─
 
 The app listens on `127.0.0.1` only, so other machines cannot reach it. Other web pages in your own browser could still send it requests, so it refuses any request that changes something unless it comes from its own page, and any request addressed to a host name other than `127.0.0.1`, `localhost` or `::1`. To serve it on your network on purpose, list the extra names in `LLM4L5X_ALLOWED_HOSTS` (comma-separated).
 
+The model server must be on this PC too: every request sends your tag names, rung comments and requirement text to it. An address that is not `localhost`, `127.x.x.x` or `::1` is refused unless **Allow a model server on another computer** is ticked in Settings (command line: `--allow-remote`); while it is, every page shows a banner naming the host, and Report.txt says so in its second line. Only `http://` and `https://` addresses are accepted. L5X files above 200 MB are refused.
+
 ## The model
 
 Pick where the model runs on the ⚙️ Settings page (or click the model badge in the header). The model list is read from the server.

@@ -14,7 +14,7 @@ const SETTINGS_KEY = 'llm4l5x.settings';
 const DEFAULTS = {
     output: 'routine', routine: 'GeneratedRoutine', program: 'MainProgram', controller: 'LLM4L5X',
     revision: '32.04', scope: 'controller', display: 'placeholder', prefix: 'L4X', comments: true,
-    backend: 'ollama', llm_url: '', model: 'phi4-mini', think: 'default', context: '16384',
+    backend: 'ollama', llm_url: '', allow_remote_model: false, model: 'phi4-mini', think: 'default', context: '16384',
     rung_format: 'neutral', disabled_rules: [],
 };
 const BACKEND_INFO = {
@@ -33,6 +33,29 @@ function loadSettings() {
     return s;
 }
 function saveSettings(s) { store.set(SETTINGS_KEY, s); }
+
+// ---------------------------------------------------------------- model server on another computer
+// Every request carries tag names, comments and requirement text: data leaving this PC is never silent.
+function isLocalUrl(url) {
+    let host;
+    try { host = new URL(url).hostname.toLowerCase(); } catch { return false; }
+    return host === 'localhost' || host === '[::1]' || host === '::1' || /^127\.\d+\.\d+\.\d+$/.test(host);
+}
+function showRemoteBanner() {
+    const s = loadSettings();
+    if (!s.llm_url || isLocalUrl(s.llm_url)) return;
+    let host;
+    try { host = new URL(s.llm_url).hostname; } catch { host = s.llm_url; }
+    const b = document.createElement('div');
+    b.className = 'remote-banner' + (s.allow_remote_model ? '' : ' blocked');
+    b.setAttribute('role', 'alert');
+    b.textContent = s.allow_remote_model
+        ? `⚠ Model server on another computer: your tags, comments and requests are sent to ${host}`
+          + (s.llm_url.startsWith('http:') ? ' unencrypted.' : '.')
+        : `Model server ${host} is not this PC and is blocked. Use 127.0.0.1, or allow it in Settings on purpose.`;
+    document.body.prepend(b);
+}
+showRemoteBanner();
 
 // ---------------------------------------------------------------- theme
 if (store.get('llm4l5x.theme', 'light') === 'dark') document.body.classList.add('dark-mode');
