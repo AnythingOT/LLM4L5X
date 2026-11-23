@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Energise{% endblock %}
+{% block bodyclass %}page{% endblock %}
+{% block body %}
+<main class="page-main">
+    <div class="page-head">
+        <h1>Energise</h1>
+        <span class="muted">Run the whole program with its plant on this PC, before any controller. Sim_Mode is on:
+            MAP_IN and MAP_OUT are not run, the plant model gives the feedback.</span>
+    </div>
+    <div class="cards">
+        <section class="card">
+            <h2>Program and plant</h2>
+            <label for="enFiles">L5X routines, a project export, or the Routines.zip from a requirements run</label>
+            <input id="enFiles" type="file" multiple accept=".L5X,.l5x,.zip" />
+            <label for="enPlant">Plant (optional): see docs/PLANT.md</label>
+            <textarea id="enPlant" rows="5" spellcheck="false" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}"></textarea>
+            <label for="enScenarios">Scenarios (optional): see docs/SCENARIOS.md</label>
+            <textarea id="enScenarios" rows="5" spellcheck="false" placeholder="SCENARIO TC-01 &quot;title&quot; REQ R1&#10;  SET Start_PB = 1&#10;  EXPECT Motor == 1 within_ms 100"></textarea>
+            <div class="btn-row"><button id="enLoad" class="btn primary">Load</button>
+                <span id="enMsg" class="muted" role="status"></span></div>
+            <ul id="enSkipped" class="muted en-list"></ul>
+        </section>
+        <section class="card" id="enLive" hidden>
+            <h2>Live</h2>
+            <div class="btn-row">
+                <button id="enRun" class="btn primary">Run</button>
+                <button id="enStep" class="btn">Step 100 ms</button>
+                <button id="enReset" class="btn">Reset</button>
+                <span class="muted">Time <b id="enTime">0</b> s</span>
+            </div>
+            <div class="en-cols">
+                <div><h3>Inputs <span class="muted">(click to change)</span></h3><table id="enInputs" class="en-tags"></table></div>
+                <div><h3>Outputs</h3><table id="enOutputs" class="en-tags"></table>
+                    <h3>Plant feedback</h3><table id="enFeedback" class="en-tags"></table></div>
+            </div>
+            <ul id="enNotes" class="en-list warn-text"></ul>
+            <div class="btn-row" id="enScenRow" hidden><button id="enScen" class="btn">Run scenarios</button>
+                <span id="enScenSum" class="muted"></span></div>
+            <pre id="enReport" class="en-report" hidden></pre>
+        </section>
+    </div>
+    <section class="card en-rungs" id="enRungsCard" hidden>
+        <h2>Rungs <span class="muted">(lit = rung true this scan)</span></h2>
+        <ol id="enRungs"></ol>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='energise.js') }}"></script>{% endblock %}
