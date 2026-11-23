@@ -1,0 +1,46 @@
+name: Valve2Pos
+version: "1.0"
+description: >
+  Two-position valve, single solenoid (spring return), open and closed limit switches.
+  Alarms if it does not reach the commanded position in time; holds until reset.
+params:
+  name: {description: instance name, e.g. XV101}
+  open_req: {default: "{name}_Open_Req", description: what asks the valve to open}
+  open_cmd: {default: "{name}_Open"}
+  open_ls: {default: "{name}_ZSO"}
+  closed_ls: {default: "{name}_ZSC"}
+  fail: {default: "{name}_Fail"}
+  reset: {default: "Reset_PB"}
+  alarm_ms: {default: 10000, description: longest allowed travel}
+  travel_ms: {default: 3000, description: plant model travel time}
+rungs:
+  - rung: "XIC({open_req})XIO({fail})OTE({open_cmd});"
+    comment: "{name}: open while requested and healthy"
+  - rung: "[XIC({open_cmd}) XIO({open_ls}) ,XIO({open_cmd}) XIO({closed_ls}) ]TON({name}_TRV_TMR,{alarm_ms},0);"
+    comment: "{name}: not in the commanded position"
+  - rung: "XIC({name}_TRV_TMR.DN)OTL({fail});"
+    comment: "{name}: failed to reach position"
+  - rung: "XIC({reset})XIO({name}_TRV_TMR.DN)OTU({fail});"
+    comment: "{name}: reset the failure"
+tags:
+  "{open_req}": BOOL
+  "{open_cmd}": BOOL
+  "{open_ls}": BOOL
+  "{closed_ls}": BOOL
+  "{fail}": BOOL
+  "{reset}": BOOL
+  "{name}_TRV_TMR": TIMER
+plant: {name: "{name}", type: valve, open_cmd: "{open_cmd}", open_ls: "{open_ls}", closed_ls: "{closed_ls}",
+        travel_ms: "{travel_ms}"}
+scenarios: |
+  SCENARIO {name}-OPEN "{name} opens and closes"
+    SET {open_req} = 1
+    EXPECT {open_ls} == 1 within_ms 5000
+    SET {open_req} = 0
+    EXPECT {closed_ls} == 1 within_ms 5000
+    EXPECT {fail} == 0
+  SCENARIO {name}-STUCK "{name} stuck alarms and drops the command"
+    SET PLANT:{name}.fault = stuck
+    SET {open_req} = 1
+    EXPECT {fail} == 1 within_ms 11000
+    EXPECT {open_cmd} == 0 within_ms 100

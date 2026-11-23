@@ -1,0 +1,54 @@
+name: Motor
+version: "1.0"
+description: >
+  Direct-on-line motor or pump. Start/stop with seal-in, run feedback, fail-to-start alarm that
+  stops the motor and holds until reset.
+params:
+  name: {description: instance name, e.g. P101}
+  start: {default: "{name}_Start_PB"}
+  stop: {default: "{name}_Stop_PB"}
+  cmd: {default: "{name}_Cmd"}
+  running: {default: "{name}_Running"}
+  fail: {default: "{name}_Fail"}
+  reset: {default: "Reset_PB"}
+  fts_ms: {default: 5000, description: how long the feedback may take}
+  start_ms: {default: 1000, description: plant model start delay}
+rungs:
+  - rung: "[XIC({start}) ,XIC({cmd}) ]XIO({stop})XIO({fail})OTE({cmd});"
+    comment: "{name}: start/stop with seal-in; a failure drops the command"
+  - rung: "XIC({cmd})XIO({running})TON({name}_FTS_TMR,{fts_ms},0);"
+    comment: "{name}: no run feedback within {fts_ms} ms"
+  - rung: "XIC({name}_FTS_TMR.DN)OTL({fail});"
+    comment: "{name}: fail to start"
+  - rung: "XIC({reset})XIO({name}_FTS_TMR.DN)OTU({fail});"
+    comment: "{name}: reset the failure"
+tags:
+  "{start}": BOOL
+  "{stop}": BOOL
+  "{cmd}": BOOL
+  "{running}": BOOL
+  "{fail}": BOOL
+  "{reset}": BOOL
+  "{name}_FTS_TMR": TIMER
+plant: {name: "{name}", type: motor, cmd: "{cmd}", running: "{running}", start_ms: "{start_ms}"}
+scenarios: |
+  SCENARIO {name}-RUN "{name} starts, runs and stops"
+    SET {start} = 1
+    WAIT 50
+    SET {start} = 0
+    EXPECT {cmd} == 1 within_ms 100
+    EXPECT {running} == 1 within_ms 3000
+    SET {stop} = 1
+    EXPECT {cmd} == 0 within_ms 100
+  SCENARIO {name}-FTS "{name} fail to start stops it and alarms"
+    SET PLANT:{name}.fault = fail_to_start
+    SET {start} = 1
+    WAIT 50
+    SET {start} = 0
+    EXPECT {fail} == 1 within_ms 6000
+    EXPECT {cmd} == 0 within_ms 100
+  SCENARIO {name}-OK "{name} normal start raises no alarm"
+    SET {start} = 1
+    WAIT 50
+    SET {start} = 0
+    EXPECT {fail} == 0 within_ms 6000 hold
