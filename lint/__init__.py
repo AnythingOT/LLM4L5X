@@ -59,14 +59,17 @@ def _run_checks(ctx: Context, enabled: set[str]) -> tuple[list[Finding], list[st
     return findings, errors
 
 
-def run(project: Project, disabled=(), catalog: Catalog | None = None) -> Report:
+def run(project: Project, disabled=(), catalog: Catalog | None = None, profile=None) -> Report:
     """All enabled rules. On a partial export (program, routine, rung) only the rung rules
     run: the others need tasks, modules and descriptions that such an export leaves out."""
-    disabled = {c.upper() for c in disabled}
+    disabled = {c.upper() for c in disabled} | (profile.disabled_rules if profile else set())
     ctx = Context.build(project, catalog)
     full = project.is_full_export
     enabled = {r.code for r in RULES if r.code not in disabled and (full or r.scope == "rung")}
     findings, errors = _run_checks(ctx, enabled)
+    if profile is not None:
+        from .profile import check_profile
+        findings += [f for f in check_profile(ctx, profile) if f.code not in disabled]
     kept, suppressed = _suppress(findings, project)
     notes = []
     if not full:
@@ -85,7 +88,7 @@ def run(project: Project, disabled=(), catalog: Catalog | None = None) -> Report
 
 
 def check_rungs(rungs: list[Rung], tag_types: dict[str, str] | None = None, catalog: Catalog | None = None,
-                disabled=()) -> list[Finding]:
+                disabled=(), profile=None) -> list[Finding]:
     """Rung rules on loose rungs (generated logic): no project needed."""
     tags = {n: TagInfo(n, t, "controller") for n, t in (tag_types or {}).items()}
     rt = RoutineInfo("Routine", "RLL", "Program",
@@ -94,8 +97,11 @@ def check_rungs(rungs: list[Rung], tag_types: dict[str, str] | None = None, cata
     ctx = Context.build(proj, catalog)
     for ref in ctx.rungs:
         ref.location = f"Rung {ref.number}"
-    disabled = {c.upper() for c in disabled}
+    disabled = {c.upper() for c in disabled} | (profile.disabled_rules if profile else set())
     findings, _ = _run_checks(ctx, {r.code for r in RULES if r.scope == "rung" and r.code not in disabled})
+    if profile is not None:
+        from .profile import check_profile
+        findings += [f for f in check_profile(ctx, profile, defined_only=False) if f.code not in disabled]
     return findings
 
 

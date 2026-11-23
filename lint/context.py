@@ -46,7 +46,10 @@ class Finding:
     @property
     def severity(self) -> str:
         from lint.rules import BY_CODE
-        return BY_CODE[self.code].severity
+        if self.code in BY_CODE:
+            return BY_CODE[self.code].severity
+        from lint.profile import PROFILE_CODES  # a company profile's own codes
+        return PROFILE_CODES[self.code][0]
 
     def to_dict(self) -> dict:
         from lint.rules import BY_CODE
