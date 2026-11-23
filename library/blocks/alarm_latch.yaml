@@ -1,0 +1,39 @@
+name: AlarmLatch
+version: "1.0"
+description: >
+  Alarm with an on-delay that latches and is reset only once its condition has cleared.
+params:
+  name: {description: the alarm tag, e.g. LT101_HH_ALM}
+  cond: {description: the condition (a BOOL)}
+  reset: {default: "Reset_PB"}
+  delay_ms: {default: 2000}
+rungs:
+  - rung: "XIC({cond})TON({name}_DLY,{delay_ms},0);"
+    comment: "{name}: condition present for {delay_ms} ms"
+  - rung: "XIC({name}_DLY.DN)OTL({name});"
+    comment: "{name}: raise and hold"
+  - rung: "XIC({reset})XIO({cond})OTU({name});"
+    comment: "{name}: reset only after the condition clears"
+tags:
+  "{name}": BOOL
+  "{cond}": BOOL
+  "{reset}": BOOL
+  "{name}_DLY": TIMER
+scenarios: |
+  SCENARIO {name}-RAISE "{name} raises after its delay and holds"
+    SET {cond} = 1
+    EXPECT {name} == 1 within_ms 2500
+    SET {cond} = 0
+    EXPECT {name} == 1 within_ms 1000 hold
+    SET {reset} = 1
+    EXPECT {name} == 0 within_ms 100
+  SCENARIO {name}-BLIP "{name} ignores a blip shorter than its delay"
+    SET {cond} = 1
+    WAIT 500
+    SET {cond} = 0
+    EXPECT {name} == 0 within_ms 3000 hold
+  SCENARIO {name}-HELD "{name} cannot be reset while the condition is present"
+    SET {cond} = 1
+    EXPECT {name} == 1 within_ms 2500
+    SET {reset} = 1
+    EXPECT {name} == 1 within_ms 500 hold
