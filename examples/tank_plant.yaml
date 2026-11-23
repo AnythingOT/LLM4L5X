@@ -1,0 +1,6 @@
+# Plant for the tank example: fill pump with run feedback, inlet valve with both limit switches.
+# Used by scenarios and the Energise page; one device per piece of equipment.
+devices:
+  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, overload: P101_OL, start_ms: 1000, stop_ms: 500}
+  - {name: XV101, type: valve, open_cmd: XV101_Open, open_ls: XV101_ZSO, closed_ls: XV101_ZSC, travel_ms: 3000}
+  - {name: AG101, type: motor, cmd: AG101_Cmd}   # agitator without feedback: nothing to simulate
