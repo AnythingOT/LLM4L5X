@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import urllib.error
 import urllib.request
+from urllib.parse import urlsplit
 from dataclasses import dataclass
 
 
@@ -123,11 +125,35 @@ class OpenAICompatClient:
         return (choices[0].get("message") or {}).get("content", "") or ""
 
 
+def is_local_url(url: str) -> bool:
+    """True for this PC only: localhost, 127.x.x.x, ::1. A LAN address is another computer."""
+    host = (urlsplit(url).hostname or "").lower()
+    if host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        return False
+
+
+def check_url(url: str, allow_remote: bool = False) -> str:
+    """Refuse what would quietly send a project off this PC: every request carries tag names, rung
+    comments and the requirement text. Another computer is allowed only on purpose."""
+    parts = urlsplit(url)
+    if parts.scheme not in ("http", "https") or not parts.hostname:
+        raise LLMError(f"model server address {url!r}: use http://host:port (for example http://127.0.0.1:11434)")
+    if not allow_remote and not is_local_url(url):
+        raise LLMError(f"model server {parts.hostname} is not this PC: your tag names, comments and requests would "
+                       f"be sent there. Use 127.0.0.1, or tick 'Allow a model server on another computer' in "
+                       f"Settings (command line: --allow-remote) if that is intended.")
+    return url
+
+
 def make_client(backend: str = "ollama", url: str | None = None, model: str = "", think: bool | None = None,
-                context: int = 16384):
+                context: int = 16384, allow_remote: bool = False):
     """context: tokens the model may see (Ollama only; llama.cpp fixes it with -c at server start)."""
     backend = backend if backend in BACKENDS else "ollama"
-    url = url or BACKENDS[backend]["url"]
+    url = check_url(url or BACKENDS[backend]["url"], allow_remote)
     if backend == "ollama":
         return OllamaClient(model=model or "phi4-mini", url=url, think=think, context=context)
     if backend == "llamacpp" and think is None:

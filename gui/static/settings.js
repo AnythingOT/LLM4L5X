@@ -3,7 +3,7 @@
 
 let settings = loadSettings();
 const fields = {
-    backend: 'setBackend', llm_url: 'setLlmUrl', think: 'setThink', context: 'setContext',
+    backend: 'setBackend', llm_url: 'setLlmUrl', allow_remote_model: 'setAllowRemote', think: 'setThink', context: 'setContext',
     rung_format: 'setRungFormat', output: 'setOutput', routine: 'setRoutine', program: 'setProgram',
     controller: 'setController', revision: 'setRevision', scope: 'setScope',
     display: 'setDisplay', prefix: 'setPrefix', comments: 'setComments',
