@@ -23,8 +23,8 @@ pinned versions, ignored output, CI with the confidential-name check), oracle ru
    *Done when* the tank scenarios pass on an emulator or bench controller unchanged.
 4. **Energise from the I/O list.** Load an I/O list: MAP routines and a proposed plant come with it.
    Add a tank level model (analog), so fill scenarios use a real level instead of set switches.
-5. **Level 2 workbooks on main.** Revive branch `harder-workbook`; drop `Flow_SP` from its extra
-   name pool (it sits next to the fixed `Flow_Setpoint` row and caused both level-2 holdout misses).
+5. ~~Level 2 workbooks on main.~~ Done: `--level 2`, with `Flow_SP` and four other near-twin names
+   removed from its pool. Next: one fresh level-2 holdout on the laptop, a seed never run with the model.
 6. **Near-name policy.** On the last attempt, a near-twin of a tag the request names (Flow_SP for
    Flow_Setpoint) fails the row instead of warning. Owner's decision: stricter vs fewer failures.
 

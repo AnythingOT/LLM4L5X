@@ -75,8 +75,9 @@ Latest real-model results (Qwen, laptop):
 | level 2, seed 23 (fresh holdout) | 70/71 | only miss: model used `Flow_SP` for the named `Flow_Setpoint` |
 
 Studio 5000 accepted an import of generated routines (owner, Nov 2026); the version and the Verify
-result were not recorded. Level 2 workbooks need the generator on the archived branch
-`harder-workbook` (PR #23 was closed without merging).
+result were not recorded. Level 2 (`--level 2`) is on main since the near-twin names were removed from
+its name pool, so a level-2 seed now gives other rows than the workbooks above: their scores do not compare
+by seed, and the next holdout needs a seed never run with the model.
 
 ## Decisions worth keeping (and why)
 
