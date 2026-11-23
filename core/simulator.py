@@ -36,6 +36,7 @@ class Simulator:
         self.rungs = rungs
         self.state: dict = dict(state or {})
         self.dt = 0  # ms elapsed this scan
+        self.power: list[bool] = []
 
     # ------------------------------------------------------------ values
 
@@ -65,8 +66,8 @@ class Simulator:
         if inputs:
             self.state.update(inputs)
         self.dt = dt_ms
-        for r in self.rungs:
-            self.series(r.body, True)
+        # whether each rung ended true this scan: the Energise page lights energised rungs
+        self.power = [self.series(r.body, True) for r in self.rungs]
         return self.state
 
     def series(self, s: Series, power: bool) -> bool:
