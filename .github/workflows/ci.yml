@@ -12,7 +12,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Confidential names must never enter the repo. The pattern lives only in the repository secret
       # CONFIDENTIAL_PATTERN (an extended regex, e.g. NAME1|NAME2). Only file names are printed, never the
@@ -33,7 +33,7 @@ jobs:
           fi
           echo "No confidential names in $(git ls-files | wc -l) tracked files."
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
