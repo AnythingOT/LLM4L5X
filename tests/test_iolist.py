@@ -97,3 +97,46 @@ def test_not_an_io_list():
         read_iolist(xlsx([["Requirement", "Rung text"], ["x", "y"]]))
     with pytest.raises(IOListError, match="not an Excel workbook"):
         read_iolist(b"plain text")
+
+
+def test_mapping_routines_follow_the_sim_mode_pattern():
+    from core.rung import format_rung
+    from inputs.iolist import mapping
+    m = mapping(read_iolist(xlsx(GOOD + [["FCV1_Out", "Valve out", "Local:4:O.Ch0Data", "AO", 0, 100, "%"],
+                                         ["Spare_9", "Spare", "", "DI"]])))
+    ins = [format_rung(r) for r in m.map_in]
+    outs = [format_rung(r) for r in m.map_out]
+    assert "XIC(Local:1:I.Data.0)OTE(P101_Running);" in ins and "MOV(Local:3:I.Ch0Data,LT101_PV);" in ins
+    assert not any("Sim_Mode" in r for r in ins)          # MAP_IN is skipped by its JSR, not by its rungs
+    assert "XIC(P101_Cmd)XIO(Sim_Mode)OTE(Local:2:O.Data.0);" in outs
+    assert any("XIC(Sim_Mode) CLR(Local:4:O.Ch0Data)" in r for r in outs)
+    assert m.map_in[0].comment == "Fill pump running (Local:1:I.Data.0)"
+    assert m.skipped == ["Spare_9"]
+    types = {t.name: t.datatype for t in m.tags}
+    assert types["LT101_PV"] == "REAL" and types["P101_Running"] == "BOOL" and types["Sim_Mode"] == "BOOL"
+    assert next(t for t in m.tags if t.name == "LT101_PV").description == "Tank level 0..100 %"
+
+
+def test_outputs_are_forced_off_in_sim_mode():
+    from core.simulator import Simulator
+    from inputs.iolist import mapping
+    m = mapping(read_iolist(xlsx(GOOD)))
+    sim = Simulator(m.map_out, {"P101_Cmd": 1})
+    sim.scan()
+    assert sim.get("Local:2:O.Data.0") == 1
+    sim.put("Sim_Mode", 1)
+    sim.scan()
+    assert sim.get("Local:2:O.Data.0") == 0                # a test on real hardware cannot run the pump
+
+
+def test_mapping_refuses_a_list_with_errors_and_writes_importable_l5x():
+    from inputs.iolist import mapping, mapping_l5x
+    from l5x.reader import read_l5x
+    with pytest.raises(IOListError, match="fix the I/O list first"):
+        mapping(read_iolist(xlsx(GOOD + [["P101_Cmd", "dup", "Local:2:O.Data.9", "DO"]])))
+    files = mapping_l5x(read_iolist(xlsx(GOOD)))
+    assert set(files) == {"MAP_IN.L5X", "MAP_OUT.L5X"}
+    p = read_l5x(files["MAP_OUT.L5X"].encode())
+    rungs = [r for rt in p.routines for r in rt.rungs]
+    assert len(rungs) == 5 and all(r.rung is not None for r in rungs)
+    assert "Sim_Mode" in files["MAP_OUT.L5X"] and "LT101_PV" not in files["MAP_OUT.L5X"]  # own tags only
