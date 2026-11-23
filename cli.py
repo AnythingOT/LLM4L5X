@@ -156,7 +156,11 @@ def cmd_validate(a) -> int:
           f"{sum(i.level == 'warning' for i in issues)} warning(s)")
     for i in issues:
         print(f"  [{i.level}] {i.where}: {i.message}")
-    rep = lint.run(p, disabled=[c.strip() for c in (a.disable or "").split(",") if c.strip()])
+    prof = None
+    if a.profile:
+        from lint.profile import load_profile
+        prof = load_profile(open(a.profile, encoding="utf-8").read())
+    rep = lint.run(p, disabled=[c.strip() for c in (a.disable or "").split(",") if c.strip()], profile=prof)
     c = rep.counts()
     print(f"\nRules: {c['critical']} critical, {c['error']} error, {c['warning']} warning, {c['info']} info"
           + (f" ({len(rep.suppressed)} suppressed by lint:disable)" if rep.suppressed else ""))
@@ -340,6 +344,7 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("file", nargs="?")
     v.add_argument("--disable", help="rule codes to skip, comma separated (e.g. INF004,INF003)")
     v.add_argument("--rules", action="store_true", help="list the rules and exit")
+    v.add_argument("--profile", help="company coding-standards profile (YAML), see docs/PROFILE.md")
     v.set_defaults(fn=cmd_validate)
 
     def llm_args(p):
