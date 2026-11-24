@@ -16,6 +16,12 @@
             <label for="tsFiles" class="btn">Load a program</label>
             <a class="btn" href="/energize" id="tsOpen" hidden>Open in Energize</a>
         </div>
+        <div class="en-pick ts-reqs-row">
+            <span id="tsReqName" class="ts-program-name">No requirements: load the instruction sheet (the
+                requirements workbook) for the traceability matrix</span>
+            <input id="tsReqFile" class="en-file" type="file" accept=".xlsx,.xlsm" />
+            <label for="tsReqFile" class="btn">Load requirements</label>
+        </div>
     </section>
 
     <div class="ts-editors ts-one">
@@ -34,17 +40,29 @@
     </div>
 
     <section class="card ts-results" id="tsResults" hidden aria-labelledby="tsSum">
-        <h2 id="tsSum"></h2>
+        <div class="ts-res-head">
+            <h2 id="tsSum"></h2>
+            <a id="tsPdf" class="btn primary" href="#" download>Download report (PDF)</a>
+            <a id="tsJson" class="btn" href="#" download>Record (JSON)</a>
+        </div>
+        <p class="muted ts-help" id="tsRunId"></p>
+        <h3>Traceability matrix</h3>
+        <table class="ts-table ts-matrix">
+            <thead><tr><th>Requirement</th><th>Text</th><th>Rungs</th><th>Test cases</th><th>Result</th></tr></thead>
+            <tbody id="tsMatrix"></tbody>
+        </table>
+        <div id="tsGapsBox" hidden><h3>Gaps</h3><ul id="tsGaps" class="ts-gaps"></ul></div>
+        <h3>Test cases</h3>
         <table class="ts-table">
             <thead><tr><th>Test case</th><th>Requirements</th><th>Result</th></tr></thead>
             <tbody id="tsCases"></tbody>
         </table>
-        <h3>By requirement</h3>
-        <table class="ts-table">
-            <thead><tr><th>Requirement</th><th>Test cases</th><th>Result</th></tr></thead>
-            <tbody id="tsTrace"></tbody>
-        </table>
         <details class="ts-report"><summary class="muted">Full report</summary><pre id="tsReport"></pre></details>
+    </section>
+
+    <section class="card ts-history" id="tsHistoryBox" hidden>
+        <h3>Earlier runs <span class="muted">kept in the runs folder, never changed</span></h3>
+        <table class="ts-table"><tbody id="tsHistory"></tbody></table>
     </section>
 </main>
 {% endblock %}

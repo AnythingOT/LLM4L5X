@@ -114,6 +114,12 @@ by seed, and the next holdout needs a seed never run with the model.
 - **Hardware testing** goes through **pylogix against Logix Emulate** (the owner has Emulate; pylogix does
   not depend on its version), with the same test cases as the simulator.
 - **Names**: Energize (manual console), Tests page, Device models, Test cases. Old `/energise` redirects.
+- **One repository** (Nov 2026): lint, UDT tools and the generator stay here; split into packages only when
+  a real need comes. L5X_Lint (still public) duplicates the rules; changes are made here.
+- **Test evidence** (#57): requirements come from the instruction sheet; a run record is written once to
+  `runs/` with SHA-256 of every input and of the tool's code; the PDF report is made from the record only,
+  marked no-modify, with the record's SHA-256 on every page. No regulation (21 CFR 11, EN 50128): an
+  open-source tool does not claim it unless someone pays for that work.
 
 ## Lessons
 

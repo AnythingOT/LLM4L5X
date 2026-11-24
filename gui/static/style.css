@@ -686,3 +686,13 @@ label.en-name { cursor: pointer; }
 .ts-editors .ts-actions { margin: 10px 0 0; }
 .dv-table td:last-child, .dv-table th:last-child { width: auto; white-space: nowrap; }
 .dv-table .ts-id .muted { font-weight: 400; }
+.ts-reqs-row { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.ts-res-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ts-res-head h2 { margin: 0 auto 0 0; }
+.ts-verdict.gap { color: var(--warn); border-color: var(--warn); }
+.ts-matrix td:nth-child(2) { min-width: 16rem; }
+.ts-gaps { margin: 0; padding-left: 18px; font-size: .84rem; color: var(--warn); }
+.ts-history { margin-top: 14px; }
+.ts-history h3 { margin: 0 0 6px; font-size: .9rem; }
+.ts-nowrap { white-space: nowrap; }
+.ts-history a { white-space: nowrap; }

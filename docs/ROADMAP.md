@@ -1,6 +1,6 @@
 # Roadmap and to-do
 
-Status 24 Nov 2026 (after #51). Each item: what, why, done when. Keep PRs small and from main.
+Status 24 Nov 2026 (after #57). Each item: what, why, done when. Keep PRs small and from main.
 
 ## Done (Nov 2026)
 
