@@ -16,9 +16,13 @@ function el(tag, cls, text) {
     return e;
 }
 
+// before a load the message goes under the files; once loaded, into the toolbar, which stays in view
 function msg(text, bad) {
-    $('enMsg').textContent = text;
-    $('enMsg').classList.toggle('err', !!bad);
+    const live = !$('enLive').hidden;
+    const box = live ? $('enLiveMsg') : $('enMsg');
+    $(live ? 'enMsg' : 'enLiveMsg').textContent = '';
+    box.textContent = text;
+    box.classList.toggle('err', !!bad);
 }
 
 async function post(url, body, form) {
@@ -104,6 +108,7 @@ function fill(id, items, make) {
 
 function build(j) {
     view = j;
+    pending = {};  // a change queued for the previous program must not reach this one
     const structNames = new Set(j.structs.map((s) => s.name));
     const isMember = (t) => structNames.has(t.split('.')[0]) && t.includes('.');
     fill('enInputs', j.inputs, inputRow);
@@ -134,7 +139,9 @@ function build(j) {
     $('enScen').hidden = !j.has_scenarios;
     $('enScenCard').hidden = true;
     const files = [...$('enFiles').files].map((f) => f.name).join(', ');
-    $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${j.outputs.length} outputs`
+    const plain = j.outputs.filter((t) => !isMember(t)).length;
+    $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${plain} outputs`
+        + (j.structs.length ? `, ${j.structs.length} timers and counters` : '')
         + (j.feedbacks.length ? `, ${j.feedbacks.length} from the plant` : '');
     document.querySelectorAll('.en-filter').forEach((f) => { f.value = ''; });
 }
@@ -197,8 +204,8 @@ function write(tag, value) {
 
 function commit(tag, input) {
     const v = Number(input.value);
-    if (input.value.trim() === '' || !Number.isFinite(v)) {
-        msg(`${tag}: ${input.value || 'nothing'} is not a number`, true);
+    if (input.value.trim() === '' || !Number.isFinite(v)) {  // a number field reads "" for "-" or "1e"
+        msg(`${tag}: type a number, then press Enter`, true);
         return;
     }
     msg('');

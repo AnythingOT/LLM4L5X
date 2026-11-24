@@ -562,6 +562,8 @@ details.order > summary { cursor: pointer; color: var(--muted); font-size: .75re
 .en-run[aria-pressed="true"] { background: var(--surface); color: var(--ink); border-color: var(--amber); }
 .en-clock { font-family: var(--mono); font-size: 1rem; min-width: 7ch; padding: 0 6px; }
 .en-summary { margin-right: auto; }
+.en-live-msg { flex-basis: 100%; order: 10; font-size: .84rem; }
+.en-live-msg:empty { display: none; }
 .en-notes { margin: 6px 0; padding-left: 18px; color: var(--warn); font-size: .84rem; }
 
 .en-bench { display: grid; grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(220px, 290px);
