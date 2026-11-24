@@ -3,6 +3,7 @@ import base64
 import io
 import time
 import zipfile
+from pathlib import Path
 
 import pytest
 from openpyxl import Workbook
@@ -281,6 +282,21 @@ def test_real_world_keeps_ordinary_rungs(text):
     from eval.test_workbook import nonsense
     assert nonsense(parse_rung(text)) is None
 
+
+
+def test_real_world_skips_a_rung_that_needs_its_own_project(tmp_path):
+    # reads and resets a timer it never times: its LogicSpec (RESET_ACC PE_Alarm_Delay) cannot compile without the
+    # source project, which used to stop the whole workbook (public corpus, Conveyor_MainProgram.L5X)
+    import random
+
+    from eval.test_workbook import real_world_sheet
+    rung = ('<Rung Number="9" Type="N"><Text><![CDATA[XIC(PE_Alarm_Delay.DN)XIC(PE_Blue)XIO(PE_Red)'
+            'RES(PE_Alarm_Delay);]]></Text></Rung>')
+    text = (Path(__file__).parent / "fixtures" / "sample_project.L5X").read_text("utf-8-sig")
+    i = text.index("</Rung>") + len("</Rung>")
+    (tmp_path / "p.L5X").write_text(text[:i] + "\n" + rung + text[i:], "utf-8")
+    rows = real_world_sheet(tmp_path, random.Random(1), 12)
+    assert rows and not any("PE_Alarm_Delay" in r[2] for r in rows)  # the other rungs still make rows
 
 def test_report_shows_how_many_attempts_each_row_took(monkeypatch):
     class Flaky(Stub):  # wrong once for Run_Lamp, then right

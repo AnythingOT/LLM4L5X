@@ -204,6 +204,8 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
   contact is green when it passes power, a coil when it is on, a rung (rails and number) when it is true.
 - **Outputs:** a bit is a lamp, a number its value. **Timers and counters** show the accumulator against
   the preset, with DN lit when done.
+- Timers and counters take their preset from the tag's data, as the controller does: an export writes
+  `TON(T,?,?)` in the rung, so the rung alone has no preset.
 - **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again. Changes made
   while a step is under way are sent with the next one, never dropped.
 - **Run scenarios** runs every scenario on a fresh copy and shows the verdict per requirement; the

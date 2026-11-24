@@ -139,3 +139,21 @@ def test_energise_takes_the_routines_zip_and_reports_bad_files(web):
 def test_energise_refuses_requests_from_other_sites(web):
     r = web.post("/api/energise/step", json={}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
+
+
+def test_timer_and_counter_presets_come_from_the_tags():
+    # an export from v36 on writes TON(T,?,?): the preset is only in the tag's data. Without it every timer
+    # had preset 0 and was done on the first scan (seed-41 Routines.zip: Purge_TMR, Batch_Done at 0.1 s)
+    from core.compiler import TagDef
+    rungs = [parse_rung(t) for t in ("XIC(Go)TON(Fill_TMR,?,?);", "XIC(Box_Eye)CTU(Box_CTR,?,?);",
+                                     "XIC(Box_CTR.DN)OTE(Batch_Done);")]
+    tags = [TagDef("Go", "BOOL"), TagDef("Box_Eye", "BOOL"), TagDef("Batch_Done", "BOOL"),
+            TagDef("Fill_TMR", "TIMER", preset=5000), TagDef("Box_CTR", "COUNTER", preset=3)]
+    s = load([write_routine(rungs, tags, routine="Main")])
+    snap = s.step(100, {"Go": 1})
+    assert snap["tags"]["Fill_TMR.DN"] == 0 and not snap["tags"]["Batch_Done"]
+    assert s.step(5000)["tags"]["Fill_TMR.DN"] == 1
+    for _ in range(3):
+        s.step(10, {"Box_Eye": 1})
+        snap = s.step(10, {"Box_Eye": 0})
+    assert snap["tags"]["Box_CTR.ACC"] == 3 and snap["tags"]["Batch_Done"]
