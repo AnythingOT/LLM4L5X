@@ -193,7 +193,12 @@ Full reference and design: [DESIGN.md](DESIGN.md).
 
 ## Command line
 
-Run from the repo folder with `.venv` active:
+Run from the repo folder with the app's Python, the one `start.bat` set up (`start.sh`:
+`~/.local/share/llm4l5x/venv`). Once per command window:
+```
+"%LOCALAPPDATA%\LLM4L5X\venv\Scripts\activate"
+```
+then:
 ```
 python cli.py compile examples\pump_station.spec -o pump.L5X
 python cli.py compile spec.txt --routine Generated --project plant.L5X --program MainProgram -o r.L5X
