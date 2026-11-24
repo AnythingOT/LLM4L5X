@@ -67,7 +67,7 @@ Ollama's `qwen3.6:35b-a3b` is the same model but untested here. If you use it, s
 2. In the GUI, describe what you want: *"Start the pump with the start button and keep it running until stop is pressed or the pump faults."*
 3. You get a plain-English read-back of what the rungs do, the rungs, the tags, the checks, **Copy** and **Download**. Check the read-back first: it says what the logic will actually do.
 
-**Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*).
+**Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*). If the request names a tag and the logic uses a look-alike in its place (`Flow_SP` for `Flow_Setpoint`), the model is sent back; if it still does it on its last attempt, the row **fails** instead of building with the wrong tag.
 
 Improve results without fine-tuning by adding examples in your plant's wording to `inputs/examples.yaml`. The most similar ones are shown to the model for each request.
 

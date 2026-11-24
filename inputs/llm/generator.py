@@ -138,6 +138,16 @@ class Generator:
                     # dropped interlock ("..., and Batch_Request is on"), which no other check would see
                     have = {_norm(u) for u in used}
                     missing = sorted(n for n in idents if _norm(n) not in have)
+                    # a near-twin used in place of a named tag (Flow_SP for Flow_Setpoint) is another tag:
+                    # the row would build and write the wrong one, so on the last attempt it fails the row
+                    named = {_norm(i) for i in idents}
+                    others = sorted({u.split(".")[0] for u in used if _norm(u.split(".")[0]) not in named})
+                    twins = {n: c[0] for n in missing
+                             if (c := difflib.get_close_matches(n, others, n=1, cutoff=0.6))}
+                    if twins:
+                        said = "; ".join(f"it names {n}, the logic uses {u}" for n, u in twins.items())
+                        raise SpecError(f"{said}: a similar name is a different tag. Use the tag names exactly "
+                                        "as the request writes them")
                     if missing and not last:
                         raise SpecError(f"the request names {', '.join(missing)} but the logic does not use "
                                         f"{'it' if len(missing) == 1 else 'them'}; every condition and "

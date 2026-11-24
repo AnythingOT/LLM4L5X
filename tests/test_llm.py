@@ -457,3 +457,30 @@ def test_a_new_output_made_of_the_request_words_passes_when_the_request_names_no
     # no project and no output named: the model has to name one, and Pump_Run is the fair pick
     m = FakeModel("Pump_Run := Start_PB;")
     assert len(Generator(m).generate("Run the pump while Start_PB is pressed.").attempts) == 1
+
+
+# ---- near-name policy (owner's decision, Nov 2026): a near-twin of a named tag fails the row
+
+def test_a_near_twin_of_a_named_tag_fails_the_row_on_the_last_attempt():
+    # level-2 seeds 17 and 23: the model wrote Flow_SP (a tag of an earlier row) for the named Flow_Setpoint
+    req = "When Flow_PV is above Flow_Setpoint, turn on High_Flow."
+    m = FakeModel(*["High_Flow := Flow_PV > Flow_SP;"] * 5)
+    r = Generator(m).generate(req, known_tags={"Flow_SP": "REAL", "Flow_PV": "REAL", "High_Flow": "BOOL"})
+    assert r.error and "it names Flow_Setpoint, the logic uses Flow_SP" in r.error
+    assert not r.spec  # nothing is built: a row that writes the wrong tag must not look done
+
+
+def test_the_model_is_told_which_twin_it_used_and_can_correct_it():
+    req = "When Flow_PV is above Flow_Setpoint, turn on High_Flow."
+    m = FakeModel("High_Flow := Flow_PV > Flow_SP;", "High_Flow := Flow_PV > Flow_Setpoint;")
+    r = Generator(m).generate(req, known_tags={"Flow_SP": "REAL", "Flow_PV": "REAL", "High_Flow": "BOOL"})
+    assert "the logic uses Flow_SP" in m.calls[1][-1]["content"]
+    assert not r.error and "Flow_Setpoint" in r.spec and len(r.attempts) == 2
+
+
+def test_a_named_tag_left_out_with_no_twin_still_only_warns_on_the_last_attempt():
+    # not a substitution, so not this policy: the dropped name is reported, the row builds as before
+    m = FakeModel(*["Lamp := Switch_A;"] * 5)
+    r = Generator(m).generate("Turn on Lamp when Switch_A and Door_Closed are on.")
+    assert r.spec and not r.error
+    assert any("names Door_Closed, which the logic does not use" in w for w in r.warnings)
