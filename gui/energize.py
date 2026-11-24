@@ -92,10 +92,13 @@ class Session:
         return {"now_ms": be.now_ms, "tags": tags, "power": list(be.sim.power), "flow": list(be.sim.flow),
                 "notes": be.plant.notes() if be.plant else []}
 
+    def results(self) -> list:
+        """Every test case on a fresh program and device models: the live session is left as it is."""
+        return run_scenarios(parse_scenarios(self.scenarios_text), self._new_backend)
+
     def run_scenarios(self) -> dict:
         """Every scenario on a fresh program and plant: the live session is left as it is."""
-        scs = parse_scenarios(self.scenarios_text)
-        results = run_scenarios(scs, self._new_backend)
+        results = self.results()
         return {"passed": sum(r.passed for r in results), "total": len(results),
                 "report": report(results), "trace": trace(results),
                 "results": [{"id": r.id, "title": r.title, "reqs": list(r.reqs), "passed": r.passed,

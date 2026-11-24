@@ -73,10 +73,12 @@ def test_bad_plant_or_scenarios_fail_at_load():
 
 
 @pytest.fixture
-def web():
+def web(tmp_path):
     import app as gui
     from gui import ENERGIZE
+    from scenario.evidence import RunStore
     gui.app.config["TESTING"] = True
+    gui.app.config["RUNS"] = RunStore(tmp_path / "runs")  # never the real runs/ folder
     ENERGIZE.clear()
     with gui.app.test_client() as c:
         yield c

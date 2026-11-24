@@ -57,6 +57,9 @@ def _foreign(req) -> str | None:
 def create_app() -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD
+    # test run records (evidence): one file each, written once, next to the app unless told otherwise
+    from scenario.evidence import ROOT, RunStore
+    app.config["RUNS"] = RunStore(os.environ.get("LLM4L5X_RUNS") or ROOT / "runs")
 
     @app.before_request
     def _only_this_app():
@@ -124,16 +127,20 @@ def create_app() -> Flask:
 
     @app.post("/api/energize/load")
     def energize_load():
-        files = []
+        files, file_names = [], []
         for f in request.files.getlist("files"):
             data = f.read()
             if f.filename.lower().endswith(".zip"):
                 with zipfile.ZipFile(io.BytesIO(data)) as z:  # a Routines.zip from a requirements run
-                    files += [z.read(n) for n in z.namelist() if n.lower().endswith(".l5x")]
+                    for n in z.namelist():
+                        if n.lower().endswith(".l5x"):
+                            files.append(z.read(n))
+                            file_names.append(f"{f.filename}/{n}")
             else:
                 files.append(data)
+                file_names.append(f.filename)
         before = dict(ENERGIZE)
-        ENERGIZE.update(files=files, names=[f.filename for f in request.files.getlist("files")])
+        ENERGIZE.update(files=files, file_names=file_names, names=[f.filename for f in request.files.getlist("files")])
         for field_, key in (("plant", "devices"), ("scenarios", "tests")):  # optional here; the Tests page sets them
             if field_ in request.form:
                 ENERGIZE[key] = request.form[field_]
@@ -151,7 +158,7 @@ def create_app() -> Flask:
         ses = ENERGIZE.get("session")
         out = _loaded(ses) if ses is not None else {"loaded": False}
         out.update(device_text=ENERGIZE.get("devices", ""), test_text=ENERGIZE.get("tests", ""),
-                   device_list=_device_list(ENERGIZE.get("devices", "")))
+                   device_list=_device_list(ENERGIZE.get("devices", "")), requirements=_req_info())
         return jsonify(out)
 
     def _device_list(text: str) -> list[dict]:
@@ -224,16 +231,72 @@ def create_app() -> Flask:
                 return jsonify(error=str(e)), 400
         return jsonify(devices=n_dev, tests=n_tc, loaded=bool(ENERGIZE.get("session")))
 
+    def _req_info() -> dict | None:
+        book = ENERGIZE.get("reqbook")
+        if not book:
+            return None
+        from scenario.evidence import requirements_from_workbook
+        return {"name": book[0], "count": len(requirements_from_workbook(book[1]))}
+
+    @app.post("/api/tests/requirements")
+    def tests_requirements():
+        """The user requirements workbook (the instruction sheet): where the requirements come from."""
+        from scenario.evidence import requirements_from_workbook
+        f = request.files.get("file")
+        if f is None:
+            return jsonify(error="no file"), 400
+        data = f.read()
+        try:
+            reqs = requirements_from_workbook(data)
+        except Exception as e:  # noqa: BLE001 - a workbook that cannot be read: say why
+            return jsonify(error=f"{f.filename}: {e}"), 400
+        if not reqs:
+            return jsonify(error=f"{f.filename}: no requirement rows found"), 400
+        ENERGIZE["reqbook"] = (f.filename, data)
+        return jsonify(_req_info())
+
     @app.post("/api/tests/run")
     def tests_run():
+        """Run every test case, keep the evidence (runs/), and answer with the matrix and results."""
+        from scenario import report
+        from scenario.evidence import run_record
         ses = ENERGIZE.get("session")
         if ses is None:
             return jsonify(error="load a program first"), 400
         if not ses.scenarios_text.strip():
             return jsonify(error="no test cases yet: write them and save"), 400
-        out = ses.run_scenarios()
-        out["trace"] = {k: [list(x) for x in v] for k, v in out["trace"].items()}
-        return jsonify(out)
+        results = ses.results()
+        names = ENERGIZE.get("file_names") or ENERGIZE.get("names") or []
+        record = run_record(program=list(zip(names, ENERGIZE["files"])), devices=ENERGIZE.get("devices", ""),
+                            tests=ENERGIZE.get("tests", ""), results=results,
+                            requirements=ENERGIZE.get("reqbook"), scan_ms=ses.scan_ms)
+        app.config["RUNS"].save(record)
+        s = record["summary"]
+        from scenario import trace
+        return jsonify(passed=s["passed"], total=s["test_cases"], report=report(results), run_id=record["id"],
+                       trace={k: [list(x) for x in v] for k, v in trace(results).items()},
+                       summary=s, matrix=record["matrix"], gaps=record["gaps"], results=record["results"])
+
+    @app.get("/api/tests/runs")
+    def tests_runs():
+        return jsonify(runs=app.config["RUNS"].list())
+
+    @app.get("/api/tests/runs/<run_id>/report.pdf")
+    def tests_report(run_id):
+        from scenario.report_pdf import build_pdf
+        record = app.config["RUNS"].get(run_id)
+        if record is None:
+            return jsonify(error="no such run"), 404
+        return Response(build_pdf(record), mimetype="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="Test report {run_id}.pdf"'})
+
+    @app.get("/api/tests/runs/<run_id>/record.json")
+    def tests_record(run_id):
+        record = app.config["RUNS"].get(run_id)
+        if record is None:
+            return jsonify(error="no such run"), 404
+        return Response(json.dumps(record, ensure_ascii=False, indent=1), mimetype="application/json", headers={
+            "Content-Disposition": f'attachment; filename="Test record {run_id}.json"'})
 
     # ------------------------------------------------------------ chat box
 

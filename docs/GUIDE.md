@@ -246,9 +246,27 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 
 - **Test cases** set inputs, wait and expect outputs, each tied to a requirement ID. Format:
   [SCENARIOS.md](SCENARIOS.md) (the file format still says `SCENARIO`).
-- **Save** checks them and keeps them; **Run tests** saves what is on the screen, runs every test case on a
-  fresh copy of the program, and shows pass or fail per test case and per requirement. The live Energize
-  session is not touched.
+- **Load requirements**: the instruction sheet (the requirements workbook the program was built from).
+  A requirement is a Req ID with the text of its rows; a row with no Req ID is a requirement of its own
+  ("Pump row 6"); INFRA rows serve none. Without it, the requirements are the Req IDs the rungs and test
+  cases name.
+- **Save** checks the test cases and keeps them; **Run tests** saves what is on the screen, runs every test
+  case on a fresh copy of the program, and shows:
+  - the **traceability matrix**: each requirement, its rungs (a generated rung carries its Req IDs in its
+    comment, `[R1, R3] ...`), its test cases and the result: Pass, Fail, No test, Not built;
+  - the **gaps**: requirements with no test case or no rung, Req IDs the workbook does not have, test cases
+    tied to no requirement, rungs that serve no requirement;
+  - each test case, and why a failed one failed.
+- **Evidence**: every run is kept as a record in the `runs` folder, one file each, never changed: every
+  step with what was expected and what was read and when, and the SHA-256 of every input (program files,
+  requirements, device models, test cases) and of the tool's own code. Two runs on different inputs never
+  look the same.
+- **Download report (PDF)**: made from the record; marked "no changes" for PDF readers, and every page prints
+  the record's SHA-256, so a report can be checked against its record. **Record (JSON)** is the record
+  itself. Earlier runs are listed with their reports.
+- What a report is: evidence from the scan simulator on this PC, not a test of the controller, and not a
+  validated record under any regulation. It says so on its first page.
+- The live Energize session is not touched by a run.
 - Outputs that need an answer from the machine get it from the device models (next section).
 - Text not saved yet is kept if you leave the page, and shown again when you come back.
 
