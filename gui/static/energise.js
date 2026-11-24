@@ -1,11 +1,29 @@
-// Energise page: load a program + plant, drive inputs, watch outputs and energised rungs.
-// All text goes in with textContent: tag names and rung text come from files.
+// Energise page: load a program + plant, drive inputs, watch outputs and the ladder light up.
+// All text goes in with textContent: tag names and rung text come from files. The only markup inserted
+// is the rung drawings, which the server builds from the rung with every text escaped (explain/ladder.py).
 'use strict';
 
 let running = null;  // interval id while Run is on
 let busy = false;
+let view = null;     // what the last load returned
+let typing = null;   // the number field being edited: live values must not overwrite it
+let pending = {};    // writes not sent yet: a click while a step is on its way is sent with the next one
 
-function msg(text, bad) { $('enMsg').textContent = text; $('enMsg').classList.toggle('warn-text', !!bad); }
+function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+}
+
+// before a load the message goes under the files; once loaded, into the toolbar, which stays in view
+function msg(text, bad) {
+    const live = !$('enLive').hidden;
+    const box = live ? $('enLiveMsg') : $('enMsg');
+    $(live ? 'enMsg' : 'enLiveMsg').textContent = '';
+    box.textContent = text;
+    box.classList.toggle('err', !!bad);
+}
 
 async function post(url, body, form) {
     const r = await fetch(url, form ? { method: 'POST', body: form }
@@ -15,79 +33,218 @@ async function post(url, body, form) {
     return j;
 }
 
-// one form for every BOOL, logic (true/false) or plant (1/0): the toggle reads it back
-function fmt(v) {
+const isOn = (v) => v === true || (typeof v === 'number' && v !== 0);
+function num(v) {
     if (typeof v === 'boolean') return v ? '1' : '0';
-    return typeof v === 'number' && !Number.isInteger(v) ? v.toFixed(2) : String(v);
+    if (typeof v === 'number' && !Number.isInteger(v)) return String(Math.round(v * 1000) / 1000);
+    return String(v);
 }
 
-function rows(table, names, snap, clickable) {
-    table.replaceChildren();
-    for (const n of names) {
-        const tr = document.createElement('tr');
-        const a = document.createElement('td'); a.textContent = n;
-        const b = document.createElement('td'); b.dataset.tag = n;
-        const v = snap.tags[n];
-        b.textContent = fmt(v);
-        b.className = 'val ' + (v ? 'on' : 'off');
-        if (clickable) {
-            b.classList.add('click');
-            b.title = 'Click: 0/1. Shift+click: type a number.';
-            b.onclick = (e) => write(n, e.shiftKey);
-        }
-        tr.append(a, b);
-        table.append(tr);
+// ------------------------------------------------------------------ building the lists
+
+function inputRow(tag) {
+    const li = el('li', 'en-row');
+    li.dataset.tag = tag;
+    const id = 'in_' + tag.replace(/[^\w]/g, '_');
+    const name = el('label', 'en-name', tag);
+    name.htmlFor = id;
+    let ctl;
+    if (view.kinds[tag] === 'BOOL') {
+        ctl = el('input', 'switch');
+        ctl.type = 'checkbox';
+        ctl.onchange = () => write(tag, ctl.checked ? 1 : 0);
+    } else {
+        ctl = el('input', 'en-num');
+        ctl.type = 'number';
+        ctl.step = 'any';
+        ctl.onfocus = () => { typing = tag; };
+        ctl.onblur = () => { typing = null; };
+        ctl.onkeydown = (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); commit(tag, ctl); }
+            if (e.key === 'Escape') { ctl.blur(); }
+        };
+        ctl.onchange = () => commit(tag, ctl);
     }
+    ctl.id = id;
+    ctl.dataset.ctl = tag;
+    li.append(name, ctl);
+    return li;
 }
 
-let tags = { inputs: [], outputs: [], feedbacks: [] };
+function outputRow(tag) {
+    const li = el('li', 'en-row');
+    li.dataset.tag = tag;
+    li.append(el('span', 'en-name', tag));
+    if (view.kinds[tag] === 'BOOL') {
+        const lamp = el('span', 'en-lamp');
+        lamp.dataset.lamp = tag;
+        lamp.setAttribute('role', 'img');
+        li.append(lamp);
+    } else {
+        const v = el('span', 'en-val');
+        v.dataset.val = tag;
+        li.append(v);
+    }
+    return li;
+}
+
+function structRow(s) {
+    const li = el('li', 'en-row en-struct');
+    li.dataset.tag = s.name;
+    const top = el('div', 'en-struct-top');
+    top.append(el('span', 'en-name', s.name), el('span', 'en-val', ''), el('span', 'en-dn', 'DN'));
+    const bar = el('div', 'en-bar');
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', s.name);
+    bar.append(el('i'));
+    li.dataset.kind = s.kind;
+    li.append(top, bar);
+    return li;
+}
+
+function fill(id, items, make) {
+    $(id).replaceChildren(...items.map(make));
+}
+
+function build(j) {
+    view = j;
+    pending = {};  // a change queued for the previous program must not reach this one
+    const structNames = new Set(j.structs.map((s) => s.name));
+    const isMember = (t) => structNames.has(t.split('.')[0]) && t.includes('.');
+    fill('enInputs', j.inputs, inputRow);
+    fill('enOutputs', j.outputs.filter((t) => !isMember(t)), outputRow);
+    fill('enStructs', j.structs, structRow);
+    fill('enFeedback', j.feedbacks, outputRow);
+    $('enStructHead').hidden = !j.structs.length;
+    $('enFeedHead').hidden = !j.feedbacks.length;
+
+    // rungs, grouped by routine as in Logix Designer; a rung the drawing cannot lay out shows its text
+    const box = $('enRungs');
+    box.replaceChildren();
+    let routine = null;
+    j.rungs.forEach((r, i) => {
+        if (r.routine !== routine) {
+            routine = r.routine;
+            box.append(el('h3', 'en-routine', routine));
+        }
+        const fig = el('figure', 'en-rung');
+        fig.dataset.i = i;
+        if (r.svg) fig.insertAdjacentHTML('beforeend', r.svg);  // server-built, escaped: see the header
+        else fig.append(el('code', '', `${r.number}  ${r.text}`));
+        box.append(fig);
+    });
+
+    $('enSkipped').replaceChildren(...j.skipped.map((t) => el('li', '', t)));
+    $('enSkippedBox').hidden = !j.skipped.length;
+    $('enScen').hidden = !j.has_scenarios;
+    $('enScenCard').hidden = true;
+    const files = [...$('enFiles').files].map((f) => f.name).join(', ');
+    const plain = j.outputs.filter((t) => !isMember(t)).length;
+    $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${plain} outputs`
+        + (j.structs.length ? `, ${j.structs.length} timers and counters` : '')
+        + (j.feedbacks.length ? `, ${j.feedbacks.length} from the plant` : '');
+    document.querySelectorAll('.en-filter').forEach((f) => { f.value = ''; });
+}
+
+// ------------------------------------------------------------------ live values
 
 function show(snap) {
+    const t = snap.tags;
     $('enTime').textContent = (snap.now_ms / 1000).toFixed(2);
-    for (const [id, list] of [['enInputs', tags.inputs], ['enOutputs', tags.outputs], ['enFeedback', tags.feedbacks]]) {
-        for (const n of list) {
-            const td = $(id).querySelector(`td[data-tag="${CSS.escape(n)}"]`);
-            if (!td) continue;
-            const v = snap.tags[n];
-            td.textContent = fmt(v);
-            td.classList.toggle('on', !!v); td.classList.toggle('off', !v);
-        }
+    document.querySelectorAll('[data-ctl]').forEach((c) => {
+        const v = t[c.dataset.ctl];
+        if (c.type === 'checkbox') c.checked = isOn(v);
+        else if (typing !== c.dataset.ctl) c.value = num(v);
+    });
+    document.querySelectorAll('[data-lamp]').forEach((l) => {
+        const on = isOn(t[l.dataset.lamp]);
+        l.classList.toggle('on', on);
+        l.setAttribute('aria-label', on ? 'on' : 'off');
+    });
+    document.querySelectorAll('[data-val]').forEach((v) => { v.textContent = num(t[v.dataset.val]); });
+    for (const li of $('enStructs').children) {
+        const n = li.dataset.tag;
+        const acc = Number(t[`${n}.ACC`]) || 0;
+        const pre = Number(t[`${n}.PRE`]) || 0;
+        const timer = li.dataset.kind === 'TIMER';
+        li.querySelector('.en-val').textContent = timer
+            ? `${(acc / 1000).toFixed(1)} / ${(pre / 1000).toFixed(1)} s` : `${acc} / ${pre}`;
+        const pct = pre > 0 ? Math.max(0, Math.min(100, (100 * acc) / pre)) : 0;
+        li.querySelector('.en-bar i').style.width = `${pct}%`;
+        li.querySelector('.en-bar').setAttribute('aria-valuenow', String(Math.round(pct)));
+        li.classList.toggle('done', isOn(t[`${n}.DN`]));
     }
-    $('enRungs').querySelectorAll('li').forEach((li, i) => li.classList.toggle('lit', !!snap.power[i]));
-    $('enNotes').replaceChildren(...(snap.notes || []).map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
+    // the ladder, as Logix Designer shows it online: a contact passes power, a coil is on, a rung is true
+    document.querySelectorAll('#enRungs .lad-el').forEach((g) => {
+        const v = isOn(t[g.dataset.tag]);
+        const k = g.dataset.kind;
+        g.classList.toggle('live', k === 'XIC' ? v : k === 'XIO' ? !v : v);
+    });
+    document.querySelectorAll('#enRungs .en-rung').forEach((f) => f.classList.toggle('lit', !!snap.power[f.dataset.i]));
+    const notes = snap.notes || [];
+    $('enNotes').replaceChildren(...notes.map((n) => el('li', '', n)));
+    $('enNotes').hidden = !notes.length;
 }
 
-async function step(ms, writes) {
+async function step(ms) {
     if (busy) return;
     busy = true;
+    const writes = pending;
+    pending = {};
     try { show(await post('/api/energise/step', { ms, writes })); }
     catch (e) { stop(); msg(e.message, true); }
     finally { busy = false; }
+    if (Object.keys(pending).length) step(0);  // written while this step was on its way
 }
 
-async function write(tag, typed) {
-    const td = $('enInputs').querySelector(`td[data-tag="${CSS.escape(tag)}"]`);
-    let v;
-    if (typed) {
-        const t = prompt(`New value for ${tag}`, td.textContent);
-        if (t === null) return;
-        v = Number(t);
-        if (!Number.isFinite(v)) { msg(`${t} is not a number`, true); return; }
-    } else {
-        v = Number(td.textContent) ? 0 : 1;
+function write(tag, value) {
+    pending[tag] = value;
+    return step(0);
+}
+
+function commit(tag, input) {
+    const v = Number(input.value);
+    if (input.value.trim() === '' || !Number.isFinite(v)) {  // a number field reads "" for "-" or "1e"
+        msg(`${tag}: type a number, then press Enter`, true);
+        return;
     }
-    await step(0, { [tag]: v });
+    msg('');
+    write(tag, v);
 }
 
-function stop() { if (running) { clearInterval(running); running = null; $('enRun').textContent = 'Run'; } }
+function stop() {
+    if (!running) return;
+    clearInterval(running);
+    running = null;
+    $('enRun').textContent = 'Run';
+    $('enRun').setAttribute('aria-pressed', 'false');
+}
+
+// ------------------------------------------------------------------ controls
+
+$('enFiles').onchange = () => {
+    const names = [...$('enFiles').files].map((f) => f.name);
+    $('enFileNames').textContent = names.length ? names.join(', ') : 'L5X routines, a project export, or the Routines.zip from a requirements run';
+    $('enLoad').disabled = !names.length;
+};
 
 $('enRun').onclick = () => {
     if (running) { stop(); return; }
     running = setInterval(() => step(200), 200);  // real time: 200 ms of plant time every 200 ms
     $('enRun').textContent = 'Pause';
+    $('enRun').setAttribute('aria-pressed', 'true');
 };
 $('enStep').onclick = () => step(100);
-$('enReset').onclick = async () => { stop(); try { show(await post('/api/energise/step', { reset: true })); } catch (e) { msg(e.message, true); } };
+$('enReset').onclick = async () => {
+    stop();
+    pending = {};
+    try { show(await post('/api/energise/step', { reset: true })); } catch (e) { msg(e.message, true); }
+};
+$('enChange').onclick = () => {
+    stop();
+    $('enSetup').hidden = false;
+    $('enFiles').focus();
+};
 
 $('enLoad').onclick = async () => {
     stop();
@@ -96,33 +253,37 @@ $('enLoad').onclick = async () => {
     form.append('plant', $('enPlant').value);
     form.append('scenarios', $('enScenarios').value);
     msg('Loading...');
+    $('enLoad').disabled = true;
     try {
         const j = await post('/api/energise/load', null, form);
-        tags = { inputs: j.inputs, outputs: j.outputs, feedbacks: j.feedbacks };
-        rows($('enInputs'), j.inputs, j.snapshot, true);
-        rows($('enOutputs'), j.outputs, j.snapshot, false);
-        rows($('enFeedback'), j.feedbacks, j.snapshot, false);
-        $('enSkipped').replaceChildren(...j.skipped.map((t) => { const li = document.createElement('li'); li.textContent = t; return li; }));
-        $('enRungs').replaceChildren(...j.rungs.map((r) => {
-            const li = document.createElement('li');
-            const where = document.createElement('span'); where.className = 'muted'; where.textContent = `${r.routine} ${r.number}  `;
-            const code = document.createElement('code'); code.textContent = r.text;
-            li.append(where, code);
-            return li;
-        }));
-        $('enLive').hidden = false; $('enRungsCard').hidden = false; $('enScenRow').hidden = !j.has_scenarios;
-        $('enReport').hidden = true;
+        build(j);
         show(j.snapshot);
-        msg(`${j.rungs.length} rungs, ${j.inputs.length} inputs, ${j.feedbacks.length} plant feedback tags.`);
-    } catch (e) { msg(e.message, true); }
+        msg('');
+        $('enSetup').hidden = true;
+        $('enLive').hidden = false;
+    } catch (e) {
+        msg(e.message, true);
+    } finally {
+        $('enLoad').disabled = !$('enFiles').files.length;
+    }
 };
 
 $('enScen').onclick = async () => {
-    $('enScenSum').textContent = 'Running...';
+    $('enScenCard').hidden = false;
+    $('enScenSum').textContent = 'running...';
     try {
         const j = await post('/api/energise/scenarios');
-        $('enScenSum').textContent = `${j.passed} of ${j.total} scenarios pass`;
+        $('enScenSum').textContent = `${j.passed} of ${j.total} pass`;
         $('enReport').textContent = j.report.join('\n');
-        $('enReport').hidden = false;
     } catch (e) { $('enScenSum').textContent = e.message; }
+    $('enScenCard').scrollIntoView({ block: 'nearest' });
 };
+
+document.querySelectorAll('.en-filter').forEach((f) => {
+    f.oninput = () => {
+        const q = f.value.trim().toLowerCase();
+        for (const id of f.dataset.for.split(' ')) {
+            for (const li of $(id).children) li.hidden = !!q && !li.dataset.tag.toLowerCase().includes(q);
+        }
+    };
+});

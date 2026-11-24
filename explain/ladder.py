@@ -106,7 +106,9 @@ class _Layout:
                       f'<path d="M{c - hw:.1f},{WIRE - 10} q-6,10 0,20 M{c + hw:.1f},{WIRE - 10} q6,10 0,20" class="lad-sym"/>']
             if mark:
                 parts.append(_text(c, WIRE + 4, _COILS[name], "lad-mark"))
-        return Box(w, WIRE + 16, parts)
+        # the tag and kind let a live page (Energise) light the symbol: a contact that passes power, a coil that is on
+        group = f'<g class="lad-el" data-kind="{name}" data-tag="{escape(tag, quote=True)}">{"".join(parts)}</g>'
+        return Box(w, WIRE + 16, [group])
 
     def _box(self, i: Instr) -> Box:
         spec = self.cat.get(i.name)

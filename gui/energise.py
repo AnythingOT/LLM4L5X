@@ -58,6 +58,7 @@ class Session:
     plant_text: str = ""
     scenarios_text: str = ""
     scan_ms: float = 10.0
+    watched: list[str] = field(default_factory=list)  # other tags the page shows live: contacts, coils, presets
     backend: SimBackend | None = None
     presets: dict = field(default_factory=dict)  # {"T.PRE": 5000} from the tags' data: rungs may show "?"
 
@@ -85,7 +86,7 @@ class Session:
 
     def snapshot(self) -> dict:
         be = self.backend
-        tags = {t: be.read(t) for t in self.inputs + self.outputs + self.feedbacks}
+        tags = {t: be.read(t) for t in self.inputs + self.outputs + self.feedbacks + self.watched}
         return {"now_ms": be.now_ms, "tags": tags, "power": list(be.sim.power),
                 "notes": be.plant.notes() if be.plant else []}
 
@@ -148,3 +149,49 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
     s.inputs = sorted(read - written - set(s.feedbacks) - {"Sim_Mode"} - {None})
     s.backend = probe
     return s
+
+
+_BIT_INSTR = {"XIC", "XIO", "OTE", "OTL", "OTU", "ONS"}
+_BIT_MEMBERS = {"DN", "EN", "TT", "CU", "CD", "OV", "UN"}
+
+
+def view(ses: Session, l5x_files: list[str | bytes]) -> dict:
+    """What the page needs besides the snapshot: each tag's kind, the timers and counters, rung drawings.
+
+    kind: "BOOL" (a switch or a lamp) or "NUM" (a number). A tag's own data type wins; a tag the files do not
+    declare is a bit if the logic uses it as one (a contact or a coil), otherwise a number.
+    """
+    from explain.ladder import to_svg
+    types: dict[str, str] = {}
+    for data in l5x_files:
+        types.update({t.name: t.datatype.upper() for t in read_l5x(data).tags.values() if t.datatype})
+    bits, structs = set(), {}
+    for r in ses.rungs:
+        for i in walk(r.body):
+            n = sim._V36.get(i.name.upper(), i.name.upper())
+            if n in _BIT_INSTR and i.args and not is_literal(i.args[0]):
+                bits.add(i.args[0])
+            if n in _STRUCTS and i.args:
+                structs[i.args[0]] = "COUNTER" if n in ("CTU", "CTD") else "TIMER"
+
+    def kind(tag: str) -> str:
+        if "." in tag and base_tag(tag) in structs:
+            return "BOOL" if tag.rsplit(".", 1)[1].upper() in _BIT_MEMBERS else "NUM"
+        t = types.get(tag) or types.get(base_tag(tag))
+        if t:
+            return "BOOL" if t == "BOOL" else "NUM"
+        return "BOOL" if tag in bits else "NUM"
+
+    shown = set(ses.inputs + ses.outputs + ses.feedbacks)
+    ses.watched = sorted((bits - shown) | {f"{t}.PRE" for t in structs})
+    be = ses.backend
+    presets = {t: be.read(f"{t}.PRE") for t in structs}
+    svgs = []
+    for r, p in zip(ses.rungs, ses.places):
+        try:
+            svgs.append(to_svg(r, number=p.number, presets=presets))
+        except Exception:  # noqa: BLE001 - a rung the drawing cannot lay out still runs; the page shows its text
+            svgs.append(None)
+    return {"kinds": {t: kind(t) for t in sorted(shown | set(ses.watched))},
+            "structs": [{"name": t, "kind": k} for t, k in sorted(structs.items())],
+            "svgs": svgs, "snapshot": ses.snapshot()}

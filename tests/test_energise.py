@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from core.rung import parse_rung
@@ -103,6 +105,21 @@ def test_energise_page_and_api(web):
     assert (out["passed"], out["total"]) == (6, 6) and out["trace"]["R3"] == [["TC-07", True], ["TC-08", True]]
     assert web.post("/api/energise/step", json={"reset": True}).get_json()["tags"]["Auto_Mode"] == 0
 
+
+def test_energise_load_tells_the_page_how_to_show_each_tag(web):
+    # bits get a switch or a lamp, numbers a field: a setpoint is no longer flipped 0/1 by a click
+    j = _upload(web, FILES).get_json()
+    kinds = j["kinds"]
+    assert kinds["Start_PB"] == "BOOL" and kinds["P101_Running"] == "BOOL"
+    assert all(kinds[t] in ("BOOL", "NUM") for t in j["inputs"] + j["outputs"] + j["feedbacks"])
+    nums = [t for t in j["inputs"] + j["outputs"] if kinds[t] == "NUM"]
+    assert nums, "the tank program has numbers (a level)"
+    for s in j["structs"]:  # each timer or counter: its preset is watched live, its done bit is a bit
+        assert f"{s['name']}.PRE" in j["snapshot"]["tags"] and kinds[f"{s['name']}.DN"] == "BOOL"
+    # every rung is drawn, and its contacts and coils name their tag so the page can light them
+    assert all(r["svg"] and 'class="lad-el"' in r["svg"] for r in j["rungs"] if "XIC(" in r["text"])
+    lit = {t for r in j["rungs"] for t in re.findall(r'data-tag="([^"]+)"', r["svg"] or "")}
+    assert lit <= set(j["snapshot"]["tags"])  # every lit symbol has a live value
 
 def test_energise_takes_the_routines_zip_and_reports_bad_files(web):
     import io
