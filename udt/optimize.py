@@ -406,9 +406,29 @@ def single_file(an: Analysis, name: str, selected: set[str]) -> str:
     return ("﻿" if an.bom else "") + out
 
 
+_NOT_IN_FILE_NAME = re.compile(r'[<>:"/\\|?*]')
+
+
 def file_name(name: str, suffix: str = "_opt") -> str:
-    """Within Studio 5000's 40-character file name habit: trim the UDT name, keep the suffix."""
-    return f"{name[:40 - len(suffix) - 4]}{suffix}.L5X"
+    """Within Studio 5000's 40-character file name habit: trim the UDT name, keep the suffix.
+
+    Characters Windows refuses in a file name (a module-defined type is `AB:...:I:0`) become `_`.
+    """
+    return f"{_NOT_IN_FILE_NAME.sub('_', name)[:40 - len(suffix) - 4]}{suffix}.L5X"
+
+
+def file_names(names) -> dict[str, str]:
+    """One file name per UDT, never two the same: names that trim alike get ~2, ~3 in their suffix."""
+    out: dict[str, str] = {}
+    taken: set[str] = set()
+    for n in sorted(names):
+        f, k = file_name(n), 1
+        while f.lower() in taken:  # Windows file names ignore case
+            k += 1
+            f = file_name(n, f"~{k}_opt")
+        taken.add(f.lower())
+        out[n] = f
+    return out
 
 
 def changes_text(an: Analysis, selected: set[str]) -> str:
@@ -433,8 +453,8 @@ def changes_text(an: Analysis, selected: set[str]) -> str:
 def zip_files(an: Analysis, selected: set[str]) -> bytes:
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for n in sorted(selected):
-            z.writestr(file_name(n), single_file(an, n, selected).encode("utf-8"))
+        for n, f in file_names(selected).items():
+            z.writestr(f, single_file(an, n, selected).encode("utf-8"))
         z.writestr("CHANGES.txt", changes_text(an, selected).encode("utf-8"))
     return buf.getvalue()
 
