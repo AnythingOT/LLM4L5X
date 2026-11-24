@@ -198,4 +198,3 @@ def test_timer_and_counter_presets_come_from_the_tags():
         s.step(10, {"Box_Eye": 1})
         snap = s.step(10, {"Box_Eye": 0})
     assert snap["tags"]["Box_CTR.ACC"] == 3 and snap["tags"]["Batch_Done"]
-
