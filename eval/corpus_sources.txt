@@ -1,0 +1,36 @@
+# Public L5X exports for tests/test_corpus.py. CI fetches them at the commit pinned here; they are
+# never committed to this repository. Only MIT- or Apache-licensed repositories (checked from their
+# LICENSE file); repositories with no licence, GPL or "All rights reserved" are left out.
+#
+# repository  commit  licence  [exclude glob ...]   (globs match paths inside the repository)
+JeremyMedders/LogixLibraries  b27a0e7fdf99f644d3d32fb84d45810db469a8f7  MIT
+reh3376/acd-l5x-tool-lib  45d3b7bca55a2870dbe491670e3ffbe5ccb4f193  MIT  docs/l5x-files/PLC100_Mashing_Detailed.L5X
+het-P301204/interlock  51482d2ca58d12191e69a96e11991c483050fd2a  Apache-2.0  fixtures/adversarial/*
+dmroeder/panelview_running_file  441485f5071ce904d94917af241fd6ae5c29ddc9  Apache-2.0
+Colt-H/L5X-Creator  163d809b88a30846205f82deeb0c37f229fcc2f5  MIT
+patrickjmcd/plc-common-objects  c1b44505b13c695e3ed7ae444b420c6628a7b9aa  MIT
+arunvenkatadri/rungstone  f793980e2af68640be0eb48d87ae5c9952cc7a4f  MIT
+zwood16/l5x-mcp  6372adc46ff3cf4233f16c7e22a51ff77d9f8eff  MIT
+hutcheb/acd  c6f5927fc35bbb7cfd28d6855510adcc88635927  Apache-2.0
+RockwellAutomation/ra-logix-cicd  de14d4ac87d5295b2380cce441ed581d1930947f  MIT
+NothinRandom/CoDeSys_EIP  993c68dd2f9d88d076ae98eb2a074e2c4b349efa  MIT
+Ani07-05/rehub-engine  f21463d1fd10a9ebe2b0c34e968464d3d4405067  MIT
+tnunnink/L5Sharp  c960ba1d471be44dae414928da17038e06661fcf  MIT
+joyautomation/nautilus  01a7b8a1029a5e610617368f30fb9837153ea073  Apache-2.0
+JRS222/l5x-studio  7efb04e03dcaed2fb9eb757850e30ed265479ea2  MIT
+ghanemja/senior-design  595a30e643261ce6a2dbdc121986a535f3ea9ab5  MIT
+asqi-carter/lgx-mcp  4f84457cbae0b773cfde114c3bbeace35f83df1a  MIT
+therealambadi/Plaxioide  cd71c6dace6fc6247f3c909b06523b1ed25566d6  MIT
+alex-controlx/rslogix5000-aois  a253c3d2ad36b3bc826a93185100f1b68bc88151  MIT
+lindseynguyen/ReadingDataOT  f2e4df24ffa3699dcf52cd07384bbc9b8a10a05f  MIT
+droydstix/PLC_Bridge  f3f741f26baa73105c8ad890eff5403a64d20fb7  MIT
+alairjunior/l5x2c  30de91efa221081c7ddbbc3ee9ac36fcf1f33b43  MIT
+JampaniKomal/plc-drift-detector  a9e9ffe2535b4122c9bab5d0f68b53cbb8b7468b  MIT
+zwood16/py_l5x  52957322f7b90140012d7b1bef459e7c2de0c8e5  MIT
+tomha85/devagent  3cf9f334cdad6e41b039df5c24d806ffaece4b1f  MIT
+shahrul-amin/Automated-Precision-Assembly-and-Inspection-Station  be15de3ff6cc6398ca45575f3f2a904489cbb2be  Apache-2.0
+oschuda/OPC-UA-Browser  6d07be2cbfe12fc3d9f13822a5587b5625e30fed  MIT
+juflunaca/Tile-Tech  c6a8cb36f089216021b963eb619bdb5c48969173  MIT
+isaacsgober/plc-projects  febfd0468e17caf10c5c4a4d389a7428dacd35e0  MIT
+danomagnum/gologix  647a0b87b756d42e37ac0f65c5762dc89036152c  MIT
+akshitag001/LogicWard  cb9854fb5c4e0f8c90dbb7f0ad7bb69fecbb7325  MIT

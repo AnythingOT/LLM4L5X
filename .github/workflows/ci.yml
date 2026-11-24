@@ -45,5 +45,20 @@ jobs:
       - name: Lint
         run: ruff check .
 
+      # Public L5X exports at pinned commits (eval/corpus_sources.txt), never committed: tests/test_corpus.py
+      # runs every feature on each one. Fetched again only when the list changes.
+      - name: Cache public L5X corpus
+        id: corpus
+        uses: actions/cache@v4
+        with:
+          path: corpus
+          key: corpus-${{ hashFiles('eval/corpus_sources.txt', 'eval/fetch_corpus.py') }}
+
+      - name: Fetch public L5X corpus
+        if: steps.corpus.outputs.cache-hit != 'true'
+        run: python -m eval.fetch_corpus corpus
+
       - name: Tests
+        env:
+          LLM4L5X_CORPUS: corpus
         run: python -m pytest -q
