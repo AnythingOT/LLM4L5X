@@ -145,7 +145,7 @@ class Generator:
                     if missing:
                         res.warnings.append(f"the request names {', '.join(missing)}, which the logic does not use")
                     stmts = parse_spec(spec)
-                    for problem in output_problems(stmts, request, idents):
+                    for problem in output_problems(stmts, request, idents, known_tags):
                         if not last:
                             raise SpecError(problem)
                         res.warnings.append(problem)

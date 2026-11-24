@@ -71,7 +71,19 @@ def _rises(e) -> bool:
                if v is not None and not isinstance(v, (str, int, float, bool)))
 
 
-def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
+_COPY = re.compile(r"\b(?:copy|move|transfer|load|put)\s+(?:the\s+value\s+(?:of|in)\s+)?([A-Za-z_]\w*)\s+"
+                   r"(?:into|to|in)\s+([A-Za-z_]\w*)", re.I)
+
+
+def _no_op(a) -> bool:
+    """X := X, X := X + 0 (or - 0, * 1, / 1, 0 + X, 1 * X): writes the value it already has."""
+    if a.op is None:
+        return a.a == a.dest
+    one = {"+": "0", "-": "0", "*": "1", "/": "1"}.get(a.op)
+    return (a.a == a.dest and a.b == one) or (a.op in "+*" and a.b == a.dest and a.a == one)
+
+
+def output_problems(stmts, request: str, idents: set[str], known_tags=None) -> list[str]:
     """Outputs the request did not ask for: checked in code because prompts did not stop them.
 
     * SET (latch), or "IF c THEN X := 1;" (MOVE 1, which holds the same way), with no RESET or
@@ -83,8 +95,14 @@ def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
     * RISE when the request has no edge word: a one-shot ran a timer for one scan.
     * A written tag the request does not name, when the request names its tags: a stray rung
       "Batch_Request := Box_CTR.DN" for "the batch is done". A tag made of the request's words
-      ("run the pump" -> Pump_Run) is a fair pick from the project and passes."""
+      ("run the pump" -> Pump_Run) passes if the project has it, or if the request names no output of its
+      own (the model had to name one); beside a named output it is invented ("Batch_Count" next to the
+      named Box_CTR, for "the batch is done at 12").
+    * A write that changes nothing, "Net_Weight := Net_Weight + 0": the model used it to make a
+      named tag appear after "the request names Net_Weight but the logic does not use it".
+    * "copy A into B" written as A := B: source and destination swapped, A is overwritten."""
     from core import logicspec as ls
+    from core.logicspec import format_statement
     written, latched = _written(stmts)
     problems = []
     if re.search(r"(?<![\w.])1(?![\w.])", request):
@@ -113,8 +131,23 @@ def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
             _rises(st.expr if isinstance(st, ls.Assign) else st.cond) for st in stmts):
         problems.append("the request asks for no edge (no 'rising edge', 'the moment', 'each time', 'once'): "
                         "do not use RISE; the outputs must follow the condition every scan")
+    acts = [a for st in stmts if isinstance(st, ls.IfThen) for a in st.actions]
+    same = [format_statement(st) for st in stmts if isinstance(st, ls.Assign) and st.expr == ls.Var(st.target)]
+    same += [format_statement(ls.IfThen(None, (a,))) for a in acts if isinstance(a, ls.Math) and _no_op(a)]
+    for text in same:
+        tag = text.split(":=")[0].split()[-1]
+        problems.append(f"{text} changes nothing; use {tag} where the request says (a condition, a source "
+                        "or an output), never in a write that changes nothing")
+    for src, dest in _COPY.findall(request):
+        for a in acts:
+            pair = (a.a, a.dest) if isinstance(a, ls.Math) and a.op is None else \
+                   (a.source, a.dest) if isinstance(a, ls.Copy) else None
+            if pair == (dest, src):
+                problems.append(f"the request copies {src} into {dest}: {src} is the source, {dest} the "
+                                f"destination, so write {dest} := {src}; (not {src} := {dest};)")
     if idents:
         said = {_norm(i) for i in idents}
+        names_an_output = any(_norm(t) in said for t in written)
         rw = _words(request)
         for t in written:
             if t.startswith(("L4X_", "REF_")) or _norm(t) in said:
@@ -122,7 +155,7 @@ def output_problems(stmts, request: str, idents: set[str]) -> list[str]:
             if re.search(rf"(?<![\w.]){re.escape(t)}(?!\w)", request):
                 continue
             tw = _words(t)
-            if tw and tw <= rw:
+            if tw and tw <= rw and (t in (known_tags or {}) or not names_an_output):
                 continue
             problems.append(f"the logic writes {t}, which the request does not name; write only the "
                             "outputs the request asks for")

@@ -393,3 +393,67 @@ def test_output_check_warns_on_the_last_attempt_instead_of_failing():
     m = FakeModel(*["IF Go_Cmd THEN SET Alarm_Latch;"] * 5)
     r = Generator(m).generate("When Go_Cmd is on, turn on Alarm_Latch.")
     assert r.spec and any("does not ask to latch" in w for w in r.warnings)
+
+
+# ---- seed-41 holdout misses (Nov 2026): each check is fed the model's own LogicSpec from that run
+
+def test_a_write_that_changes_nothing_is_sent_back():
+    req = ("Reset Interlock_OK if either Shift_No is at most 80 or Temp_SP equals 100 or Speed_Ref is above "
+           "FT110_PV, and Tank_Level is equal to Net_Weight.")
+    m = FakeModel("IF Shift_No <= 80 OR Temp_SP = 100 OR Speed_Ref > FT110_PV THEN Interlock_OK := Tank_Level;\n"
+                  "Net_Weight := Net_Weight + 0;",
+                  "IF (Shift_No <= 80 OR Temp_SP = 100 OR Speed_Ref > FT110_PV) AND Tank_Level = Net_Weight "
+                  "THEN RESET Interlock_OK;")
+    r = Generator(m).generate(req)
+    assert "Net_Weight := Net_Weight + 0; changes nothing" in m.calls[1][-1]["content"]
+    assert len(r.attempts) == 2 and not r.warnings
+
+
+@pytest.mark.parametrize("stmt", ["X := X;", "X := X - 0;", "X := X * 1;", "X := X / 1;", "X := 1 * X;"])
+def test_every_identity_write_is_a_no_op(stmt):
+    from core.logicspec import parse_spec
+    from inputs.llm.checks import output_problems
+    assert any("changes nothing" in p for p in output_problems(parse_spec(stmt), "Use X.", {"X"}))
+
+
+@pytest.mark.parametrize("stmt", ["X := X + 1;", "X := X * 2;", "X := Y + 0;", "IF Y THEN X := 0;", "X := Y;"])
+def test_a_write_that_changes_something_passes(stmt):
+    from core.logicspec import parse_spec
+    from inputs.llm.checks import output_problems
+    assert not any("changes nothing" in p for p in output_problems(parse_spec(stmt), "Use X and Y.", {"X", "Y"}))
+
+
+def test_copy_source_and_destination_swapped_is_sent_back():
+    req = ("When Remote_Enable is on and Retry_Count is less than or equal to Fault_Code, copy the value of "
+           "Order_No into Steam_SP, subtract Cool_SP from Dosing_Rate and store the result in Net_Weight and "
+           "divide FlowRate by 2 and store it in Tare_Weight.")
+    bad = ("IF Remote_Enable AND Retry_Count <= Fault_Code THEN Order_No := Steam_SP, "
+           "Net_Weight := Dosing_Rate - Cool_SP, Tare_Weight := FlowRate / 2;")
+    m = FakeModel(bad, bad.replace("Order_No := Steam_SP", "Steam_SP := Order_No"))
+    r = Generator(m).generate(req)
+    assert "Order_No is the source, Steam_SP the destination" in m.calls[1][-1]["content"]
+    assert "Steam_SP := Order_No" in r.spec and len(r.attempts) == 2
+
+
+@pytest.mark.parametrize("req", ["Move Speed_Ref to Motor_SP when Run is on.",
+                                 "When Run is on, copy the value in Speed_Ref into Motor_SP."])
+def test_copy_the_right_way_round_passes(req):
+    m = FakeModel("IF Run THEN Motor_SP := Speed_Ref;")
+    assert len(Generator(m).generate(req).attempts) == 1
+
+
+def test_an_invented_output_beside_a_named_one_is_sent_back():
+    # Batch_Count is made of the request's words (batch, count), but the request names its output: Box_CTR
+    req = "Count each box on Box_Eye with the up counter Box_CTR; the batch is done at 12 boxes."
+    m = FakeModel("IF Box_Eye THEN COUNT_UP(Box_CTR, 12);\nBatch_Count := Box_CTR.ACC / 12;\n"
+                  "Batch_Count := Box_CTR.DN / 12;",
+                  "IF Box_Eye THEN COUNT_UP(Box_CTR, 12);")
+    r = Generator(m).generate(req)
+    assert "writes Batch_Count, which the request does not name" in m.calls[1][-1]["content"]
+    assert "Batch_Count" not in r.spec
+
+
+def test_a_new_output_made_of_the_request_words_passes_when_the_request_names_none():
+    # no project and no output named: the model has to name one, and Pump_Run is the fair pick
+    m = FakeModel("Pump_Run := Start_PB;")
+    assert len(Generator(m).generate("Run the pump while Start_PB is pressed.").attempts) == 1
