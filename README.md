@@ -22,7 +22,7 @@ Samples of both Excel files are in the app: the list button next to **Send**.
 ## Start
 
 1. Install **Python 3.10+** from python.org (tick *Add python.exe to PATH*).
-2. Download this repo and double-click **`start.bat`**. The first run installs everything; then the app opens at http://127.0.0.1:5000.
+2. Download this repo and double-click **`start.bat`**. The first start installs the packages, once, into your user folder (`%LOCALAPPDATA%\LLM4L5X\venv`), not into the download: a newer download starts at once, and packages are installed again only when `requirements.txt` changes. No git needed. Then the app opens at http://127.0.0.1:5000.
    (Linux/macOS: `./start.sh`.)
 3. For plain English, start a model server and pick it in ⚙️ Settings. Rung text, Excel UDTs and attached L5X files need no model.
 
