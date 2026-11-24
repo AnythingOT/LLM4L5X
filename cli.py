@@ -174,6 +174,71 @@ def cmd_validate(a) -> int:
     return 1 if blocking else 0
 
 
+def cmd_fix(a) -> int:
+    """Fix what the lint finds where a fix is certain: safe fixes in one batch, the others one by one."""
+    from lint.autofix import AutoFix
+    src = Path(a.file)
+    af = AutoFix(src.read_bytes())
+    fixes = af.proposals()
+    if not fixes:
+        print("Nothing to fix automatically.")
+        return 0
+
+    def ask(question: str) -> str:
+        return "y" if a.yes else input(question).strip()
+
+    chosen, values = [], {}
+    safe = [f for f in fixes if f.safe]
+    if safe:
+        print(f"{len(safe)} safe fix(es): the program behaves exactly as before.")
+        for f in safe:
+            print(f"  {f.code} {f.where}: {f.what} ({f.checked})")
+        if a.safe or ask("Apply them? [y/n] ").lower().startswith("y"):
+            chosen += safe
+    rest = [] if a.safe else [f for f in fixes if not f.safe]  # --safe: nothing that changes behaviour
+    tags = [f for f in rest if f.code == "INF001"]  # often thousands: one question for all of them
+    for f in [f for f in rest if f.code != "INF001"]:
+        print(f"\n{f.code} {f.where}: {f.what}\n  Changes: {f.change}")
+        if f.needs:
+            while not a.yes:  # checked as it is typed: one wrong answer must not lose the other fixes
+                v = ask(f"  {f.needs[0].upper() + f.needs[1:]} (empty: skip): ")
+                if not v:
+                    break
+                try:
+                    if float(v) > 0:
+                        values[len(chosen)] = v
+                        chosen.append(f)
+                        break
+                except ValueError:
+                    pass
+                print("  A number above 0, please.")
+        elif ask("  Apply? [y/n] ").lower().startswith("y"):
+            chosen.append(f)
+    if tags:
+        print(f"\nINF001: {len(tags)} unused tag(s) that an HMI, SCADA or another controller could still read:")
+        for f in tags[:10]:
+            print(f"  {f.where}")
+        if len(tags) > 10:
+            print(f"  ... and {len(tags) - 10} more")
+        if ask("Delete them all? [y/n] ").lower().startswith("y"):
+            chosen += tags
+    if not chosen:
+        print("Nothing applied; the file is unchanged.")
+        return 0
+    try:
+        done = af.apply(chosen, values)
+    except ValueError as e:
+        print(f"fix: {e}", file=sys.stderr)
+        return 2
+    out = Path(a.output) if a.output else src.with_name(src.stem + "_fixed" + src.suffix)
+    out.write_bytes(af.write())
+    print(f"\n{len(done)} fix(es) applied, written to {out}")
+    still = af.findings()
+    if still:
+        print(f"Still open ({len(still)}): " + ", ".join(sorted({f.code for f in still})))
+    return 0
+
+
 def _client(a):
     from inputs.llm import make_client
     return make_client(a.backend, a.url, a.model, think=False if a.no_think else None,
@@ -346,6 +411,14 @@ def main(argv: list[str] | None = None) -> int:
     v.add_argument("--rules", action="store_true", help="list the rules and exit")
     v.add_argument("--profile", help="company coding-standards profile (YAML), see docs/PROFILE.md")
     v.set_defaults(fn=cmd_validate)
+
+    fx = sub.add_parser("fix", help="fix lint findings where the fix is certain: safe ones in one batch, "
+                                    "the ones that change behaviour one by one")
+    fx.add_argument("file")
+    fx.add_argument("-o", "--output", help="where to write (default: FILE_fixed.L5X next to it)")
+    fx.add_argument("--safe", action="store_true", help="apply the safe fixes only, without asking")
+    fx.add_argument("--yes", action="store_true", help="answer yes to every question (values are skipped)")
+    fx.set_defaults(fn=cmd_fix)
 
     def llm_args(p):
         p.add_argument("--backend", choices=["ollama", "llamacpp", "openai"], default="ollama",

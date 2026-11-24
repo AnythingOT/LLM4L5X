@@ -134,6 +134,26 @@ Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes th
 
 `python cli.py validate --rules` lists the rules. The rules are a rewrite, for this repo's parser and data model, of the checklist in [L5X_Lint](https://github.com/AnythingOT/L5X_Lint), with the same codes.
 
+### Fix: where the fix is certain
+
+`python cli.py fix plant.L5X` proposes fixes for six rules and writes `plant_fixed.L5X` next to the file (never over it):
+
+| Rule | Fix | Kind |
+|---|---|---|
+| WAR006 empty rung | deleted; a rung with a comment (a heading) keeps it and gets a `NOP()` | safe |
+| ERR010 the same condition twice in series, identical legs of conditions | the repeat removed | safe |
+| INF001 unused tag with External Access None | deleted | safe |
+| INF001 unused tag an HMI, SCADA or another controller could read | deleted, one question for all of them | changes |
+| ERR012 DIV or MOD by a tag nothing compares with 0 | `NEQ(divisor,0)` before it | changes |
+| ERR015 one storage bit shared by several one-shots | each one-shot after the first gets its own bit | changes |
+| WAR008 timer or counter preset 0, set by nothing | the preset you type, written into the tag | changes |
+
+- **Safe** means the program behaves exactly as before: a rung fix is run in the scan simulator before and after, and offered as safe only if nothing differs. If the simulator cannot run that routine, the fix is offered as one that may change behaviour, with the reason. All safe fixes come as one batch, one question.
+- **Changes** fixes are asked one by one, each with what behaves differently afterwards.
+- `--safe` applies the safe batch and asks nothing; `-o` names the output file.
+- Everything a fix does not touch is the same XML afterwards. The lint runs again at the end and lists what is still open.
+- Not fixed here, because the right fix depends on intent: several latches or unlatches, a timer used twice, a counter never reset, an empty branch leg, AFI, safety tags, REAL to integer moves, backward jumps.
+
 ## Neutral text and ASCII text
 
 | | Neutral | ASCII |
@@ -177,6 +197,7 @@ python cli.py inspect plant.L5X --decompile
 python cli.py inspect plant.L5X --xref Pump
 python cli.py validate plant.L5X --disable INF003,INF004
 python cli.py validate --rules
+python cli.py fix plant.L5X              # safe fixes in one batch, the others one by one
 python cli.py survey folder_of_exports
 python cli.py ask "run the pump from start, stop with stop" --project plant.L5X --model phi4-mini -o pump.L5X
 python cli.py eval --model qwen3.6:35b-a3b --no-think
