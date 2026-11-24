@@ -74,9 +74,13 @@ def create_app() -> Flask:
     def settings_page():
         return render_template("settings.html", page="settings")
 
-    @app.get("/rules")
+    @app.get("/lint")
+    def lint_page():
+        return render_template("rules.html", page="lint")
+
+    @app.get("/rules")  # the page's old name: links and bookmarks still work
     def rules_page():
-        return render_template("rules.html", page="rules")
+        return redirect("/lint", code=301)
 
     @app.get("/energize")
     def energize_page():
@@ -89,6 +93,10 @@ def create_app() -> Flask:
     @app.get("/tests")
     def tests_page():
         return render_template("tests.html", page="tests")
+
+    @app.get("/devices")
+    def devices_page():
+        return render_template("devices.html", page="devices")
 
     # ------------------------------------------------------------ energize and tests: one program, shared
     # The program, the device models and the test cases live here, not in a page: either page can be left and
@@ -142,8 +150,42 @@ def create_app() -> Flask:
         """What a page shows when it is opened again: the loaded program, or nothing yet."""
         ses = ENERGIZE.get("session")
         out = _loaded(ses) if ses is not None else {"loaded": False}
-        out.update(device_text=ENERGIZE.get("devices", ""), test_text=ENERGIZE.get("tests", ""))
+        out.update(device_text=ENERGIZE.get("devices", ""), test_text=ENERGIZE.get("tests", ""),
+                   device_list=_device_list(ENERGIZE.get("devices", "")))
         return jsonify(out)
+
+    def _device_list(text: str) -> list[dict]:
+        """Each device model as the page lists it: what it reads, what it answers, how long it takes."""
+        from dataclasses import fields
+
+        from plant import load_plant
+        if not text.strip():
+            return []
+        out = []
+        for d in load_plant(text).devices.values():
+            timing = {f.name: getattr(d, f.name) for f in fields(d) if f.name.endswith("_ms")}
+            out.append({"name": d.name, "kind": d.kind, "reads": [t for t in d.commands() if t],
+                        "answers": d.feedbacks(), "timing": timing})
+        return out
+
+    @app.post("/api/devices/save")
+    def devices_save():
+        """Device models alone: checked now, kept, and the live program answers with them."""
+        from plant import load_plant
+        devices = (request.get_json(silent=True) or {}).get("devices", "")
+        try:
+            if devices.strip():
+                load_plant(devices)
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Device models: {e}"), 400
+        ENERGIZE["devices"] = devices
+        if ENERGIZE.get("files"):
+            try:
+                _reload()
+            except Exception as e:  # noqa: BLE001 - e.g. a device names a tag the program does not have
+                return jsonify(error=str(e)), 400
+        return jsonify(devices=len(_device_list(devices)), device_list=_device_list(devices),
+                       loaded=bool(ENERGIZE.get("session")))
 
     @app.post("/api/energize/step")
     def energize_step():
@@ -165,7 +207,7 @@ def create_app() -> Flask:
         from plant import load_plant
         from scenario import parse_scenarios
         body = request.get_json(silent=True) or {}
-        devices, tests = body.get("devices", ""), body.get("tests", "")
+        devices, tests = body.get("devices", ENERGIZE.get("devices", "")), body.get("tests", "")
         try:
             n_dev = len(load_plant(devices).devices) if devices.strip() else 0
         except Exception as e:  # noqa: BLE001

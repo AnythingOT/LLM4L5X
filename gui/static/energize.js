@@ -137,8 +137,8 @@ function build(j) {
     $('enSkipped').replaceChildren(...j.skipped.map((t) => el('li', '', t)));
     $('enSkippedBox').hidden = !j.skipped.length;
     $('enDevices').textContent = j.devices ? `Device models: ${j.devices}` : 'Add device models';
-    $('enDevices').title = j.devices ? 'Device models answer the outputs; edit them on the Tests page'
-        : 'Nothing answers the outputs yet: add device models on the Tests page';
+    $('enDevices').title = j.devices ? 'Device models answer the outputs; edit them on the Devices page'
+        : 'Nothing answers the outputs yet: add device models on the Devices page';
     const files = (j.names || []).join(', ');
     const plain = j.outputs.filter((t) => !isMember(t)).length;
     $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${plain} outputs`

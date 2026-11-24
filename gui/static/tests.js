@@ -1,9 +1,9 @@
-// Tests page: device models and test cases, kept on the server with the program Energize runs.
+// Tests page: test cases, kept on the server with the program Energize runs (device models: Devices page).
 // All text goes in with textContent: tag names, titles and reports come from files.
 'use strict';
 
 const DRAFT_KEY = 'llm4l5x.tests.draft';  // what was typed, kept if the page is left before saving
-let saved = { devices: '', tests: '' };  // what the server has
+let saved = { tests: '' };  // what the server has
 
 function tsMsg(text, bad) {
     $('tsMsg').textContent = text;
@@ -24,8 +24,8 @@ async function api(url, opts) {
     return j;
 }
 
-function text() { return { devices: $('tsDevices').value, tests: $('tsTests').value }; }
-function dirty() { const t = text(); return t.devices !== saved.devices || t.tests !== saved.tests; }
+function text() { return { tests: $('tsTests').value }; }
+function dirty() { return text().tests !== saved.tests; }
 
 function showProgram(j) {
     $('tsProgram').textContent = j.loaded
@@ -45,7 +45,7 @@ async function save() {
 $('tsSave').onclick = async () => {
     try {
         const j = await save();
-        tsMsg(`Saved: ${j.devices} device model${j.devices === 1 ? '' : 's'}, ${j.tests} test case${j.tests === 1 ? '' : 's'}.`);
+        tsMsg(`Saved: ${j.tests} test case${j.tests === 1 ? '' : 's'}.`);
     } catch (e) { tsMsg(e.message, true); }
 };
 
@@ -103,19 +103,17 @@ $('tsFiles').onchange = async () => {
     } catch (e) { tsMsg(e.message, true); }
 };
 
-for (const id of ['tsDevices', 'tsTests']) {
-    $(id).addEventListener('input', () => store.set(DRAFT_KEY, text()));
-}
+$('tsTests').addEventListener('input', () => store.set(DRAFT_KEY, text()));
 
 (async () => {
     try {
         const j = await api('/api/energize/state');
-        saved = { devices: j.device_text || '', tests: j.test_text || '' };
+        saved = { tests: j.test_text || '' };
         showProgram(j);
+        const n = (j.device_list || []).length;
+        $('tsDevLink').textContent = n ? `${n} device model${n === 1 ? '' : 's'}` : 'device models (none yet)';
     } catch { /* server not ready */ }
     const draft = store.get(DRAFT_KEY, null);
-    const t = draft || saved;
-    $('tsDevices').value = t.devices;
-    $('tsTests').value = t.tests;
+    $('tsTests').value = (draft && typeof draft.tests === 'string' ? draft : saved).tests;
     if (draft && dirty()) tsMsg('Not saved yet: the text from before you left the page.');
 })();

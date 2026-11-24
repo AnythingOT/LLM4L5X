@@ -12,7 +12,8 @@ Everything the app does, in detail. The short version is the [README](../README.
 - [LogicSpec](#logicspec)
 - [Command line](#command-line)
 - [Energize: run the whole program before any controller](#energize-run-the-whole-program-before-any-controller)
-- [Tests: device models and test cases](#tests-device-models-and-test-cases)
+- [Tests: test cases, pass or fail per requirement](#tests-test-cases-pass-or-fail-per-requirement)
+- [Device models](#device-models)
 
 ## How it works
 
@@ -86,7 +87,7 @@ Three pages, light and dark. Every rung, generated, pasted or read from your fil
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
   - **Logic | UDT** switch in the input box. In UDT mode you create data types (below).
 - **Settings** (`/settings`): model (backend, address, model, thinking, context window), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
-- **Rules** (`/rules`): the 50 validation rules, grouped, with search and severity filter; switch each on or off.
+- **Lint** (`/lint`; `/rules` still works): the 50 lint rules, grouped, with search and severity filter; switch each on or off.
 
 ## UDTs: create and optimize
 
@@ -128,7 +129,7 @@ Attach an `.xlsx` where **each sheet is one routine** (the sheet name becomes th
 `validate` (GUI, or `python cli.py validate plant.L5X`) runs two layers:
 
 1. **Import checks** (`core/validator.py`): will Studio 5000 accept it. Syntax, operand count and types, tags that exist, instruction names for the target version (GRT before v36, GT from v36).
-2. **Rules** (`lint/`): 50 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Rules page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
+2. **Rules** (`lint/`): 50 programming rules with fixed codes. The prefix is the severity: **CRT** critical, **ERR** error, **WAR** warning, **INF** info. A rule can be switched off (Lint page, or `--disable INF004,INF003`), never softened, so a code always means the same thing.
    - 19 *rung* rules (duplicate OTE, reused timer or one-shot, unguarded division, unchecked array index, writes to status bits ...) also check every generated or pasted rung. Two of them, a reused timer and a reused one-shot, send the model back for another attempt.
    - 30 *project* rules (fault handlers, task watchdogs and names, uncalled routines, unscheduled programs, I/O mapping and comments, aliases, electronic keying, module lifecycle, UDT padding and order, descriptions ...) need a full controller export; on a partial export only the rung rules run, and the report says so.
    - Accept one case by writing `lint:disable=ERR010` (or `lint:disable` for all rules) in that rung's comment or that tag's or AOI's description. Suppressed findings are listed separately, never dropped.
@@ -235,16 +236,24 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 - **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again. Changes made
   while a step is under way are sent with the next one, never dropped.
 
-## Tests: device models and test cases
+## Tests: test cases, pass or fail per requirement
 
-**Tests** (top bar) holds what checks the program, next to the program Energize runs (load it on either page).
+**Tests** (top bar) holds the test cases, next to the program Energize runs (load it on either page).
 
-- **Device models** stand in for the machine: a pump's running contact closes a second after it is
-  commanded, a valve's limit switches follow its command. Format: [PLANT.md](PLANT.md). Energize uses them
-  too, so its outputs get the same answers.
 - **Test cases** set inputs, wait and expect outputs, each tied to a requirement ID. Format:
   [SCENARIOS.md](SCENARIOS.md) (the file format still says `SCENARIO`).
-- **Save** checks both and keeps them; **Run tests** saves what is on the screen, runs every test case on a
+- **Save** checks them and keeps them; **Run tests** saves what is on the screen, runs every test case on a
   fresh copy of the program, and shows pass or fail per test case and per requirement. The live Energize
   session is not touched.
+- Outputs that need an answer from the machine get it from the device models (next section).
 - Text not saved yet is kept if you leave the page, and shown again when you come back.
+
+## Device models
+
+**Devices** (top bar) holds the device models: stand-ins for the machine. A pump's running contact closes
+a second after it is commanded; a valve's limit switches follow its solenoids. Format: [PLANT.md](PLANT.md).
+
+- **Save** checks them, keeps them, and the loaded program answers with them at once; Energize and Tests
+  both use them.
+- **What each device does** lists, from the saved models, the PLC output each device reads, the PLC input
+  it answers, and how long it takes: check it against the I/O list before trusting a test.

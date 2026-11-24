@@ -35,7 +35,7 @@ page (#50).
      `Flow_Setpoint`) fails the row instead of warning (owner: yes, in this iteration).
    *Done when* every "safe" fix passes a before/after simulator comparison on the public corpus, and the
    y/n flow works in the chat and on a requirements run.
-2. **Profile in the app, and generation follows it.** Choose a profile file on the Rules page; the
+2. **Profile in the app, and generation follows it.** Choose a profile file on the Lint page; the
    compiler names helper tags, avoids banned instructions, and adds `MOV(preset, T.PRE)` only if the
    profile asks. *Done when* generated rungs pass their own profile with no STD findings.
 3. **Test cases: rules first, then drafts.** Standard test cases per block (Motor: start, stop, fault,

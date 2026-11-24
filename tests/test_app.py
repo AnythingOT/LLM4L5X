@@ -179,7 +179,7 @@ def test_generated_and_pasted_rungs_carry_rung_rule_findings(client):
 
 
 def test_pages_and_rule_list(client):
-    for page in ("/", "/settings", "/rules"):
+    for page in ("/", "/settings", "/lint", "/devices", "/tests", "/energize"):
         assert client.get(page).status_code == 200
     rules = client.get("/api/rules").get_json()["rules"]
     assert len(rules) == 50 and {"code", "title", "description", "severity", "scope", "group"} <= set(rules[0])
