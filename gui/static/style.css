@@ -205,15 +205,19 @@ details > summary { cursor: pointer; color: var(--ink-2); font-size: .87rem; }
 }
 .drawing + .drawing { margin-top: -4px; }
 .drawing .rung-note { font-size: .82rem; color: var(--ink-2); padding: 0 8px 4px; }
+/* light wires and rails, so the names (bold) and the symbols carry the eye; a live page adds power flow */
+:root { --lad-wire: #a7b2c3; --lad-rail: #8e9bb0; --lad-sym: #44536b; --ok-soft: color-mix(in srgb, var(--ok) 15%, transparent); }
+body.dark-mode { --lad-wire: #4c5b72; --lad-rail: #66768f; --lad-sym: #b4bfcf; }
 svg.ladder { display: block; }
 svg.ladder text { font-family: var(--mono); font-size: 12px; fill: var(--ink); }
-svg.ladder .lad-op { font-weight: 700; }
-svg.ladder .lad-arg-name, svg.ladder .lad-num { fill: var(--muted); }
+svg.ladder .lad-op, svg.ladder .lad-tag, svg.ladder .lad-arg { font-weight: 700; }
+svg.ladder .lad-arg-name, svg.ladder .lad-num { fill: var(--muted); font-weight: 400; }
 svg.ladder .lad-mark { font-size: 10px; font-weight: 700; }
-svg.ladder line, svg.ladder path { stroke: var(--rail); stroke-width: 1.4; fill: none; stroke-linecap: round; }
-svg.ladder .lad-rail { stroke-width: 3; }
-svg.ladder .lad-sym { stroke: var(--ink); stroke-width: 2; }
-svg.ladder .lad-box { fill: var(--surface); stroke: var(--ink); stroke-width: 1.3; }
+svg.ladder line, svg.ladder path { stroke: var(--lad-wire); stroke-width: 1.4; fill: none; stroke-linecap: round; }
+svg.ladder .lad-rail { stroke: var(--lad-rail); stroke-width: 3; }
+svg.ladder .lad-sym { stroke: var(--lad-sym); stroke-width: 2; }
+svg.ladder .lad-box { fill: var(--surface); stroke: var(--lad-sym); stroke-width: 1.2; }
+svg.ladder .lad-glow { fill: transparent; stroke: none; }
 
 /* ---------- requirements workbook ---------- */
 .progress { height: 6px; border-radius: 3px; background: var(--sunken); border: 1px solid var(--line); overflow: hidden; }
@@ -605,7 +609,8 @@ label.en-name { cursor: pointer; }
 
 .en-ladder { min-width: 0; }
 .en-key { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; }
-.en-swatch { display: inline-block; width: 18px; height: 3px; border-radius: 2px; background: var(--ok); }
+.en-swatch { display: inline-block; width: 18px; height: 0; border-top: 2.4px dashed var(--ok); }
+.en-coil { display: inline-block; width: 16px; height: 11px; border-radius: 6px; background: var(--ok-soft); border: 1px solid var(--ok); }
 #enRungs { overflow-x: auto; }
 .en-routine { font-size: .82rem; color: var(--ink-2); margin: 14px 0 2px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
 .en-routine:first-child { margin-top: 4px; }
@@ -617,9 +622,23 @@ label.en-name { cursor: pointer; }
 .en-rung.lit { background: color-mix(in srgb, var(--ok) 6%, transparent); }
 .en-rung.lit svg.ladder .lad-right { stroke: var(--ok); }
 .en-rung.lit svg.ladder .lad-num { fill: var(--ok); font-weight: 700; }
-#enRungs svg.ladder .lad-el.live line, #enRungs svg.ladder .lad-el.live path { stroke: var(--ok); }
-#enRungs svg.ladder .lad-el.live .lad-sym { stroke-width: 3; }
-#enRungs svg.ladder .lad-el.live text { fill: var(--ok); font-weight: 700; }
+/* power flow, from the simulator's trace: a wire is green and moving up to where power stops */
+#enRungs svg.ladder line.pwr { stroke: var(--ok); stroke-width: 2.4; stroke-dasharray: 7 5; animation: lad-flow .7s linear infinite; }
+#enRungs svg.ladder .lad-rail.pwr, #enRungs svg.ladder .lad-left { stroke-dasharray: none; animation: none; }
+@keyframes lad-flow { to { stroke-dashoffset: -12; } }
+/* a contact true, a coil on: the symbol itself (not its wires) in green, thicker; a coil also glows */
+#enRungs svg.ladder .lad-el.live .lad-sym { stroke: var(--ok); stroke-width: 3; }
+#enRungs svg.ladder .lad-el.live text { fill: var(--ok); }
+#enRungs svg.ladder .lad-el.live .lad-glow { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1;
+    animation: lad-glow 1.8s ease-in-out infinite; }
+@keyframes lad-glow {
+    0%, 100% { filter: drop-shadow(0 0 2px color-mix(in srgb, var(--ok) 45%, transparent)); }
+    50% { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--ok) 85%, transparent)); }
+}
+@media (prefers-reduced-motion: reduce) {
+    #enRungs svg.ladder line.pwr { animation: none; stroke-dasharray: none; }
+    #enRungs svg.ladder .lad-el.live .lad-glow { animation: none; filter: drop-shadow(0 0 4px var(--ok)); }
+}
 
 .en-devices-note { margin: 10px 0 0; font-size: .82rem; }
 .en-skipped { margin-top: 12px; font-size: .82rem; }

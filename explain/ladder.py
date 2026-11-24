@@ -33,16 +33,24 @@ class Box:
 
 
 def _fit(text: str, limit: int = LABEL_MAX) -> str:
-    return text if len(text) <= limit else text[:limit - 1] + "…"
+    """Too long: cut in the middle, so the end that tells tags apart survives (..._LF vs ..._LR)."""
+    if len(text) <= limit:
+        return text
+    head = (limit - 1) // 2
+    return text[:head] + "…" + text[len(text) - (limit - 1 - head):]
 
 
-def _text(x, y, s, cls="lad-tag", anchor="middle", title=None) -> str:
+def _text(x, y, s, cls="lad-tag", anchor="middle", title=None, live=None) -> str:
     t = f"<title>{escape(title)}</title>" if title else ""
-    return f'<text x="{x:.1f}" y="{y:.1f}" class="{cls}" text-anchor="{anchor}">{t}{escape(s)}</text>'
+    v = f' data-live="{escape(live, quote=True)}"' if live else ""
+    return f'<text x="{x:.1f}" y="{y:.1f}" class="{cls}" text-anchor="{anchor}"{v}>{t}{escape(s)}</text>'
 
 
-def _line(x1, y1, x2, y2, cls="lad-wire") -> str:
-    return f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" class="{cls}"/>'
+def _line(x1, y1, x2, y2, cls="lad-wire", at: str | None = None) -> str:
+    """at: which power this wire carries, for a live page: "<path>:in" or "<path>:out" of an element (its
+    path as the simulator's trace names it), or "rail" for the left rail's power."""
+    p = f' data-p="{at}"' if at is not None else ""
+    return f'<line x1="{x1:.1f}" y1="{y1:.1f}" x2="{x2:.1f}" y2="{y2:.1f}" class="{cls}"{p}/>'
 
 
 def _shift(parts: list[str], dx: float, dy: float) -> str:
@@ -54,47 +62,50 @@ class _Layout:
         self.cat = catalog
         self.presets = presets or {}
 
-    def series(self, s: Series) -> Box:
+    def series(self, s: Series, prefix: str = "", offset: int = 0, empty_at: str | None = None) -> Box:
         x, h, parts = 0.0, WIRE + 16, []
-        for e in s.items:
-            b = self.branch(e) if isinstance(e, Branch) else self.instr(e)
+        for k, e in enumerate(s.items):
+            here = f"{prefix}{k + offset}"
+            b = self.branch(e, here) if isinstance(e, Branch) else self.instr(e, here)
             parts.append(_shift(b.parts, x, 0))
             x += b.w
             h = max(h, b.h)
-        if not s.items:  # an empty leg is a plain wire
-            parts.append(_line(0, WIRE, 40, WIRE))
+        if not s.items:  # an empty leg is a plain wire: it carries what reaches the branch
+            parts.append(_line(0, WIRE, 40, WIRE, at=empty_at))
             x = 40
         return Box(x, h, parts)
 
-    def branch(self, b: Branch) -> Box:
-        legs = [self.series(leg) for leg in b.legs]
+    def branch(self, b: Branch, path: str = "") -> Box:
+        legs = [self.series(leg, f"{path}.{j}.", empty_at=f"{path}:in") for j, leg in enumerate(b.legs)]
+        ends = [f"{path}.{j}.{len(leg.items) - 1}:out" if leg.items else f"{path}:in"
+                for j, leg in enumerate(b.legs)]
         inner = max(leg.w for leg in legs)
         w = inner + 2 * PAD
         y, parts, wires = 0.0, [], []
-        for leg in legs:
+        for leg, end in zip(legs, ends):
             parts.append(_shift(leg.parts, PAD, y))
             wires.append(y + WIRE)
-            parts.append(_line(0, y + WIRE, PAD, y + WIRE))
-            parts.append(_line(PAD + leg.w, y + WIRE, w, y + WIRE))  # short legs run on to the bar
+            parts.append(_line(0, y + WIRE, PAD, y + WIRE, at=f"{path}:in"))
+            parts.append(_line(PAD + leg.w, y + WIRE, w, y + WIRE, at=end))  # short legs run on to the bar
             y += leg.h + GAP
-        parts.append(_line(0, wires[0], 0, wires[-1], "lad-bar"))
-        parts.append(_line(w, wires[0], w, wires[-1], "lad-bar"))
+        parts.append(_line(0, wires[0], 0, wires[-1], "lad-bar", at=f"{path}:in"))
+        parts.append(_line(w, wires[0], w, wires[-1], "lad-bar", at=f"{path}:out"))
         return Box(w, y - GAP, parts)
 
-    def instr(self, i: Instr) -> Box:
+    def instr(self, i: Instr, path: str = "") -> Box:
         name = i.name.upper()
         if name in _CONTACTS or name in _COILS:
-            return self._symbol(i, name)
-        return self._box(i)
+            return self._symbol(i, name, path)
+        return self._box(i, path)
 
-    def _symbol(self, i: Instr, name: str) -> Box:
+    def _symbol(self, i: Instr, name: str, path: str = "") -> Box:
         tag = i.args[0] if i.args else "?"
         label = _fit(tag)
         w = max(76, len(label) * CHAR + 16)
         c, parts = w / 2, []
         parts.append(_text(c, WIRE - 16, label, title=tag if label != tag else None))
         if name in _CONTACTS:
-            parts += [_line(0, WIRE, c - 7, WIRE), _line(c + 7, WIRE, w, WIRE),
+            parts += [_line(0, WIRE, c - 7, WIRE, at=f"{path}:in"), _line(c + 7, WIRE, w, WIRE, at=f"{path}:out"),
                       _line(c - 7, WIRE - 10, c - 7, WIRE + 10, "lad-sym"),
                       _line(c + 7, WIRE - 10, c + 7, WIRE + 10, "lad-sym")]
             if _CONTACTS[name]:
@@ -102,7 +113,10 @@ class _Layout:
         else:
             mark = _COILS[name]
             hw = 6 if len(mark) <= 1 else len(mark) * CHAR / 2 + 5  # brackets wide enough for the mark
-            parts += [_line(0, WIRE, c - hw - 5, WIRE), _line(c + hw + 5, WIRE, w, WIRE),
+            # a light fill behind the coil: shown when it is on (a live page), so "on" is not colour of a line only
+            parts.insert(0, f'<rect x="{c - hw - 9:.1f}" y="{WIRE - 13}" width="{2 * hw + 18:.1f}" height="26" '
+                            'rx="13" class="lad-glow"/>')
+            parts += [_line(0, WIRE, c - hw - 5, WIRE, at=f"{path}:in"), _line(c + hw + 5, WIRE, w, WIRE, at=f"{path}:out"),
                       f'<path d="M{c - hw:.1f},{WIRE - 10} q-6,10 0,20 M{c + hw:.1f},{WIRE - 10} q6,10 0,20" class="lad-sym"/>']
             if mark:
                 parts.append(_text(c, WIRE + 4, _COILS[name], "lad-mark"))
@@ -110,7 +124,7 @@ class _Layout:
         group = f'<g class="lad-el" data-kind="{name}" data-tag="{escape(tag, quote=True)}">{"".join(parts)}</g>'
         return Box(w, WIRE + 16, [group])
 
-    def _box(self, i: Instr) -> Box:
+    def _box(self, i: Instr, path: str = "") -> Box:
         spec = self.cat.get(i.name)
         names = [o.name for o in spec.operands] if spec else []
         rows = []
@@ -126,13 +140,16 @@ class _Layout:
         bw = max(len(i.name) * CHAR + 24, lw + vw + 26, 70)
         bh = 22 + 17 * len(rows) + 6
         top, lead = WIRE - 11, 12
-        parts = [_line(0, WIRE, lead, WIRE), _line(lead + bw, WIRE, 2 * lead + bw, WIRE),
+        parts = [_line(0, WIRE, lead, WIRE, at=f"{path}:in"), _line(lead + bw, WIRE, 2 * lead + bw, WIRE, at=f"{path}:out"),
                  f'<rect x="{lead}" y="{top}" width="{bw:.1f}" height="{bh}" rx="3" class="lad-box"/>',
                  _text(lead + bw / 2, top + 15, i.name, "lad-op")]
         for k, (label, value, full) in enumerate(rows):
             y = top + 22 + 17 * k + 12
             parts.append(_text(lead + 8, y, label, "lad-arg-name", "start"))
-            parts.append(_text(lead + bw - 8, y, value, "lad-arg", "end", title=full if value != full else None))
+            # an accumulator ("Accum ?") shows its live value on a live page
+            live = f"{i.args[0]}.ACC" if label == "Accum" and i.args else None
+            parts.append(_text(lead + bw - 8, y, value, "lad-arg", "end", title=full if value != full else None,
+                               live=live))
         return Box(bw + 2 * lead, top + bh + 10, parts)
 
 
@@ -152,7 +169,8 @@ def to_svg(rung: Rung, catalog: Catalog | None = None, number: int | None = None
     while split > 0 and _is_output(items[split - 1], cat):
         split -= 1
     lay = _Layout(cat, presets)
-    cond, outs = lay.series(Series(tuple(items[:split]))), lay.series(Series(tuple(items[split:])))
+    cond = lay.series(Series(tuple(items[:split])))
+    outs = lay.series(Series(tuple(items[split:])), offset=split)  # paths as in the whole rung
     if not items[:split]:
         cond = Box(0, WIRE + 16, [])
     if not items[split:]:
@@ -165,7 +183,7 @@ def to_svg(rung: Rung, catalog: Catalog | None = None, number: int | None = None
         _line(left, 4, left, height - 4, "lad-rail lad-left"),  # left: the power supply
         _line(right, 4, right, height - 4, "lad-rail lad-right"),
         _shift(cond.parts, left, 4),
-        _line(left + cond.w, WIRE + 4, right - outs.w, WIRE + 4),
+        _line(left + cond.w, WIRE + 4, right - outs.w, WIRE + 4, at=f"{split - 1}:out" if split else "rail"),
         _shift(outs.parts, right - outs.w, 4),
     ]
     if number is not None:

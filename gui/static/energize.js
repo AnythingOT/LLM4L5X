@@ -181,7 +181,26 @@ function show(snap) {
         const k = g.dataset.kind;
         g.classList.toggle('live', k === 'XIC' ? v : k === 'XIO' ? !v : v);
     });
-    document.querySelectorAll('#enRungs .en-rung').forEach((f) => f.classList.toggle('lit', !!snap.power[f.dataset.i]));
+    document.querySelectorAll('#enRungs .en-rung').forEach((f) => {
+        const i = Number(f.dataset.i);
+        f.classList.toggle('lit', !!snap.power[i]);
+        // where power flows, from the simulator's trace of this scan: "path:in" / "path:out" of an element
+        const flow = (snap.flow || [])[i] || {};
+        f.querySelectorAll('line[data-p]').forEach((ln) => {
+            const at = ln.dataset.p;
+            let on = at === 'rail';
+            if (!on) {
+                const [path, side] = at.split(':');
+                const bits = path === '' ? 3 : (flow[path] || 0);
+                on = side === 'in' ? !!(bits & 1) : !!(bits & 2);
+            }
+            ln.classList.toggle('pwr', on);
+        });
+        f.querySelectorAll('text[data-live]').forEach((tx) => {  // a timer's or counter's accumulator, live
+            const v = t[tx.dataset.live];
+            if (v !== undefined) tx.textContent = num(v);
+        });
+    });
     const notes = snap.notes || [];
     $('enNotes').replaceChildren(...notes.map((n) => el('li', '', n)));
     $('enNotes').hidden = !notes.length;

@@ -41,8 +41,23 @@ def test_outputs_are_pushed_to_the_right_rail():
 
 def test_long_tags_are_cut_but_kept_in_a_tooltip():
     root = svg("XIC(A_Very_Long_Tag_Name_That_Goes_On_And_On)OTE(B);")
-    assert any(t.endswith("…") for t in texts(root))
+    cut = [t for t in texts(root) if "…" in t]
+    assert cut and cut[0].startswith("A_Very") and cut[0].endswith("On_And_On")  # cut in the middle
     assert any("Goes_On_And_On" in (x.text or "") for x in root.iterfind(".//s:title", NS))
+
+
+def test_long_tags_that_differ_at_the_end_stay_apart():
+    # Tracer lesson: corner suffixes (_LF, _LR) are what tells such tags apart, so the end must survive
+    root = svg("XIC(BUG01_SFTY.IO_UP_LIMIT_SWITCH_LF)XIC(BUG01_SFTY.IO_UP_LIMIT_SWITCH_LR)OTE(B);")
+    cut = [t for t in texts(root) if "…" in t]
+    assert len(cut) == 2 and cut[0] != cut[1] and cut[0].endswith("_LF") and cut[1].endswith("_LR")
+
+
+def test_every_wire_names_the_power_it_carries():
+    # the live page lights a wire from the simulator's trace: element path + in/out side
+    root = svg("[XIC(A) ,XIC(B) ]XIO(C)OTE(D);")
+    at = {ln.get("data-p") for ln in root.iterfind(".//s:line", NS) if ln.get("data-p")}
+    assert {"0:in", "0:out", "0.0.0:in", "0.0.0:out", "0.1.0:out", "1:in", "1:out", "2:in", "2:out"} <= at
 
 
 def test_special_characters_are_escaped():
