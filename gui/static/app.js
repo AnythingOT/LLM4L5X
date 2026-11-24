@@ -8,6 +8,25 @@ const inputWrapper = $('inputWrapper');
 let settings = loadSettings();
 window.addEventListener('focus', () => { settings = loadSettings(); updateBadge(); });  // changed in another tab
 
+// ---------------------------------------------------------------- work that must survive going to another page
+// A requirements run keeps going on the server: its id is kept for this tab, so coming back to this page picks
+// it up again (rows so far, then the result). A request to the model cannot be picked up again, so leaving
+// while one is on its way asks first instead of dropping it.
+const tab = {
+    get(k) { try { return JSON.parse(sessionStorage.getItem(k)); } catch { return null; } },
+    set(k, v) { try { sessionStorage.setItem(k, JSON.stringify(v)); } catch { /* storage unavailable */ } },
+    del(k) { try { sessionStorage.removeItem(k); } catch { /* storage unavailable */ } },
+};
+const JOB_KEY = 'llm4l5x.job';
+let inflight = 0;  // requests on their way that leaving the page would drop
+async function tracked(work) {
+    inflight++;
+    try { return await work(); } finally { inflight--; }
+}
+window.addEventListener('beforeunload', (e) => {
+    if (inflight) { e.preventDefault(); e.returnValue = ''; }  // the browser asks "Leave site?"
+});
+
 // ---------------------------------------------------------------- model badge
 async function updateBadge() {
     const dot = $('modelDot');
@@ -503,6 +522,7 @@ const render = {
 
     spec_started(d) {
         // a requirements workbook: rows are built in the background; poll and show them as they come
+        tab.set(JOB_KEY, d);
         const total = d.sheets.reduce((n, x) => n + x.rows, 0);
         const modelRows = d.sheets.reduce((n, x) => n + x.model_rows, 0);
         const head = el('div', { cls: 'status-line', text: `${d.filename}: ${plural(d.sheets.length, 'routine')}, ${plural(total, 'row')}` });
@@ -525,7 +545,7 @@ const render = {
         const tick = async () => {
             let v;
             try { v = await (await fetch(`/api/jobs/${d.job}?since=${since}`)).json(); } catch { setTimeout(tick, 2000); return; }
-            if (v.kind === 'error') { row.replaceChildren(el('div', { cls: 'err', text: v.message })); return; }
+            if (v.kind === 'error') { tab.del(JOB_KEY); row.replaceChildren(el('div', { cls: 'err', text: v.message })); return; }
             since = v.next;
             bar.firstChild.style.width = `${Math.round((100 * v.done) / Math.max(v.total, 1))}%`;
             v.events.forEach((e) => {
@@ -569,10 +589,10 @@ async function send(text) {
     const who = settings.backend === 'llamacpp' ? 'the model' : (settings.model || 'the model');
     const wait = loading(english ? `Asking ${who} (can take a minute on a CPU)` : 'Working');
     try {
-        const res = await fetch('/api/process', {
+        const res = await tracked(() => fetch('/api/process', {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ text, settings, mode: command ? 'logic' : mode }),
-        });
+        }));
         wait.remove();
         show(await res.json());
     } catch (e) {
@@ -620,7 +640,7 @@ async function upload(file) {
     fd.append('file', file);
     fd.append('settings', JSON.stringify(loadSettings()));
     try {
-        const res = await fetch('/api/project', { method: 'POST', body: fd });
+        const res = await tracked(() => fetch('/api/project', { method: 'POST', body: fd }));
         wait.remove();
         if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
         const d = await res.json();
@@ -650,8 +670,23 @@ inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]
         setProject(s.project, s.programs, s.default_program);
     } catch { /* server not ready */ }
     updateBadge();
-    intro();
+    await intro();
+    resumeJob();
 })();
+
+// a requirements run started before going to another page: show it again, from its first row
+async function resumeJob() {
+    const d = tab.get(JOB_KEY);
+    if (!d || !d.job) return;
+    let r;
+    try { r = await fetch(`/api/jobs/${d.job}?since=0`); } catch { return; }
+    if (!r.ok) { tab.del(JOB_KEY); return; }  // finished long ago and forgotten, or the server restarted
+    const v = await r.json();
+    addBot(el('div', { cls: 'meta', text: v.status === 'running'
+        ? `${d.filename}: still running; it kept going while you were on another page.`
+        : `${d.filename}: the run from before you left this page.` }));
+    show(d);
+}
 
 // ---------------------------------------------------------------- requirements workbook
 function specRow(e) {
