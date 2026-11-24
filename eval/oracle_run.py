@@ -64,11 +64,21 @@ def run(data: bytes, revision: str = "37.00") -> dict:
     finally:
         state.llm = saved
     # a row with no answer is sent back by design (an empty reply): only a right answer sent back is a failure
-    retried = [e for e in job.events if e.get("attempts", 1) > 1 and f"{e['sheet']} row {e['line']}" not in missing]
-    wrong = [e for e in job.events if not e.get("ok") or not e.get("match", True)]
+    def unanswerable(e: dict) -> bool:
+        return f"{e['sheet']} row {e['line']}" in missing
+
+    retried = [e for e in job.events if e.get("attempts", 1) > 1 and not unanswerable(e)]
+    # a NO SPEC row fails by design (it got an empty reply): list it once, under NO SPEC, not again as WRONG
+    wrong = [e for e in job.events if (not e.get("ok") or not e.get("match", True)) and not unanswerable(e)]
     return {"matched": sum(e["matched"] for e in out["sheets"]), "expected": sum(e["expected"] for e in out["sheets"]),
             "sheets": [(e["routine"], e["matched"], e["expected"]) for e in out["sheets"]],
-            "no_spec": missing, "retried": retried, "wrong": wrong}
+            "no_spec": missing, "no_spec_rows": [e for e in job.events if unanswerable(e)],
+            "retried": retried, "wrong": wrong}
+
+
+def _where(e: dict) -> str:
+    """Excel row, as in Report.txt, with the workbook's own Rung number beside it."""
+    return f"{e['sheet']} row {e['line']}" + (f" (Rung {e['ref']})" if e.get("ref") else "")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -78,12 +88,12 @@ def main(argv: list[str] | None = None) -> int:
     r = run(open(a.workbook, "rb").read())
     for name, m, n in r["sheets"]:
         print(f"{name}: {m}/{n}")
-    for row in r["no_spec"]:
-        print("NO SPEC (decompiler cannot express):", row)
+    for e in r["no_spec_rows"]:
+        print("NO SPEC (decompiler cannot express):", _where(e))
     for e in r["wrong"]:
-        print("  WRONG", e["sheet"], e["line"], e.get("error") or e.get("match_why"))
+        print("  WRONG", _where(e), e.get("error") or e.get("match_why"))
     for e in r["retried"]:
-        print("  RETRIED", e["sheet"], e["line"], (e.get("retries") or [""])[0][:120])
+        print("  RETRIED", _where(e), (e.get("retries") or [""])[0][:120])
     print(f"TOTAL {r['matched']}/{r['expected']}  RETRIED {len(r['retried'])}")
     return 1 if r["retried"] else 0
 
