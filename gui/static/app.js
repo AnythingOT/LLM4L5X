@@ -406,7 +406,7 @@ const render = {
         if (L.disabled.length) extra.push(`${L.disabled.length} rule(s) switched off`);
         const row = el('div', { cls: 'btn-row' });
         if (extra.length) row.appendChild(el('span', { cls: 'muted', text: extra.join('; ') }));
-        const a = el('a', { cls: 'save-btn', text: 'Rules page' }); a.href = '/rules';
+        const a = el('a', { cls: 'save-btn', text: 'Lint page' }); a.href = '/lint';
         row.appendChild(a);
         const report = [`Validation of ${d.filename}`, '', 'Import checks:',
             ...imp.map((i) => `  [${i.level}] ${i.where}: ${i.message}`), '',

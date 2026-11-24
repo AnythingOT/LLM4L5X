@@ -5,8 +5,8 @@
 <main class="page-main ts-main">
     <div class="page-head">
         <h1>Tests</h1>
-        <span class="muted">Test cases check the program against its requirements. Device models stand in for the
-            machine: they answer the outputs the way the real devices would.</span>
+        <span class="muted">Test cases check the program against its requirements. Outputs that need an answer
+            from the machine get it from the <a href="/devices" id="tsDevLink">device models</a>.</span>
     </div>
 
     <section class="card ts-program" aria-label="Program">
@@ -18,13 +18,7 @@
         </div>
     </section>
 
-    <div class="ts-editors">
-        <section class="card">
-            <label class="ts-label" for="tsDevices">Device models</label>
-            <p class="muted ts-help">A pump's running contact, a valve's limit switches: what answers each output,
-                and after how long. Format: docs/PLANT.md.</p>
-            <textarea id="tsDevices" class="ts-text" rows="14" spellcheck="false" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}"></textarea>
-        </section>
+    <div class="ts-editors ts-one">
         <section class="card">
             <label class="ts-label" for="tsTests">Test cases</label>
             <p class="muted ts-help">Steps that set inputs, wait, and expect outputs, each tied to a requirement ID.

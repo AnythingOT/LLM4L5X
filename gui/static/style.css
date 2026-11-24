@@ -682,3 +682,7 @@ label.en-name { cursor: pointer; }
 .ts-report summary { cursor: pointer; width: max-content; }
 .ts-report pre { white-space: pre-wrap; font-family: var(--mono); font-size: .78rem; background: var(--sunken); padding: 10px; border-radius: 6px; }
 @media (max-width: 860px) { .ts-editors { grid-template-columns: 1fr; } }
+.ts-one { grid-template-columns: minmax(0, 1fr); }
+.ts-editors .ts-actions { margin: 10px 0 0; }
+.dv-table td:last-child, .dv-table th:last-child { width: auto; white-space: nowrap; }
+.dv-table .ts-id .muted { font-weight: 400; }

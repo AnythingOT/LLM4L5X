@@ -85,8 +85,8 @@ def web():
 
 def _upload(web, files, plant=PLANT, scenarios=SCENARIOS):
     import io
-    data = {"files": [(io.BytesIO(f.encode()), f"R{i}.L5X") for i, f in enumerate(files)],
-            "plant": plant, "scenarios": scenarios}
+    data = {"files": [(io.BytesIO(f.encode()), f"R{i}.L5X") for i, f in enumerate(files)]}
+    data.update({k: v for k, v in (("plant", plant), ("scenarios", scenarios)) if v is not None})
     return web.post("/api/energize/load", data=data, content_type="multipart/form-data")
 
 

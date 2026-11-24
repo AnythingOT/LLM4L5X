@@ -27,7 +27,7 @@ The design has **two steps**, kept apart on purpose:
 | `plant/` | **device models** (UI name; was "plant"): motor/pump and 2-position valve, fault injection through `PLANT:` tags |
 | `scenario/` | **test cases** (UI name; the file format still says `SCENARIO`): OpenVnV step language (SET/EXPECT/WAIT/RESET/COMMENT/CALL), runner, traceability |
 | `library/` | blocks (Motor, Valve2Pos, AlarmLatch): rungs + tags + plant + scenarios from one file |
-| `gui/` | Flask app on 127.0.0.1: chat, requirements jobs, Rules, Settings, **Energize** (run the program live), **Tests** (device models, test cases) |
+| `gui/` | Flask app on 127.0.0.1: chat, requirements jobs, **Lint** (was Rules), Settings, **Energize** (run the program live), **Tests** (test cases), **Devices** (device models) |
 | `eval/` | test workbook generator, **oracle_run** (always-correct stand-in), suites, mutation |
 | `explain/` | ladder SVG, decompiler (rung → LogicSpec), plain-English read-back |
 
