@@ -31,9 +31,9 @@ class Decompiled:
     statements: list[Statement]
 
 
-def _cond_elem(e) -> Expr:
+def _cond_elem(e, first: bool = False) -> Expr:
     if isinstance(e, Branch):
-        return Or(tuple(_cond_series(l) for l in e.legs))
+        return Or(tuple(_cond_series(l, first) for l in e.legs))
     n = e.name.upper()
     if n == "XIC":
         return Var(e.args[0])
@@ -42,14 +42,32 @@ def _cond_elem(e) -> Expr:
     if n in INSTR_CMP:
         return Cmp(INSTR_CMP[n], e.args[0], e.args[1])
     if n == "ONS":
-        raise NotConvertible("ONS inside a branch or after another ONS")
+        raise NotConvertible("ONS not at the start of the power path")
     raise NotConvertible(f"{e.name} is not a condition LogicSpec can express")
 
 
-def _cond_series(s: Series) -> Expr:
-    if not s.items:
+def _cond_series(s: Series, first: bool = False) -> Expr:
+    """Conditions of one series. `first`: nothing is left of it on the power path (the rung start).
+
+    An ONS is RISE of everything to its left, which this series alone knows only when it starts the
+    path: the same place the compiler puts an inline ONS. Elsewhere it stays not convertible.
+    """
+    items = list(s.items)
+    if not items:
         raise NotConvertible("empty branch leg (always-true path)")
-    parts = [_cond_elem(i) for i in s.items]
+    ons_at = [k for k, c in enumerate(items) if isinstance(c, Instr) and c.name.upper() == "ONS"]
+    if len(ons_at) > 1:
+        raise NotConvertible("more than one ONS in one series")
+    parts: list[Expr] = []
+    if ons_at:
+        k = ons_at[0]
+        if not first:
+            raise NotConvertible("ONS not at the start of the power path")
+        if k == 0:
+            raise NotConvertible("ONS with nothing to its left")
+        parts.append(Rise(_cond_series(Series(tuple(items[:k])), True)))
+        items, first = items[k + 1:], False
+    parts += [_cond_elem(c, first and i == 0) for i, c in enumerate(items)]
     return parts[0] if len(parts) == 1 else And(tuple(_flatten_and(parts)))
 
 
@@ -117,25 +135,7 @@ def decompile_rung(r: Rung, presets: dict[str, int] | None = None) -> list[State
             if ins.name.upper() in _OUTPUTS:
                 raise NotConvertible(f"output {ins.name} in the middle of the rung")
 
-    # one ONS allowed, at top level: everything to its left becomes RISE(...)
-    ons_at = [k for k, c in enumerate(conds) if isinstance(c, Instr) and c.name.upper() == "ONS"]
-    if len(ons_at) > 1:
-        raise NotConvertible("more than one ONS in the rung")
-    parts: list[Expr] = []
-    if ons_at:
-        k = ons_at[0]
-        if k == 0:
-            raise NotConvertible("ONS with nothing to its left")
-        parts.append(Rise(_cond_series(Series(tuple(conds[:k])))))
-        conds = conds[k + 1:]
-    parts += [_cond_elem(c) for c in conds]
-    cond: Expr | None
-    if not parts:
-        cond = None
-    elif len(parts) == 1:
-        cond = parts[0]
-    else:
-        cond = And(tuple(_flatten_and(parts)))
+    cond: Expr | None = _cond_series(Series(tuple(conds)), True) if conds else None
 
     if len(outs) == 1 and outs[0].name.upper() == "OTE":
         if cond is None:
