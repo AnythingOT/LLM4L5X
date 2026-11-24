@@ -24,7 +24,7 @@ from pathlib import Path
 
 from core.catalog import default_catalog
 from core.compiler import Compiler
-from core.logicspec import format_spec, parse_spec
+from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import Branch, Instr, Rung, Series, format_rung, parse_rung, walk
 from eval.rung_compare import Side, _refs, compare
 from eval.suite import make_case
@@ -189,8 +189,11 @@ def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[s
         if key in seen or _writes([exp]) & written:
             continue
         spec = format_spec(stmts)
-        ok, _ = behaves_like(spec, [exp])
-        if not ok or not buildable(spec):  # e.g. T.DN of a timer the sheet never creates
+        try:
+            ok = behaves_like(spec, [exp])[0] and buildable(spec)
+        except SpecError:  # CompileError too: RES of a timer its own project times elsewhere: not reachable here
+            ok = False
+        if not ok:  # e.g. T.DN of a timer the sheet never creates
             continue
         seen.add(key)
         written |= _writes([exp])
