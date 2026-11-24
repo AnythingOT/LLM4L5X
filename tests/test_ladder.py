@@ -19,7 +19,8 @@ def test_contacts_coil_and_rails():
     root = svg("XIC(Start)[XIC(Run) ,XIO(Stop) ]OTE(Motor);", number=0)
     assert root.tag == "{http://www.w3.org/2000/svg}svg"
     assert {"Start", "Run", "Stop", "Motor", "0"} <= set(texts(root))
-    assert len(root.findall(".//s:line[@class='lad-rail']", NS)) == 2
+    rails = [ln.get("class") for ln in root.iterfind(".//s:line", NS) if "lad-rail" in ln.get("class", "")]
+    assert rails == ["lad-rail lad-left", "lad-rail lad-right"]  # a live page keeps the supply (left) energized
     assert len(root.findall(".//s:line[@class='lad-bar']", NS)) == 2  # one branch: two vertical bars
     assert len(root.findall(".//s:path", NS)) == 1  # the coil
 

@@ -1,4 +1,4 @@
-"""Energise: run a whole program with its plant, live, before any controller is involved.
+"""Energize: run a whole program with its plant, live, before any controller is involved.
 
 Every routine runs once per scan, in file order, with Sim_Mode = 1. MAP_IN and MAP_OUT are skipped:
 in simulation the plant model owns the mapped inputs and the field outputs stay off. A rung that only
@@ -25,7 +25,7 @@ _STRUCTS = {"TON", "TOF", "RTO", "CTU", "CTD"}
 _FIRST_ARG_WRITES = {"OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "ONS", "CLR"}
 
 
-class EnergiseError(ValueError):
+class EnergizeError(ValueError):
     pass
 
 
@@ -77,9 +77,9 @@ class Session:
         self.backend = be
         for tag, value in (writes or {}).items():
             if not be.has(tag):
-                raise EnergiseError(f"{tag} is not used by this program or plant")
+                raise EnergizeError(f"{tag} is not used by this program or plant")
             if tag in self.outputs or base_tag(tag) in {base_tag(o) for o in self.outputs}:
-                raise EnergiseError(f"{tag} is written by the logic; a value set here would be overwritten")
+                raise EnergizeError(f"{tag} is written by the logic; a value set here would be overwritten")
             be.write(tag, value)
         be.advance(ms)
         return self.snapshot()
@@ -130,10 +130,10 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
                 rungs.append(r)
                 places.append(Place(rt.name, n, format_rung(r)))
     if unsupported:
-        raise EnergiseError("the simulator cannot run every rung, so it would not behave like the controller: "
+        raise EnergizeError("the simulator cannot run every rung, so it would not behave like the controller: "
                             + "; ".join(unsupported[:10]) + (" ..." if len(unsupported) > 10 else ""))
     if not rungs:
-        raise EnergiseError("no ladder rungs to run")
+        raise EnergizeError("no ladder rungs to run")
     written = {base_tag(w) for r in rungs for i in walk(r.body) for w in _writes(i) if not is_literal(w)}
     # a timer or counter is a structure: its elapsed/count and done bits are what a person watches
     structs = {i.args[0] for r in rungs for i in walk(r.body)

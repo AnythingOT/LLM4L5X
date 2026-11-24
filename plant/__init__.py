@@ -1,7 +1,7 @@
 """Plant models: what the field devices do when the PLC drives them.
 
 A plant model reads the PLC's command tags, waits the way real equipment waits, and writes the
-feedback tags back: a pump's run contact closes a second after its contactor is energised; a valve
+feedback tags back: a pump's run contact closes a second after its contactor is energized; a valve
 leaves its closed limit switch at once and reaches the open one after its travel time.
 
 Everything is deterministic and driven by elapsed milliseconds, so the same scenario gives the same

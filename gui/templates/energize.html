@@ -1,11 +1,11 @@
 {% extends "base.html" %}
-{% block title %}Energise{% endblock %}
+{% block title %}Energize{% endblock %}
 {% block bodyclass %}page{% endblock %}
 {% block body %}
 <main class="page-main en-main">
     <div class="page-head">
-        <h1>Energise</h1>
-        <span class="muted">Run the whole program on this PC, with a plant model in place of the machine, before it
+        <h1>Energize</h1>
+        <span class="muted">Run the whole program on this PC, with device models in place of the machine, before it
             goes near a controller.</span>
     </div>
 
@@ -16,19 +16,8 @@
             <span id="enFileNames" class="muted">L5X routines, a project export, or the Routines.zip from a requirements run</span>
             <button id="enLoad" class="btn primary" disabled>Load</button>
         </div>
-        <details class="en-more">
-            <summary>Plant and scenarios <span class="muted">optional</span></summary>
-            <div class="en-two">
-                <div>
-                    <label for="enPlant">Plant: devices that answer the outputs (docs/PLANT.md)</label>
-                    <textarea id="enPlant" rows="5" spellcheck="false" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}"></textarea>
-                </div>
-                <div>
-                    <label for="enScenarios">Scenarios: tests to run against the program (docs/SCENARIOS.md)</label>
-                    <textarea id="enScenarios" rows="5" spellcheck="false" placeholder="SCENARIO TC-01 &quot;Motor starts&quot; REQ R1&#10;  SET Start_PB = 1&#10;  EXPECT Motor == 1 within_ms 100"></textarea>
-                </div>
-            </div>
-        </details>
+        <p class="muted en-devices-note">Outputs that need an answer from the machine (a pump's running contact, a
+            valve's limit switch) get one from the <a href="/tests">device models on the Tests page</a>.</p>
         <p id="enMsg" class="en-msg" role="status"></p>
     </section>
 
@@ -40,7 +29,7 @@
             <span class="en-clock" aria-live="off"><b id="enTime">0.00</b> s</span>
             <span id="enSummary" class="muted en-summary"></span>
             <span id="enLiveMsg" class="en-live-msg" role="alert"></span>
-            <button id="enScen" class="btn" hidden>Run scenarios</button>
+            <a id="enDevices" class="btn" href="/tests"></a>
             <button id="enChange" class="btn">Change program</button>
         </div>
         <ul id="enNotes" class="en-notes" hidden></ul>
@@ -65,15 +54,11 @@
                 <ul id="enOutputs" class="en-tags"></ul>
                 <h3 id="enStructHead" hidden>Timers and counters</h3>
                 <ul id="enStructs" class="en-tags"></ul>
-                <h3 id="enFeedHead" hidden>Plant feedback</h3>
+                <h3 id="enFeedHead" hidden>From the device models</h3>
                 <ul id="enFeedback" class="en-tags"></ul>
             </aside>
         </div>
 
-        <section class="card en-scen" id="enScenCard" hidden>
-            <h2>Scenarios <span id="enScenSum" class="muted"></span></h2>
-            <pre id="enReport" class="en-report"></pre>
-        </section>
         <details class="en-skipped" id="enSkippedBox" hidden>
             <summary class="muted">Not run in simulation</summary>
             <ul id="enSkipped" class="muted"></ul>
@@ -81,4 +66,4 @@
     </section>
 </main>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='energise.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='energize.js') }}"></script>{% endblock %}

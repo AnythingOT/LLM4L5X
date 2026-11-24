@@ -66,7 +66,7 @@ class Simulator:
         if inputs:
             self.state.update(inputs)
         self.dt = dt_ms
-        # whether each rung ended true this scan: the Energise page lights energised rungs
+        # whether each rung ended true this scan: the Energize page lights energized rungs
         self.power = [self.series(r.body, True) for r in self.rungs]
         return self.state
 

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Tests{% endblock %}
+{% block bodyclass %}page{% endblock %}
+{% block body %}
+<main class="page-main ts-main">
+    <div class="page-head">
+        <h1>Tests</h1>
+        <span class="muted">Test cases check the program against its requirements. Device models stand in for the
+            machine: they answer the outputs the way the real devices would.</span>
+    </div>
+
+    <section class="card ts-program" aria-label="Program">
+        <div class="en-pick">
+            <span id="tsProgram" class="ts-program-name">No program loaded</span>
+            <input id="tsFiles" class="en-file" type="file" multiple accept=".L5X,.l5x,.zip" />
+            <label for="tsFiles" class="btn">Load a program</label>
+            <a class="btn" href="/energize" id="tsOpen" hidden>Open in Energize</a>
+        </div>
+    </section>
+
+    <div class="ts-editors">
+        <section class="card">
+            <label class="ts-label" for="tsDevices">Device models</label>
+            <p class="muted ts-help">A pump's running contact, a valve's limit switches: what answers each output,
+                and after how long. Format: docs/PLANT.md.</p>
+            <textarea id="tsDevices" class="ts-text" rows="14" spellcheck="false" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}"></textarea>
+        </section>
+        <section class="card">
+            <label class="ts-label" for="tsTests">Test cases</label>
+            <p class="muted ts-help">Steps that set inputs, wait, and expect outputs, each tied to a requirement ID.
+                Format: docs/SCENARIOS.md.</p>
+            <textarea id="tsTests" class="ts-text" rows="14" spellcheck="false" placeholder="SCENARIO TC-01 &quot;Pump starts&quot; REQ R1&#10;  SET Start_PB = 1&#10;  EXPECT P101_Running == 1 within_ms 1500"></textarea>
+        </section>
+    </div>
+
+    <div class="ts-actions">
+        <button id="tsRun" class="btn en-run">Run tests</button>
+        <button id="tsSave" class="btn">Save</button>
+        <span id="tsMsg" class="muted" role="status"></span>
+    </div>
+
+    <section class="card ts-results" id="tsResults" hidden aria-labelledby="tsSum">
+        <h2 id="tsSum"></h2>
+        <table class="ts-table">
+            <thead><tr><th>Test case</th><th>Requirements</th><th>Result</th></tr></thead>
+            <tbody id="tsCases"></tbody>
+        </table>
+        <h3>By requirement</h3>
+        <table class="ts-table">
+            <thead><tr><th>Requirement</th><th>Test cases</th><th>Result</th></tr></thead>
+            <tbody id="tsTrace"></tbody>
+        </table>
+        <details class="ts-report"><summary class="muted">Full report</summary><pre id="tsReport"></pre></details>
+    </section>
+</main>
+{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='tests.js') }}"></script>{% endblock %}

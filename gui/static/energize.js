@@ -1,4 +1,4 @@
-// Energise page: load a program + plant, drive inputs, watch outputs and the ladder light up.
+// Energize page: load a program + plant, drive inputs, watch outputs and the ladder light up.
 // All text goes in with textContent: tag names and rung text come from files. The only markup inserted
 // is the rung drawings, which the server builds from the rung with every text escaped (explain/ladder.py).
 'use strict';
@@ -136,13 +136,14 @@ function build(j) {
 
     $('enSkipped').replaceChildren(...j.skipped.map((t) => el('li', '', t)));
     $('enSkippedBox').hidden = !j.skipped.length;
-    $('enScen').hidden = !j.has_scenarios;
-    $('enScenCard').hidden = true;
-    const files = [...$('enFiles').files].map((f) => f.name).join(', ');
+    $('enDevices').textContent = j.devices ? `Device models: ${j.devices}` : 'Add device models';
+    $('enDevices').title = j.devices ? 'Device models answer the outputs; edit them on the Tests page'
+        : 'Nothing answers the outputs yet: add device models on the Tests page';
+    const files = (j.names || []).join(', ');
     const plain = j.outputs.filter((t) => !isMember(t)).length;
     $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${plain} outputs`
-        + (j.structs.length ? `, ${j.structs.length} timers and counters` : '')
-        + (j.feedbacks.length ? `, ${j.feedbacks.length} from the plant` : '');
+        + (j.structs.length ? `, ${j.structs.length} ${j.structs.length === 1 ? 'timer or counter' : 'timers and counters'}` : '')
+        + (j.feedbacks.length ? `, ${j.feedbacks.length} from the device models` : '');
     document.querySelectorAll('.en-filter').forEach((f) => { f.value = ''; });
 }
 
@@ -191,7 +192,7 @@ async function step(ms) {
     busy = true;
     const writes = pending;
     pending = {};
-    try { show(await post('/api/energise/step', { ms, writes })); }
+    try { show(await post('/api/energize/step', { ms, writes })); }
     catch (e) { stop(); msg(e.message, true); }
     finally { busy = false; }
     if (Object.keys(pending).length) step(0);  // written while this step was on its way
@@ -238,7 +239,7 @@ $('enStep').onclick = () => step(100);
 $('enReset').onclick = async () => {
     stop();
     pending = {};
-    try { show(await post('/api/energise/step', { reset: true })); } catch (e) { msg(e.message, true); }
+    try { show(await post('/api/energize/step', { reset: true })); } catch (e) { msg(e.message, true); }
 };
 $('enChange').onclick = () => {
     stop();
@@ -246,21 +247,23 @@ $('enChange').onclick = () => {
     $('enFiles').focus();
 };
 
+function open_(j) {  // a loaded program: build the page from it and show its live state
+    build(j);
+    show(j.snapshot);
+    $('enSetup').hidden = true;
+    $('enLive').hidden = false;
+}
+
 $('enLoad').onclick = async () => {
     stop();
     const form = new FormData();
     for (const f of $('enFiles').files) form.append('files', f);
-    form.append('plant', $('enPlant').value);
-    form.append('scenarios', $('enScenarios').value);
     msg('Loading...');
     $('enLoad').disabled = true;
     try {
-        const j = await post('/api/energise/load', null, form);
-        build(j);
-        show(j.snapshot);
+        const j = await post('/api/energize/load', null, form);
         msg('');
-        $('enSetup').hidden = true;
-        $('enLive').hidden = false;
+        open_(j);
     } catch (e) {
         msg(e.message, true);
     } finally {
@@ -268,16 +271,13 @@ $('enLoad').onclick = async () => {
     }
 };
 
-$('enScen').onclick = async () => {
-    $('enScenCard').hidden = false;
-    $('enScenSum').textContent = 'running...';
+// the program stays loaded on the server: coming back to this page (or from Tests) shows it as it was left
+(async () => {
     try {
-        const j = await post('/api/energise/scenarios');
-        $('enScenSum').textContent = `${j.passed} of ${j.total} pass`;
-        $('enReport').textContent = j.report.join('\n');
-    } catch (e) { $('enScenSum').textContent = e.message; }
-    $('enScenCard').scrollIntoView({ block: 'nearest' });
-};
+        const j = await (await fetch('/api/energize/state')).json();
+        if (j.loaded) open_(j);
+    } catch { /* nothing loaded: the page starts empty */ }
+})();
 
 document.querySelectorAll('.en-filter').forEach((f) => {
     f.oninput = () => {
