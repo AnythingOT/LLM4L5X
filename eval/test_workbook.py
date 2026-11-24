@@ -12,7 +12,7 @@ Expected rung in the scan simulator (equivalent rungs count as right). Sheets:
 Every expected answer is checked before it is written: the LogicSpec that says the same thing
 is compiled and must behave like the Expected rung, so the sheet holds no impossible rows.
 
-    python -m eval.test_workbook out.xlsx [--seed 3] [--rows 12] [--corpus folder_of_L5X]
+    python -m eval.test_workbook out.xlsx [--seed 3] [--rows 12] [--level 1|2] [--corpus folder_of_L5X]
 """
 
 from __future__ import annotations
@@ -105,7 +105,8 @@ def _writes(rungs) -> set[str]:
     return {w.split(".")[0].split("[")[0] for w in _refs(Side(list(rungs), {}), default_catalog())[2]}
 
 
-def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str] | None = None) -> list[tuple]:
+def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str] | None = None,
+                level: int = 1) -> list[tuple]:
     """Rows of one structure, every instruction family represented, no tag written by two rows.
 
     `written` is shared by the whole workbook: every sheet goes into one program, so a timer
@@ -118,7 +119,7 @@ def suite_sheet(rng: random.Random, structure: str, want: int, written: set[str]
     while len(rows) < want and n < 5000:
         feat = feats[n % len(feats)]
         n += 1
-        case = make_case(rng, feat, structure, n, 35)
+        case = make_case(rng, feat, structure, n, 35, level)
         if any("COP(" in t for t in case.rungs):  # COP needs array tags from a project; a sheet has none
             continue
         main = [parse_rung(t) for t in case.rungs if t not in case.context]
@@ -199,7 +200,7 @@ def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[s
     return rows
 
 
-def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None) -> dict[str, int]:
+def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None, level: int = 1) -> dict[str, int]:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Font, PatternFill
     if corpus is not None:
@@ -210,8 +211,8 @@ def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None) 
     rng = random.Random(seed)
     # one program: each tag is written by one row of the whole workbook (Referenced's names are fixed, so first)
     written = _writes(parse_rung(e) for _, e, _ in REFERENCED)
-    sheets = {s.title(): suite_sheet(rng, s, rows, written) for s in ("series", "parallel", "nested")}
-    sheets["Multi_output"] = suite_sheet(rng, "multi_output", rows, written)
+    sheets = {s.title(): suite_sheet(rng, s, rows, written, level) for s in ("series", "parallel", "nested")}
+    sheets["Multi_output"] = suite_sheet(rng, "multi_output", rows, written, level)
     sheets["Referenced"] = [(r, "", e, "uses earlier rows of this sheet", s) for r, e, s in REFERENCED]
     if corpus:
         sheets["Real_world"] = real_world_sheet(corpus, rng, rows, written)
@@ -240,7 +241,7 @@ def build(out: Path, seed: int = 3, rows: int = 12, corpus: Path | None = None) 
         ws.freeze_panes = "A2"
     info = wb.create_sheet("How to use")
     for line in [
-        f"LLM4L5X test workbook, seed {seed}. Attach it in the app: each sheet becomes a routine, rows are built one by one.",
+        f"LLM4L5X test workbook, seed {seed}, level {level}. Attach it in the app: each sheet becomes a routine, rows are built one by one.",
         "Expected rung: what the row must behave like. Rows are run against it in the scan simulator, so an equivalent",
         "rung written differently counts as right. The score per routine is in the summary and in Report.txt.",
         "Rows with Rung text and no Requirement are context (an earlier rung the next row refers to); the model is not asked.",
@@ -258,10 +259,12 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("out", type=Path)
     ap.add_argument("--seed", type=int, default=3)
+    ap.add_argument("--level", type=int, choices=(1, 2), default=1,
+                    help="2: longer series, wider branches, two-group nests, 3-4 outputs per rung")
     ap.add_argument("--rows", type=int, default=12)
     ap.add_argument("--corpus", type=Path)
     a = ap.parse_args()
-    counts = build(a.out, a.seed, a.rows, a.corpus)
+    counts = build(a.out, a.seed, a.rows, a.corpus, a.level)
     print(counts)
     short = {k: v for k, v in counts.items() if v < a.rows and k != "Referenced"}
     if short:  # a short sheet is not the same test as a full one; say so instead of saving it quietly

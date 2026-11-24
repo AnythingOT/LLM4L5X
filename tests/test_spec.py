@@ -348,3 +348,52 @@ def test_no_req_column_no_requirements_section(client):
     _, v = run(client, book({"A": [["Requirement", "Rung text"], ["", "XIC(A)OTE(B);"]]}))
     assert "Traceability:" not in (v["result"].get("zip_b64") and zipfile.ZipFile(io.BytesIO(
         base64.b64decode(v["result"]["zip_b64"]))).read("Report.txt").decode() or "")
+
+
+@pytest.mark.parametrize("seed", [11, 17])
+def test_level_2_fills_every_sheet_with_bigger_rungs(tmp_path, seed):
+    import openpyxl
+
+    from eval.test_workbook import build
+    counts = {lvl: build(tmp_path / f"l{lvl}.xlsx", seed=seed, rows=12, level=lvl) for lvl in (1, 2)}
+    assert all(v == 12 for v in counts[2].values()), counts[2]
+
+    def size(path):  # mean instructions per model row on the generated sheets
+        wb = openpyxl.load_workbook(path)
+        n = [r[3].value.count("(") for s in ("Series", "Parallel", "Nested", "Multi_output")
+             for r in wb[s].iter_rows(min_row=2) if r[1].value]
+        return sum(n) / len(n)
+    assert size(tmp_path / "l2.xlsx") > 1.3 * size(tmp_path / "l1.xlsx")
+
+
+def test_level_2_nests_two_groups_in_plain_english():
+    import random
+
+    from eval.suite import Builder, condition
+    seen = set()
+    for i in range(200):
+        eng, spec, _ = condition(Builder(random.Random(i), 35, level=2), "nested", None)
+        assert eng.count("either") <= 2  # never "either ... either ... either": three-deep reads two ways
+        seen.add(("OR (" in spec and spec.count("AND") >= 2) or ") AND (" in spec or spec.count("OR") >= 2)
+    assert seen == {True}  # every level-2 nest is a two-group or three-way shape, never a lone A AND (B OR C)
+
+
+@pytest.mark.parametrize("twin,named", [
+    ("Flow_SP", "Flow_Setpoint"),       # the model wrote Flow_SP for the named Flow_Setpoint (level 2, seeds 17, 23)
+    ("Speed_SP", "Speed_Ref"),
+    ("Purge_Delay_TMR", "Purge_TMR"),
+    ("Cycle_CTR", "Cycle_Count"),
+    ("Tote_Count", "Tote_CTR"),
+])
+def test_level_2_names_have_no_near_twin(twin, named):
+    from eval.suite import MORE
+    assert twin not in {x for pool in MORE.values() for x in pool}
+
+
+def test_level_2_oracle_sends_nothing_back(tmp_path):
+    from eval.oracle_run import run as oracle
+    from eval.test_workbook import build
+    f = tmp_path / "l2.xlsx"
+    build(f, seed=17, level=2)
+    r = oracle(f.read_bytes())
+    assert r["retried"] == [] and r["no_spec"] == [] and r["matched"] == r["expected"] > 0

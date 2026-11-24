@@ -81,8 +81,14 @@ Add your own requests there. To improve results without fine-tuning, add example
 
 ## Test workbook
 
-`python -m eval.test_workbook out.xlsx --seed 3 --rows 12 --corpus folder_of_exports` writes a requirements
-workbook in which every row has an **Expected rung**. Attach it in the app to score the model (see the guide).
+`python -m eval.test_workbook out.xlsx --seed 3 --rows 12 --level 1 --corpus folder_of_exports` writes a
+requirements workbook in which every row has an **Expected rung**. Attach it in the app to score the model (see the guide).
+
+`--level 2` keeps the same sheets with bigger rungs for when level 1 scores full marks: 4-5 condition series,
+3-4 leg branches with 1-2 more conditions, two-group nests, 3-4 outputs (about 5.5 instructions a row against
+3.8). It adds extra tag names (`MORE` in `eval/suite.py`); none may mean the same as a name already used, or
+the model takes the near-twin for the named tag (`Flow_SP` for `Flow_Setpoint`) and the workbook, not the
+model, fails the row.
 
 | Sheet | Rows |
 |---|---|
