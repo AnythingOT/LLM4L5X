@@ -196,6 +196,8 @@ with an optional plant file ([PLANT.md](PLANT.md)) and scenarios ([SCENARIOS.md]
   would make the program look like it works.
 - Click an input to switch it 0/1 (Shift+click to type a number). Outputs and plant feedback update
   live; timers and counters show `.ACC` and `.DN`. Rungs that are true this scan are lit.
+- Timers and counters take their preset from the tag's data, as the controller does: an export writes
+  `TON(T,?,?)` in the rung, so the rung alone has no preset.
 - **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again.
 - **Run scenarios** runs every scenario on a fresh copy and shows the verdict per requirement; the
   live session is not touched.
