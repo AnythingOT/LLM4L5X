@@ -11,7 +11,7 @@ from l5x.reader import read_l5x
 from udt import layout
 from udt.excel import read_excel, template
 from udt.model import UdtDef, UdtError, UdtMember, check, format_spec, parse_spec
-from udt.optimize import analyse, file_name, full_program, single_file, zip_files
+from udt.optimize import analyse, file_name, file_names, full_program, single_file, zip_files
 from udt.writer import host_name, sizes, write_udt
 
 FIX = Path(__file__).parent / "fixtures"
@@ -186,6 +186,26 @@ def test_zip_has_one_file_per_udt_and_changes(an):
     assert "Pad_UDT: 12 -> 8 bytes (4 saved per instance, 13 instances, 52 bytes in total)" in changes
     assert "LAYOUT RISK: COP copies bytes of CopySrc" in changes
 
+
+
+def test_udts_whose_names_trim_alike_get_their_own_file():
+    # names are trimmed to 32 characters: these two share them, and the zip once held one file twice
+    a, b = "Conveyor_Section_Control_Data_XY_Pad", "Conveyor_Section_Control_Data_XY_Copy"
+    text = (FIX / "udt_program.L5X").read_text("utf-8-sig").replace("Pad_UDT", a).replace("Copy_UDT", b)
+    an = analyse(text.encode("utf-8"))
+    z = zipfile.ZipFile(io.BytesIO(zip_files(an, {a, b})))
+    names = [n for n in z.namelist() if n != "CHANGES.txt"]
+    assert len(names) == len(set(names)) == 2 and all(len(n) <= 40 for n in names)
+    targets = {u for n in names for u in (a, b) if f'Use="Target" Name="{u}"' in z.read(n).decode("utf-8-sig")}
+    assert targets == {a, b}  # each file is its own UDT
+
+
+def test_file_names_suit_windows():
+    f = file_names(["AB:5000_HART_Command_Control_Struct:I:0", "AB:5000_HART_Command_Control_Struct:O:0",
+                    "Valve_UDT", "VALVE_UDT"])
+    assert not any(c in n for n in f.values() for c in '<>:"/\\|?*')
+    assert len({n.lower() for n in f.values()}) == 4  # Windows ignores case: no two may differ only by it
+    assert {f["Valve_UDT"], f["VALVE_UDT"]} == {"VALVE_UDT_opt.L5X", "Valve_UDT~2_opt.L5X"}
 
 def test_real_studio_exports_match_the_original_optimizer():
     """Sizes and order on Studio 5000 exports, compared with L5X UDT Optimizer's results."""
