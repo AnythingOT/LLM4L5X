@@ -1,6 +1,7 @@
 """Every feature over a folder of real L5X exports. Skipped unless LLM4L5X_CORPUS names the folder:
 
-    LLM4L5X_CORPUS=path/to/exports pytest tests/test_corpus.py -q
+    python -m eval.fetch_corpus corpus          # the public exports CI uses (eval/corpus_sources.txt)
+    LLM4L5X_CORPUS=corpus pytest tests/test_corpus.py -q
 
 The exports themselves are never committed (they can be confidential). What is checked per file:
 the GUI flows run without an error (attach, summary, explain, validate, optimize UDTs), no rule

@@ -42,12 +42,22 @@ python cli.py survey C:\path\to\your\exports
 
 **Every feature, on every file:** `tests/test_corpus.py` attaches each export in a folder and runs summary,
 explain, validate, every ladder drawing, the UDT plan and its downloads, and a write-and-read round trip
-of every routine. The exports are never committed:
+of every routine. The exports are never committed.
+
+**CI runs it on every push** over public exports: `eval/corpus_sources.txt` pins 31 MIT- or Apache-licensed
+GitHub repositories at a commit, and `python -m eval.fetch_corpus FOLDER` fetches only their .L5X files
+(858 distinct files, about 77 MB; CI caches them until the list changes). Repositories with no licence, GPL
+or "All rights reserved", and the AnythingOT repositories (one holds a confidential name, and CI logs are
+public), are not on the list. Files broken on purpose, such as another tool's adversarial fixtures, are
+excluded by a glob on their line. To run the same set, or your own folder:
 
 ```
-set LLM4L5X_CORPUS=C:\path\to\your\exports
+python -m eval.fetch_corpus corpus
+set LLM4L5X_CORPUS=corpus
 pytest tests/test_corpus.py -q
 ```
+
+CI run on the pinned list (Nov 2026): 858 files, 2574 checks, all passing.
 
 Last run: 241 files (234 public exports from 16 GitHub repositories, plus every L5X in the AnythingOT
 repositories), 723 checks, all passing. On the same files the rules agree with L5X_Lint rule for rule, except that INF007 also sees the

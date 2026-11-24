@@ -53,7 +53,9 @@ Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, PLANT, SCENARIOS, LIB
   `CONFIDENTIAL_PATTERN`; CI fails if any tracked file matches (it prints file names only).
 - The test fixture of the separate L5X_Lint repo contains one of those names: never copy it here.
 - Corpus and Real_world test rows come **only from public GitHub L5X exports**, never company exports
-  (`LLM4L5X_CORPUS` points at a folder of them; the corpus test skips without it).
+  (`LLM4L5X_CORPUS` points at a folder of them; the corpus test skips without it). CI fetches the public
+  set pinned in `eval/corpus_sources.txt` and runs it on every push; add a repository there only if its
+  LICENSE is MIT or Apache and it is not an AnythingOT repository.
 - Company libraries and profiles stay outside this repo.
 
 ## How results are measured
