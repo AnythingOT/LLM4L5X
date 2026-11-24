@@ -11,7 +11,7 @@ import time
 import zipfile
 from urllib.parse import urlsplit
 
-from flask import Flask, Response, jsonify, render_template, request
+from flask import Flask, Response, jsonify, redirect, render_template, request
 
 import lint
 from gui import jobs, logic, project, spec, state, udts
@@ -78,15 +78,44 @@ def create_app() -> Flask:
     def rules_page():
         return render_template("rules.html", page="rules")
 
-    @app.get("/energise")
+    @app.get("/energize")
+    def energize_page():
+        return render_template("energize.html", page="energize")
+
+    @app.get("/energise")  # the page's old spelling: links and bookmarks still work
     def energise_page():
-        return render_template("energise.html", page="energise")
+        return redirect("/energize", code=301)
 
-    # ------------------------------------------------------------ energise: whole program + plant, live
+    @app.get("/tests")
+    def tests_page():
+        return render_template("tests.html", page="tests")
 
-    @app.post("/api/energise/load")
-    def energise_load():
-        from gui import energise
+    # ------------------------------------------------------------ energize and tests: one program, shared
+    # The program, the device models and the test cases live here, not in a page: either page can be left and
+    # opened again (or the other one used) without loading anything twice.
+
+    def _loaded(ses) -> dict:
+        from gui import energize
+        extra = energize.view(ses, ENERGIZE["files"])
+        svgs = extra.pop("svgs")
+        return dict(loaded=True, names=ENERGIZE["names"], inputs=ses.inputs, outputs=ses.outputs,
+                    feedbacks=ses.feedbacks, skipped=ses.skipped, devices=_count_devices(ses),
+                    rungs=[{"routine": p.routine, "number": p.number, "text": p.text, "svg": s}
+                           for p, s in zip(ses.places, svgs)],
+                    has_scenarios=bool(ses.scenarios_text.strip()), **extra)
+
+    def _count_devices(ses) -> int:
+        be = ses.backend
+        return len(be.plant.devices) if be is not None and be.plant is not None else 0
+
+    def _reload() -> None:
+        """(Re)build the session from the shared program, device models and test cases."""
+        from gui import energize
+        ENERGIZE["session"] = energize.load(ENERGIZE["files"], ENERGIZE.get("devices", ""),
+                                            ENERGIZE.get("tests", ""))
+
+    @app.post("/api/energize/load")
+    def energize_load():
         files = []
         for f in request.files.getlist("files"):
             data = f.read()
@@ -95,22 +124,30 @@ def create_app() -> Flask:
                     files += [z.read(n) for n in z.namelist() if n.lower().endswith(".l5x")]
             else:
                 files.append(data)
+        before = dict(ENERGIZE)
+        ENERGIZE.update(files=files, names=[f.filename for f in request.files.getlist("files")])
+        for field_, key in (("plant", "devices"), ("scenarios", "tests")):  # optional here; the Tests page sets them
+            if field_ in request.form:
+                ENERGIZE[key] = request.form[field_]
         try:
-            ses = energise.load(files, request.form.get("plant", ""), request.form.get("scenarios", ""),
-                                float(request.form.get("scan_ms") or 10))
+            _reload()
         except Exception as e:  # noqa: BLE001 - a bad file is the user's to fix: say what is wrong
+            ENERGIZE.clear()
+            ENERGIZE.update(before)  # the program that was loaded stays loaded
             return jsonify(error=str(e)), 400
-        ENERGISE["session"] = ses
-        extra = energise.view(ses, files)
-        svgs = extra.pop("svgs")
-        return jsonify(inputs=ses.inputs, outputs=ses.outputs, feedbacks=ses.feedbacks, skipped=ses.skipped,
-                       rungs=[{"routine": p.routine, "number": p.number, "text": p.text, "svg": s}
-                              for p, s in zip(ses.places, svgs)],
-                       has_scenarios=bool(ses.scenarios_text.strip()), **extra)
+        return jsonify(_loaded(ENERGIZE["session"]))
 
-    @app.post("/api/energise/step")
-    def energise_step():
-        ses = ENERGISE.get("session")
+    @app.get("/api/energize/state")
+    def energize_state():
+        """What a page shows when it is opened again: the loaded program, or nothing yet."""
+        ses = ENERGIZE.get("session")
+        out = _loaded(ses) if ses is not None else {"loaded": False}
+        out.update(device_text=ENERGIZE.get("devices", ""), test_text=ENERGIZE.get("tests", ""))
+        return jsonify(out)
+
+    @app.post("/api/energize/step")
+    def energize_step():
+        ses = ENERGIZE.get("session")
         if ses is None:
             return jsonify(error="load a program first"), 400
         body = request.get_json(silent=True) or {}
@@ -122,11 +159,36 @@ def create_app() -> Flask:
         except Exception as e:  # noqa: BLE001
             return jsonify(error=str(e)), 400
 
-    @app.post("/api/energise/scenarios")
-    def energise_scenarios():
-        ses = ENERGISE.get("session")
+    @app.post("/api/tests/save")
+    def tests_save():
+        """Device models and test cases: checked now, so a mistake shows here, not when the tests run."""
+        from plant import load_plant
+        from scenario import parse_scenarios
+        body = request.get_json(silent=True) or {}
+        devices, tests = body.get("devices", ""), body.get("tests", "")
+        try:
+            n_dev = len(load_plant(devices).devices) if devices.strip() else 0
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Device models: {e}"), 400
+        try:
+            n_tc = len(parse_scenarios(tests)) if tests.strip() else 0
+        except Exception as e:  # noqa: BLE001
+            return jsonify(error=f"Test cases: {e}"), 400
+        ENERGIZE.update(devices=devices, tests=tests)
+        if ENERGIZE.get("files"):
+            try:
+                _reload()  # the live program now answers with these device models
+            except Exception as e:  # noqa: BLE001 - e.g. a device names a tag the program does not have
+                return jsonify(error=str(e)), 400
+        return jsonify(devices=n_dev, tests=n_tc, loaded=bool(ENERGIZE.get("session")))
+
+    @app.post("/api/tests/run")
+    def tests_run():
+        ses = ENERGIZE.get("session")
         if ses is None:
             return jsonify(error="load a program first"), 400
+        if not ses.scenarios_text.strip():
+            return jsonify(error="no test cases yet: write them and save"), 400
         out = ses.run_scenarios()
         out["trace"] = {k: [list(x) for x in v] for k, v in out["trace"].items()}
         return jsonify(out)
@@ -272,7 +334,7 @@ def create_app() -> Flask:
     return app
 
 
-ENERGISE: dict = {}  # one live session: the app serves one user on this PC
+ENERGIZE: dict = {}  # one live session: the app serves one user on this PC
 
 
 def _dispatch(text: str, mode: str | None, s: dict) -> dict:

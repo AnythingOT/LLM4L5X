@@ -1,7 +1,7 @@
 # Plant models
 
 A plant model plays the field devices: it reads the PLC's command tags and writes the feedback a real
-device would give, after the time a real device takes. Used by scenario tests and the Energise page,
+device would give, after the time a real device takes. Used by test cases (the Tests page) and the Energize page,
 against our simulator, an emulator or a controller (the plant only sees tag values).
 
 ## Devices

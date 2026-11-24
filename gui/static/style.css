@@ -345,16 +345,25 @@ body.dark-mode .code { color: #0e1520; }
     overflow: auto;
     scrollbar-width: thin;
 }
-.help-content { width: min(980px, 96vw); padding: 18px 22px 14px; }
-.help-content h2 { font-size: 1.2rem; }
-.help-content .modal-description { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; font-size: .8rem; margin-bottom: 10px; }
-.help-table { width: 100%; border-collapse: collapse; font-size: .8rem; line-height: 1.4; }
-.help-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: .74rem; padding: 0 12px 4px 0; border-bottom: 1px solid var(--line); }
-.help-table td { padding: 7px 12px 7px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
-.help-table td:first-child { width: 40%; }
-.help-table td:last-child { width: 1%; white-space: nowrap; padding-right: 0; }
-.help-table .eg { display: block; color: var(--muted); font-size: .76rem; margin-top: 1px; }
+.help-content { width: min(980px, 96vw); padding: 16px 22px 14px; }
+.help-head { display: flex; align-items: center; gap: 12px; }
+.help-head h2 { margin: 0; font-size: 1.2rem; flex: 1; }
+.help-head .close-button { position: static; margin: 0; }
+.help-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: .8rem; color: var(--muted); margin: 6px 0 12px; }
+.help-legend > span { display: inline-flex; align-items: center; gap: 6px; }
+.help-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .8rem; line-height: 1.45; }
+.help-table .c-in { width: 37%; }
+.help-table .c-out { width: 45%; }
+.help-table .c-by { width: 18%; }
+.help-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: .74rem; padding: 0 14px 4px 0; border-bottom: 1px solid var(--line); }
+.help-table td { padding: 8px 14px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.help-table td:last-child, .help-table th:last-child { padding-right: 0; }
+.help-table .eg { display: block; color: var(--muted); font-size: .76rem; margin-top: 2px; }
 .help-table code { font-size: .74rem; padding: 0 3px; white-space: nowrap; }
+.help-table .eg code { white-space: normal; overflow-wrap: anywhere; }
+.help-table td .by { vertical-align: 1px; }
+.help-table a { color: inherit; }
+.help-sub { font-size: .86rem; color: var(--ink-2); margin: 16px 0 2px; }
 .by { display: inline-block; font-size: .72rem; font-weight: 600; padding: 0 7px; border-radius: 9px; line-height: 1.6; white-space: nowrap; }
 .by.model { color: var(--amber); border: 1px solid var(--amber); }
 .by.fixed { color: var(--ok); border: 1px solid var(--ok); }
@@ -518,6 +527,8 @@ details.order > summary { cursor: pointer; color: var(--muted); font-size: .75re
 }
 
 @media (max-width: 640px) {
+    .help-table { table-layout: auto; }
+    .help-table colgroup { display: none; }
     .help-table thead { display: none; }
     .help-table td { display: block; width: auto !important; border: 0; padding: 2px 0; }
     .help-table tr { display: block; padding: 6px 0; border-bottom: 1px solid var(--line); }
@@ -528,7 +539,7 @@ details.order > summary { cursor: pointer; color: var(--muted); font-size: .75re
     background: #8a5a00; color: #fff; text-align: center; }
 .remote-banner.blocked { background: #9b1c1c; }
 
-/* Energise: inputs | ladder | outputs, read left to right like power through a rung.
+/* Energize: inputs | ladder | outputs, read left to right like power through a rung.
    Green (--ok) means one thing on this page: power flows (a contact passes it, a coil or lamp is on, a rung
    is true), as in Logix Designer online. Numbers are never green: -1 is not "on". */
 .en-main { width: min(1680px, 100%); }
@@ -540,17 +551,13 @@ details.order > summary { cursor: pointer; color: var(--muted); font-size: .75re
 #enFileNames { flex: 1 1 260px; min-width: 0; overflow-wrap: anywhere; }
 .en-pick .btn.primary { margin-left: auto; }
 .btn:disabled { opacity: .45; cursor: default; }
-.en-more { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
-.en-more > summary { cursor: pointer; font-size: .88rem; width: max-content; }
-.en-two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 10px; }
-.en-two label { display: block; font-size: .82rem; color: var(--ink-2); margin-bottom: 4px; }
-.en-two textarea, .en-num, .en-filter {
+.en-num, .en-filter, .ts-text {
     width: 100%; margin: 0; border: 1px solid var(--line-strong); border-radius: 6px;
     background: var(--surface); color: var(--ink); font: inherit; font-size: .82rem;
 }
-.en-two textarea { display: block; padding: 8px 10px; font-family: var(--mono); font-size: .78rem; resize: vertical; }
-.en-two textarea::placeholder, .en-filter::placeholder { color: var(--muted); }
-.en-two textarea:focus, .en-num:focus, .en-filter:focus { outline: 0; border-color: var(--focus);
+.ts-text { display: block; padding: 8px 10px; font-family: var(--mono); font-size: .8rem; line-height: 1.5; resize: vertical; tab-size: 2; }
+.ts-text::placeholder, .en-filter::placeholder { color: var(--muted); }
+.ts-text:focus, .en-num:focus, .en-filter:focus { outline: 0; border-color: var(--focus);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--focus) 18%, transparent); }
 .en-msg { margin: 10px 0 0; font-size: .85rem; color: var(--muted); }
 .en-msg:empty { display: none; }
@@ -602,17 +609,19 @@ label.en-name { cursor: pointer; }
 #enRungs { overflow-x: auto; }
 .en-routine { font-size: .82rem; color: var(--ink-2); margin: 14px 0 2px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
 .en-routine:first-child { margin-top: 4px; }
-.en-rung { margin: 0; padding: 2px 0; border-left: 3px solid transparent; }
+.en-rung { margin: 0; padding: 2px 0; }
 .en-rung > code { display: block; padding: 6px 8px; margin: 4px 0; white-space: pre-wrap; }
-.en-rung.lit { border-left-color: var(--ok); background: color-mix(in srgb, var(--ok) 6%, transparent); }
-.en-rung.lit svg.ladder .lad-rail { stroke: var(--ok); }
+/* the left rail is the supply: always energized while a program is loaded. The right rail, the rung
+   number and a faint tint show a rung that is true this scan. */
+#enRungs svg.ladder .lad-left { stroke: var(--ok); }
+.en-rung.lit { background: color-mix(in srgb, var(--ok) 6%, transparent); }
+.en-rung.lit svg.ladder .lad-right { stroke: var(--ok); }
 .en-rung.lit svg.ladder .lad-num { fill: var(--ok); font-weight: 700; }
 #enRungs svg.ladder .lad-el.live line, #enRungs svg.ladder .lad-el.live path { stroke: var(--ok); }
 #enRungs svg.ladder .lad-el.live .lad-sym { stroke-width: 3; }
 #enRungs svg.ladder .lad-el.live text { fill: var(--ok); font-weight: 700; }
 
-.en-scen { margin-top: 14px; }
-.en-report { white-space: pre-wrap; font-family: var(--mono); font-size: .78rem; background: var(--sunken); padding: 10px; border-radius: 6px; margin: 8px 0 0; }
+.en-devices-note { margin: 10px 0 0; font-size: .82rem; }
 .en-skipped { margin-top: 12px; font-size: .82rem; }
 .en-skipped summary { cursor: pointer; width: max-content; }
 
@@ -622,8 +631,35 @@ label.en-name { cursor: pointer; }
     .en-io { position: static; max-height: 420px; }
 }
 @media (max-width: 700px) {
-    .en-bench, .en-two { grid-template-columns: 1fr; }
+    .en-bench { grid-template-columns: 1fr; }
     .en-ladder { grid-row: auto; }
     .en-toolbar { position: static; }
     .en-summary { flex-basis: 100%; order: 9; }
 }
+
+/* Tests: device models and test cases beside each other, then the results */
+.ts-main { width: min(1400px, 100%); }
+.ts-main [hidden] { display: none !important; }
+.ts-program { padding: 10px 14px; margin-bottom: 14px; }
+.ts-program-name { flex: 1 1 260px; font-family: var(--mono); font-size: .84rem; overflow-wrap: anywhere; }
+.ts-editors { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+.ts-label { display: block; font-family: var(--head-font); font-weight: 600; font-size: .95rem; }
+.ts-help { margin: 2px 0 8px; font-size: .8rem; }
+.ts-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 14px 0; }
+.ts-actions .en-run { min-width: 104px; }
+.ts-results h2 { margin: 0 0 8px; font-size: 1rem; }
+.ts-results h3 { font-size: .86rem; color: var(--ink-2); margin: 16px 0 4px; }
+.ts-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.ts-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: .76rem; padding: 0 12px 4px 0; border-bottom: 1px solid var(--line); }
+.ts-table td { padding: 6px 12px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.ts-table td:last-child, .ts-table th:last-child { width: 1%; padding-right: 0; }
+.ts-id { font-family: var(--mono); font-size: .8rem; font-weight: 600; }
+.ts-reqs { font-family: var(--mono); font-size: .8rem; color: var(--ink-2); }
+.ts-why { color: var(--err); font-size: .8rem; margin-top: 2px; }
+.ts-verdict { display: inline-block; min-width: 3.4em; text-align: center; font-size: .74rem; font-weight: 700; padding: 1px 8px; border-radius: 9px; border: 1px solid; }
+.ts-verdict.pass { color: var(--ok); border-color: var(--ok); }
+.ts-verdict.fail { color: var(--surface); background: var(--err); border-color: var(--err); }
+.ts-report { margin-top: 12px; }
+.ts-report summary { cursor: pointer; width: max-content; }
+.ts-report pre { white-space: pre-wrap; font-family: var(--mono); font-size: .78rem; background: var(--sunken); padding: 10px; border-radius: 6px; }
+@media (max-width: 860px) { .ts-editors { grid-template-columns: 1fr; } }

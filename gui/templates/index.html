@@ -52,13 +52,16 @@
 
 <div id="helpModal" class="modal" role="dialog" aria-labelledby="helpTitle">
     <div class="modal-content help-content">
-        <button class="close-button" title="Close">&times;</button>
-        <h2 id="helpTitle">What LLM4L5X does</h2>
-        <p class="modal-description">Runs offline on this PC.
-            <span class="by model">Model</span> the local model writes it.
-            <span class="by fixed">Fixed code</span> deterministic: same input, same result.</p>
+        <div class="help-head">
+            <h2 id="helpTitle">What LLM4L5X does</h2>
+            <button class="close-button" title="Close" aria-label="Close">&times;</button>
+        </div>
+        <p class="help-legend">Runs offline on this PC.
+            <span><span class="by model">Model</span> written by the local model</span>
+            <span><span class="by fixed">Fixed code</span> deterministic: same input, same result</span></p>
         <table class="help-table">
-            <thead><tr><th>Input</th><th>Output</th><th>By</th></tr></thead>
+            <colgroup><col class="c-in"><col class="c-out"><col class="c-by"></colgroup>
+            <thead><tr><th>You give</th><th>You get</th><th>Done by</th></tr></thead>
             <tbody>
                 <tr><td><b>Plain English</b><span class="eg">Start the pump with the start button and keep it running until stop is pressed.</span></td>
                     <td>Ladder rungs, read-back in English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
@@ -66,24 +69,39 @@
                 <tr><td><b>Plain English</b>, UDT mode<span class="eg">A motor with run and fault bits, speed and 32 alarms.</span></td>
                     <td>UDT in the order that wastes no memory; <code>Name.L5X</code></td>
                     <td><span class="by model">Model</span></td></tr>
-                <tr><td><b>Rung text</b><span class="eg">Neutral <code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code><br>ASCII <code>XIC a BST XIC b NXB XIO c BND OTE d</code></span></td>
+                <tr><td><b>Rung text</b><span class="eg">Neutral <code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code></span><span class="eg">ASCII <code>XIC a BST XIC b NXB XIO c BND OTE d</code></span></td>
                     <td>Ladder, English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
                     <td><span class="by fixed">Fixed code</span></td></tr>
                 <tr><td><b>Requirements Excel</b><span class="eg">Sheet = routine, row = requirement</span></td>
                     <td>One routine per sheet, requirement as rung comment; <code>.L5X</code> or zip</td>
-                    <td><span class="by model">Model</span><span class="eg">rows with rung text: fixed code</span></td></tr>
+                    <td><span class="by model">Model</span><span class="eg">Rows with rung text: fixed code</span></td></tr>
                 <tr><td><b>UDT Excel</b><span class="eg">Row = member</span></td>
                     <td>UDTs, checked and ordered; <code>Name.L5X</code> or zip</td>
                     <td><span class="by fixed">Fixed code</span></td></tr>
                 <tr><td><b>L5X export</b><span class="eg">Controller, program, routine, rungs or UDT</span></td>
-                    <td><b>Explain all rungs</b>, <b>xref</b> Tag, <b>Validate</b> (import checks and coding rules, UDT rules included), <b>Optimize UDTs</b>. New logic uses its tags.</td>
+                    <td><b>Explain all rungs</b>, <b>xref</b> a tag, <b>Validate</b> (import checks and coding rules, UDT rules included), <b>Optimize UDTs</b>. New logic uses its tags.</td>
                     <td><span class="by fixed">Fixed code</span></td></tr>
             </tbody>
         </table>
-        <p class="help-foot">The model only writes logic; fixed code draws, checks and writes every file, so check the read-back before you import.
-            Text form and download type: <a href="/settings">Settings</a>. Rules on or off: <a href="/rules">Rules</a>.
-            Samples: the list button next to Send.</p>
-        <p class="help-foot muted">Planned: documentation from an attached program; translating comments, descriptions and tag names to English.</p>
+        <h3 class="help-sub">Other pages</h3>
+        <table class="help-table">
+            <colgroup><col class="c-in"><col class="c-out"><col class="c-by"></colgroup>
+            <tbody>
+                <tr><td><b><a href="/energize">Energize</a></b><span class="eg">L5X routines or the Routines.zip of a run</span></td>
+                    <td>The whole program running on this PC: flip inputs, watch the ladder light up, outputs, timers and counters</td>
+                    <td><span class="by fixed">Fixed code</span></td></tr>
+                <tr><td><b><a href="/tests">Tests</a></b><span class="eg">Device models and test cases</span></td>
+                    <td>Each test case run against the program, pass or fail per requirement</td>
+                    <td><span class="by fixed">Fixed code</span></td></tr>
+                <tr><td><b><a href="/rules">Rules</a></b>, <b><a href="/settings">Settings</a></b></td>
+                    <td>Which checks run; the model, text form and download type</td>
+                    <td></td></tr>
+            </tbody>
+        </table>
+        <p class="help-foot">The model only writes logic; fixed code draws, checks and writes every file, so check the
+            read-back before you import. Samples: the list button next to Send.</p>
+        <p class="help-foot muted">Planned: documentation from an attached program; translating comments, descriptions
+            and tag names to English.</p>
     </div>
 </div>
 {% endblock %}

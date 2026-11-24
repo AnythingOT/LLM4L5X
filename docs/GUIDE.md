@@ -11,6 +11,8 @@ Everything the app does, in detail. The short version is the [README](../README.
 - [Neutral text and ASCII text](#neutral-text-and-ascii-text)
 - [LogicSpec](#logicspec)
 - [Command line](#command-line)
+- [Energize: run the whole program before any controller](#energize-run-the-whole-program-before-any-controller)
+- [Tests: device models and test cases](#tests-device-models-and-test-cases)
 
 ## How it works
 
@@ -185,11 +187,12 @@ python cli.py rung "XIC(a)[XIC(b) ,XIO(c) ]OTE(d);"
 python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 ```
 
-## Energise: run the whole program before any controller
+## Energize: run the whole program before any controller
 
-**Energise** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run.
-A plant file ([PLANT.md](PLANT.md)) and scenarios ([SCENARIOS.md](SCENARIOS.md)) are optional, under
-**Plant and scenarios**.
+**Energize** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run.
+The program stays loaded: leave the page (or use Tests) and come back, and it is as you left it (Run
+pauses while you are away). Outputs that need an answer from the machine get it from the device models on
+the **Tests** page.
 
 The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**.
 
@@ -200,13 +203,26 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
   would make the program look like it works.
 - **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
   a tag the files do not declare is a bit if the logic uses it as a contact or coil.
-- **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online: green means power flows. A
-  contact is green when it passes power, a coil when it is on, a rung (rails and number) when it is true.
+- **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online: green means power flows. The
+  left rail (the supply) is always green; a contact is green when it passes power, a coil when it is on, and
+  a rung that is true has a green right rail and number.
 - **Outputs:** a bit is a lamp, a number its value. **Timers and counters** show the accumulator against
   the preset, with DN lit when done.
 - Timers and counters take their preset from the tag's data, as the controller does: an export writes
   `TON(T,?,?)` in the rung, so the rung alone has no preset.
 - **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again. Changes made
   while a step is under way are sent with the next one, never dropped.
-- **Run scenarios** runs every scenario on a fresh copy and shows the verdict per requirement; the
-  live session is not touched.
+
+## Tests: device models and test cases
+
+**Tests** (top bar) holds what checks the program, next to the program Energize runs (load it on either page).
+
+- **Device models** stand in for the machine: a pump's running contact closes a second after it is
+  commanded, a valve's limit switches follow its command. Format: [PLANT.md](PLANT.md). Energize uses them
+  too, so its outputs get the same answers.
+- **Test cases** set inputs, wait and expect outputs, each tied to a requirement ID. Format:
+  [SCENARIOS.md](SCENARIOS.md) (the file format still says `SCENARIO`).
+- **Save** checks both and keeps them; **Run tests** saves what is on the screen, runs every test case on a
+  fresh copy of the program, and shows pass or fail per test case and per requirement. The live Energize
+  session is not touched.
+- Text not saved yet is kept if you leave the page, and shown again when you come back.
