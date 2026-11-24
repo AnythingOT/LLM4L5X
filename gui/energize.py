@@ -65,7 +65,9 @@ class Session:
     def _new_backend(self) -> SimBackend:
         from plant import load_plant
         plant = load_plant(self.plant_text) if self.plant_text.strip() else None
-        return SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms)
+        be = SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms)
+        be.sim.trace = True  # the page draws where power flows in each rung
+        return be
 
     def reset(self) -> dict:
         self.backend = self._new_backend()
@@ -87,7 +89,7 @@ class Session:
     def snapshot(self) -> dict:
         be = self.backend
         tags = {t: be.read(t) for t in self.inputs + self.outputs + self.feedbacks + self.watched}
-        return {"now_ms": be.now_ms, "tags": tags, "power": list(be.sim.power),
+        return {"now_ms": be.now_ms, "tags": tags, "power": list(be.sim.power), "flow": list(be.sim.flow),
                 "notes": be.plant.notes() if be.plant else []}
 
     def run_scenarios(self) -> dict:

@@ -198,3 +198,12 @@ def test_timer_and_counter_presets_come_from_the_tags():
         s.step(10, {"Box_Eye": 1})
         snap = s.step(10, {"Box_Eye": 0})
     assert snap["tags"]["Box_CTR.ACC"] == 3 and snap["tags"]["Batch_Done"]
+
+
+def test_the_page_gets_where_power_flows_in_each_rung():
+    # seal-in with Stop pressed: power comes through the Run leg, stops at XIO(Stop), never reaches the coil
+    s = load([routine("Main", "[XIC(Start) ,XIC(Run) ]XIO(Stop)OTE(Run);")])
+    snap = s.step(0, {"Start": 1})
+    assert snap["flow"][0] == {"0.0.0": 3, "0.1.0": 1, "0": 3, "1": 3, "2": 3} and snap["power"] == [True]
+    snap = s.step(0, {"Start": 0, "Stop": 1})
+    assert snap["flow"][0] == {"0.0.0": 1, "0.1.0": 3, "0": 3, "1": 1, "2": 0} and snap["power"] == [False]

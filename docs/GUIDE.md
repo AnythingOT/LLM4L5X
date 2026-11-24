@@ -225,9 +225,13 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
   would make the program look like it works.
 - **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
   a tag the files do not declare is a bit if the logic uses it as a contact or coil.
-- **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online: green means power flows. The
-  left rail (the supply) is always green; a contact is green when it passes power, a coil when it is on, and
-  a rung that is true has a green right rail and number.
+- **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online, from the simulator's own
+  trace of each scan: a wire is green and moving up to where power stops (a dashed green line in the
+  key), the left rail (the supply) is always green, a true contact and a coil that is on are drawn in green,
+  and a coil that is on glows. A rung that is true has a green right rail and number. Timer and counter
+  boxes show their accumulator live instead of `?`. With "reduce motion" set in the system, nothing moves.
+- Long tag names are shortened in the middle (`BUG01_SFT…UP_LIMIT_LF`), so the end that tells them apart
+  stays; the full name is in the tooltip.
 - **Outputs:** a bit is a lamp, a number its value. **Timers and counters** show the accumulator against
   the preset, with DN lit when done.
 - Timers and counters take their preset from the tag's data, as the controller does: an export writes

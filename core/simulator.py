@@ -37,6 +37,11 @@ class Simulator:
         self.state: dict = dict(state or {})
         self.dt = 0  # ms elapsed this scan
         self.power: list[bool] = []
+        # power trace of the last scan, kept only when asked (the Energize page draws it): per rung,
+        # element path -> 1 if power reached the element, | 2 if power left it. A path is the item's index in
+        # its series, and in a branch "branch.leg.item": "2", "1.0.0", "1.1.0" ...
+        self.trace = False
+        self.flow: list[dict[str, int]] = []
 
     # ------------------------------------------------------------ values
 
@@ -67,18 +72,30 @@ class Simulator:
             self.state.update(inputs)
         self.dt = dt_ms
         # whether each rung ended true this scan: the Energize page lights energized rungs
-        self.power = [self.series(r.body, True) for r in self.rungs]
+        if self.trace:
+            self.flow = []
+            self.power = []
+            for r in self.rungs:
+                self._flow: dict[str, int] = {}
+                self.power.append(self.series(r.body, True, ""))
+                self.flow.append(self._flow)
+        else:
+            self.power = [self.series(r.body, True) for r in self.rungs]
         return self.state
 
-    def series(self, s: Series, power: bool) -> bool:
-        for e in s.items:
-            power = self.branch(e, power) if isinstance(e, Branch) else self.instr(e, power)
+    def series(self, s: Series, power: bool, path: str | None = None) -> bool:
+        for k, e in enumerate(s.items):
+            here = None if path is None else f"{path}{k}"
+            before = power
+            power = self.branch(e, power, here) if isinstance(e, Branch) else self.instr(e, power)
+            if here is not None:
+                self._flow[here] = int(bool(before)) | (2 if power else 0)
         return power
 
-    def branch(self, b: Branch, power: bool) -> bool:
+    def branch(self, b: Branch, power: bool, path: str | None = None) -> bool:
         out = False
-        for leg in b.legs:  # every leg executes, left to right
-            out = self.series(leg, power) or out
+        for j, leg in enumerate(b.legs):  # every leg executes, left to right
+            out = self.series(leg, power, None if path is None else f"{path}.{j}.") or out
         return out
 
     def instr(self, i: Instr, p: bool) -> bool:
