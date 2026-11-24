@@ -59,11 +59,12 @@ class Session:
     scenarios_text: str = ""
     scan_ms: float = 10.0
     backend: SimBackend | None = None
+    presets: dict = field(default_factory=dict)  # {"T.PRE": 5000} from the tags' data: rungs may show "?"
 
     def _new_backend(self) -> SimBackend:
         from plant import load_plant
         plant = load_plant(self.plant_text) if self.plant_text.strip() else None
-        return SimBackend(self.rungs, {"Sim_Mode": 1}, plant, self.scan_ms)
+        return SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms)
 
     def reset(self) -> dict:
         self.backend = self._new_backend()
@@ -102,8 +103,12 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
          ) -> Session:
     from core.rung import format_rung
     rungs, places, skipped, unsupported = [], [], [], []
+    presets: dict[str, int] = {}
     for data in l5x_files:
-        for rt in read_l5x(data).routines:
+        project = read_l5x(data)
+        # a timer or counter keeps its preset in the tag: an export (v36 and later) writes TON(T,?,?) in the rung
+        presets.update({f"{name}.PRE": pre for name, pre in project.presets().items()})
+        for rt in project.routines:
             if rt.name.upper() in SKIPPED_ROUTINES:
                 skipped.append(f"{rt.name}: not run in simulation (Sim_Mode = 1)")
                 continue
@@ -135,7 +140,7 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
     read = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
     outputs = sorted(t for t in written if t not in structs) + [f"{t}.{m}" for t in sorted(structs)
                                                                 for m in ("ACC", "DN")]
-    s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms)
+    s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms, presets=presets)
     probe = s._new_backend()  # validates the plant and scenarios before the page shows anything
     if scenarios_text.strip():
         parse_scenarios(scenarios_text)
