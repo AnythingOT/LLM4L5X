@@ -101,9 +101,12 @@ def create_app() -> Flask:
         except Exception as e:  # noqa: BLE001 - a bad file is the user's to fix: say what is wrong
             return jsonify(error=str(e)), 400
         ENERGISE["session"] = ses
+        extra = energise.view(ses, files)
+        svgs = extra.pop("svgs")
         return jsonify(inputs=ses.inputs, outputs=ses.outputs, feedbacks=ses.feedbacks, skipped=ses.skipped,
-                       rungs=[{"routine": p.routine, "number": p.number, "text": p.text} for p in ses.places],
-                       has_scenarios=bool(ses.scenarios_text.strip()), snapshot=ses.snapshot())
+                       rungs=[{"routine": p.routine, "number": p.number, "text": p.text, "svg": s}
+                              for p, s in zip(ses.places, svgs)],
+                       has_scenarios=bool(ses.scenarios_text.strip()), **extra)
 
     @app.post("/api/energise/step")
     def energise_step():

@@ -34,7 +34,7 @@ def test_outputs_are_pushed_to_the_right_rail():
     width = float(root.get("width"))
     coil = next(t for t in root.iterfind(".//s:text", NS) if t.text == "B")
     x = float(coil.get("x")) + sum(float(g.get("transform").split("(")[1].split(",")[0])
-                                   for g in coil.iterancestors("{http://www.w3.org/2000/svg}g"))
+                                   for g in coil.iterancestors("{http://www.w3.org/2000/svg}g") if g.get("transform"))
     assert x > width * 0.75
 
 
@@ -60,3 +60,9 @@ def test_a_question_mark_preset_shows_the_tag_preset():
     assert ">5000</text>" in svg and ">?</text>" in svg      # preset filled, accum still '?'
     assert ">?</text>" in to_svg(parse_rung("XIC(Go)TON(Other_TMR,?,?);"), presets={"Fill_TMR": 5000})
     assert ">7</text>" in to_svg(parse_rung("XIC(Go)TON(Fill_TMR,7,0);"), presets={"Fill_TMR": 5000})  # written wins
+
+
+def test_contacts_and_coils_carry_their_tag_for_a_live_page():
+    root = svg("XIC(A)XIO(B.DN)[OTE(C) ,OTL(D) ];")
+    els = {(g.get("data-kind"), g.get("data-tag")) for g in root.iterfind(".//s:g[@class='lad-el']", NS)}
+    assert els == {("XIC", "A"), ("XIO", "B.DN"), ("OTE", "C"), ("OTL", "D")}

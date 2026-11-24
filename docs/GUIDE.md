@@ -187,15 +187,24 @@ python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 
 ## Energise: run the whole program before any controller
 
-**Energise** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run,
-with an optional plant file ([PLANT.md](PLANT.md)) and scenarios ([SCENARIOS.md](SCENARIOS.md)).
+**Energise** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run.
+A plant file ([PLANT.md](PLANT.md)) and scenarios ([SCENARIOS.md](SCENARIOS.md)) are optional, under
+**Plant and scenarios**.
+
+The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**.
 
 - Every routine runs once per scan with `Sim_Mode = 1`. MAP_IN and MAP_OUT are not run (the plant
-  gives the feedback, field outputs stay off), and rungs that only call a subroutine are skipped.
+  gives the feedback, field outputs stay off), and rungs that only call a subroutine are skipped
+  (listed under **Not run in simulation**).
 - An instruction the simulator does not have (PID, MSG ...) stops the load with a list: skipping it
   would make the program look like it works.
-- Click an input to switch it 0/1 (Shift+click to type a number). Outputs and plant feedback update
-  live; timers and counters show `.ACC` and `.DN`. Rungs that are true this scan are lit.
-- **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again.
+- **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
+  a tag the files do not declare is a bit if the logic uses it as a contact or coil.
+- **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online: green means power flows. A
+  contact is green when it passes power, a coil when it is on, a rung (rails and number) when it is true.
+- **Outputs:** a bit is a lamp, a number its value. **Timers and counters** show the accumulator against
+  the preset, with DN lit when done.
+- **Run** advances in real time; **Step 100 ms** one step at a time; **Reset** starts again. Changes made
+  while a step is under way are sent with the next one, never dropped.
 - **Run scenarios** runs every scenario on a fresh copy and shows the verdict per requirement; the
   live session is not touched.
