@@ -1,6 +1,6 @@
 # Handover
 
-Read this first, then `docs/ROADMAP.md` for what is next. Written 24 Nov 2026, after PR #39.
+Read this first, then `docs/ROADMAP.md` for what is next. Written 24 Nov 2026, after PR #51.
 
 ## What the tool is
 
@@ -24,10 +24,10 @@ The design has **two steps**, kept apart on purpose:
 | `core/` | LogicSpec, compiler, validator, rung parser, **scan simulator** (time-based, records rung power) |
 | `l5x/` | L5X reader (size cap, no entities) and writer |
 | `lint/` | 50 rules (CRT/ERR/WAR/INF) plus the company **profile** (STD001-STD004) |
-| `plant/` | motor/pump and 2-position valve models, fault injection through `PLANT:` tags |
-| `scenario/` | OpenVnV step language (SET/EXPECT/WAIT/RESET/COMMENT/CALL), runner, traceability |
+| `plant/` | **device models** (UI name; was "plant"): motor/pump and 2-position valve, fault injection through `PLANT:` tags |
+| `scenario/` | **test cases** (UI name; the file format still says `SCENARIO`): OpenVnV step language (SET/EXPECT/WAIT/RESET/COMMENT/CALL), runner, traceability |
 | `library/` | blocks (Motor, Valve2Pos, AlarmLatch): rungs + tags + plant + scenarios from one file |
-| `gui/` | Flask app on 127.0.0.1: chat, requirements jobs, Rules, Settings, **Energise** |
+| `gui/` | Flask app on 127.0.0.1: chat, requirements jobs, Rules, Settings, **Energize** (run the program live), **Tests** (device models, test cases) |
 | `eval/` | test workbook generator, **oracle_run** (always-correct stand-in), suites, mutation |
 | `explain/` | ladder SVG, decompiler (rung → LogicSpec), plain-English read-back |
 
@@ -44,7 +44,9 @@ Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, PLANT, SCENARIOS, LIB
   Qwen on llama.cpp). Do not drive the laptop unless asked: it costs usage. The owner sends back
   `Routines_N.zip` (L5X files + Report.txt) to analyse.
 - Run a UI change in a real browser (headless Chrome is available in the cloud workspace) before
-  calling it done: API tests passed while the Energise page was completely broken.
+  calling it done: API tests passed while the Energize page was completely broken.
+- **The owner tests only new features**, not features already tested. Ask for a laptop run only when
+  something new needs the real model, and say exactly what to run.
 
 ## Confidentiality
 
@@ -55,7 +57,8 @@ Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, PLANT, SCENARIOS, LIB
 - Corpus and Real_world test rows come **only from public GitHub L5X exports**, never company exports
   (`LLM4L5X_CORPUS` points at a folder of them; the corpus test skips without it). CI fetches the public
   set pinned in `eval/corpus_sources.txt` and runs it on every push; add a repository there only if its
-  LICENSE is MIT or Apache and it is not an AnythingOT repository.
+  LICENSE is MIT or Apache and it is not an AnythingOT repository (only the L5X_Lint fixture is known to
+  hold a confidential name, but CI logs are public, so all AnythingOT repositories stay off the list).
 - Company libraries and profiles stay outside this repo.
 
 ## How results are measured
@@ -75,6 +78,9 @@ Latest real-model results (Qwen, laptop):
 | level 2, seed 11 (tuning) | 71/71 | after the three output checks (#24) |
 | level 2, seed 17 | 64/71 | led to the RESET_ACC fix (#25); now spent as a holdout |
 | level 2, seed 23 (fresh holdout) | 70/71 | only miss: model used `Flow_SP` for the named `Flow_Setpoint` |
+| level 1, seed 41, 3 rows (fresh holdout) | 24/27 | three misses the checks let through: a no-op write, a swapped copy, an invented output. Fixed in #46; **spent** |
+
+Not measured yet: the #46 checks on a fresh holdout (level 2, a seed never run with the model, e.g. 53).
 
 Studio 5000 accepted an import of generated routines (owner, Nov 2026); the version and the Verify
 result were not recorded. Level 2 (`--level 2`) is on main since the near-twin names were removed from
@@ -88,13 +94,26 @@ by seed, and the next holdout needs a seed never run with the model.
 - **A fallback that makes output compile is a hidden error**: RESET_ACC on a tag that is no timer or
   counter is refused (it once turned three tags into COUNTERs and broke a fourth row).
 - **Fail loudly**: unknown tags stop a scenario (a typo would pass a negative test); unsupported
-  instructions stop Energise; the CI name check fails without its secret; a remote model server is
+  instructions stop Energize; the CI name check fails without its secret; a remote model server is
   refused unless allowed, and a banner shows while it is.
 - **Sim_Mode**: logic uses mapped tags only; MAP_IN is skipped by its JSR (an OTE behind
   `XIO(Sim_Mode)` would write 0 every scan); MAP_OUT forces field outputs off in simulation.
 - A profile adds rules and switches rules off but **cannot change a severity**.
 - Blocks are **self-tested when loaded** and carry negative tests.
 - v36+ mnemonics (`MOVE`, `LE`, `GT`) are emitted for v36+ revisions; the simulator maps them.
+- **Timer and counter presets live in the tag's data** (an export writes `TON(T,?,?)`); Energize reads them
+  from there (#48). A `MOV(preset, T.PRE)` rung is a **profile option**, off by default: it keeps the preset
+  in the logic but stops HMI and online changes.
+- **Who writes test cases**: rules first (standard test cases per block from the library), then the model
+  drafts from the **requirement text only**, never from the generated rungs or LogicSpec (the same misreading
+  would pass its own test: seed 41's swapped copy), then the engineer approves. Only the runner decides
+  pass or fail.
+- **Lint auto-fix**: every fix is checked in the simulator. Fixes that keep behaviour go in one batch with
+  one y/n; fixes that change behaviour get their own y/n and say what changes; some are never automatic
+  (ROADMAP item 1 has the list).
+- **Hardware testing** goes through **pylogix against Logix Emulate** (the owner has Emulate; pylogix does
+  not depend on its version), with the same test cases as the simulator.
+- **Names**: Energize (manual console), Tests page, Device models, Test cases. Old `/energise` redirects.
 
 ## Lessons
 
@@ -103,3 +122,8 @@ by seed, and the next holdout needs a seed never run with the model.
 - Count retries, not just passes: a pass on the third try is the first to fail on drift.
 - A fix that never fired in a run is untested, whatever the score did.
 - Tests at one layer cannot see the layer above (import vs Verify, simulator vs controller, API vs page).
+- A new test proves something only if it fails on the old code: break the fix on purpose and watch it fail.
+- Green CI can mean "skipped": check the test count (the corpus tests skipped in CI until #45).
+- A message shown in a part of the page that gets hidden is no message (Energize errors, #49).
+- Two checks from the same source fail together (common-mode failure): tests must not be derived from
+  the code they test.
