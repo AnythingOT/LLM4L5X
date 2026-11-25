@@ -41,6 +41,7 @@ SCENARIO TC-04 "a requirement the workbook does not have" REQ R77
 """
 
 
+@functools.cache  # one file: openpyxl writes the save time into it, so two saves a second apart differ
 def workbook() -> bytes:
     wb = Workbook()
     ws = wb.active
