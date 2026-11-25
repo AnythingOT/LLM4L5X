@@ -10,8 +10,8 @@ from datetime import datetime
 from lxml import etree
 
 from l5x.writer import serialize, skeleton
-from udt import layout
-from udt.layout import M
+from core import udt_layout as layout
+from core.udt_layout import M
 from udt.model import UdtDef, UdtMember, dependency_order
 
 _STRUCT = {"STRING", "TIMER", "COUNTER", "CONTROL", "MESSAGE"}
@@ -29,7 +29,7 @@ def radix(datatype: str, is_struct: bool) -> str:
 
 
 def ordered(u: UdtDef, user_types: set[str]) -> list[UdtMember]:
-    """Members in the no-padding order (see udt.layout.sort_key)."""
+    """Members in the no-padding order (see core.udt_layout.sort_key)."""
     return sorted(u.members, key=lambda m: layout.sort_key(M(m.name, m.datatype, m.dim), user_types))
 
 

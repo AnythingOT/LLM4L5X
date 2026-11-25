@@ -5,7 +5,7 @@ import pytest
 from core.rung import parse_rung
 from gui.energize import EnergizeError, load
 from l5x.writer import write_routine
-from test_scenario import PLANT, SCENARIOS, TANK
+from test_testcases import PLANT, SCENARIOS, TANK
 
 
 def routine(name, text):
@@ -64,8 +64,8 @@ def test_unsupported_instructions_stop_the_load_with_a_list():
 
 
 def test_bad_plant_or_scenarios_fail_at_load():
-    from plant import PlantError
-    from scenario import ScenarioError
+    from devices import PlantError
+    from testcases import ScenarioError
     with pytest.raises(PlantError):
         load(FILES, "devices: [")
     with pytest.raises(ScenarioError):
@@ -76,7 +76,7 @@ def test_bad_plant_or_scenarios_fail_at_load():
 def web(tmp_path):
     import app as gui
     from gui import ENERGIZE
-    from scenario.evidence import RunStore
+    from testcases.evidence import RunStore
     gui.app.config["TESTING"] = True
     gui.app.config["RUNS"] = RunStore(tmp_path / "runs")  # never the real runs/ folder
     ENERGIZE.clear()

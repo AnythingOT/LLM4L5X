@@ -2,30 +2,22 @@
 
 ## Repo layout
 
+[STRUCTURE.txt](../STRUCTURE.txt) lists every folder and file with one line each. It is made from the
+folders' README.md and the files' docstrings by `python -m eval.structure`, and `tests/test_structure.py`
+fails when it is out of date, so it cannot drift from the code. Each folder's README.md says what it owns,
+which page and command use it, and which folders it may import.
+
+Folders carry the names of the pages: `devices/` (Devices), `testcases/` (Tests; `tests/` is pytest),
+`lint/` (Lint), `generate/` (from English or Excel to logic). Dependencies point one way only:
+
 ```
-app.py              starts the GUI (python app.py)
-cli.py              command line (python cli.py ...)
-core/               catalog.py + instructions.yaml (124 instructions), rung.py, ascii.py, logicspec.py,
-                    compiler.py, validator.py, simulator.py
-l5x/                reader.py, writer.py, xref.py
-lint/               rules.py (the 50-rule checklist), checks_*.py, context.py, paths.py, lifecycle.json
-udt/                layout.py (sizes, alignment, best order), model.py (UDT text form, checks),
-                    writer.py (DataType export), excel.py (sheet + template), optimize.py (reorder
-                    an existing export, byte-preserving)
-explain/            decompiler.py (rungs -> LogicSpec), describe.py (English), ladder.py (rungs -> SVG
-                    ladder diagrams), survey.py
-inputs/             llm.py (Ollama/llama.cpp, English -> LogicSpec), examples.yaml (few-shot), gbnf.py,
-                    udt_llm.py (English -> UDT text form), spec_excel.py (requirements workbook)
-eval/               requests.yaml + run.py (hand-written eval), suite.py + suite_run.py (generated
-                    instruction suite), rung_compare.py (behavioural oracle), mutation.py
-gui/                __init__.py (routes), state.py (attached file, settings), logic.py (rungs),
-                    project.py (the attached L5X), udts.py, spec.py + jobs.py (requirements workbook
-                    in the background); templates/ and static/ (pages, CSS, JS)
-tests/              pytest (318 tests, plus 3 per file with a corpus); fixtures/ are hand-written, except studio_single_udt.L5X
-                    (the public L5X_UDTOptimizer sample); test_corpus.py runs on a folder of exports
-examples/  docs/
-requirements.txt  ruff.toml  start.bat  start.sh
+core  <-  l5x  <-  explain, lint  <-  udt  <-  generate  <-  testcases  <-  library
+devices (stands alone)          gui: uses them all, the only folder with Flask
+eval: developers' measuring; uses anything, used by nothing in the product
 ```
+
+`tests/test_structure.py` holds the exact table of which folder may import which. A new import across
+folders is a design decision: change the table in the same PR and say why.
 
 Run the tests with `pytest` from the repo folder, and `ruff check .` for the code checks.
 
@@ -87,11 +79,11 @@ python cli.py suite --model qwen3.6:35b-a3b --no-think --only ONS,TON,GT    # a 
 
 `python cli.py eval --model phi4-mini` scores a model on `eval/requests.yaml` by meaning (truth tables), not text.
 Add your own requests there. To improve results without fine-tuning, add examples in your plant's wording to
-`inputs/examples.yaml`: the most similar ones are shown to the model for each request.
+`generate/examples.yaml`: the most similar ones are shown to the model for each request.
 
 ## Test workbook
 
-`python -m eval.test_workbook out.xlsx --seed 3 --rows 12 --level 1 --corpus folder_of_exports` writes a
+`python -m eval.expected_workbook out.xlsx --seed 3 --rows 12 --level 1 --corpus folder_of_exports` writes a
 requirements workbook in which every row has an **Expected rung**. Attach it in the app to score the model (see the guide).
 
 `--level 2` keeps the same sheets with bigger rungs for when level 1 scores full marks: 4-5 condition series,

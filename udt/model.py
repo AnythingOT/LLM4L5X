@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from udt.layout import SIZE
+from core.udt_layout import SIZE
 
 # member types a new UDT may use (MESSAGE and motion types cannot be UDT members)
 MEMBER_TYPES = {"BOOL", "SINT", "INT", "DINT", "LINT", "REAL", "LREAL", "STRING", "TIMER", "COUNTER", "CONTROL"}

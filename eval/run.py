@@ -11,7 +11,7 @@ from pathlib import Path
 import yaml
 
 from explain.equivalence import equivalent
-from inputs.llm import Generator, LLMError
+from generate.llm import Generator, LLMError
 
 
 @dataclass

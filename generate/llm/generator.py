@@ -84,7 +84,7 @@ class Generator:
                 pass
         grammar = None
         if getattr(self.client, "supports_grammar", False):
-            from inputs.gbnf import build_gbnf
+            from generate.gbnf import build_gbnf
             types = dict(known_tags or {})
             # names the request writes but that do not look like tags (Beacon, A, D) must be writable too,
             # or the grammar forces the model onto some other existing tag

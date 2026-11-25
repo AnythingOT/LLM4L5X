@@ -19,13 +19,13 @@ from core.compiler import CompileError, infer_tags
 from core.rung import base_tag, format_rung, is_literal, walk
 from core.simulator import SimError
 from core.validator import errors, validate
-from eval.rung_compare import Side, compare
+from core.rung_compare import Side, compare
 from explain.ladder import to_svg
 from gui import jobs, state
 from gui.logic import generate, parse_rung_text
 from gui.state import SESSION
-from inputs.llm import LLMError
-from inputs.spec_excel import Sheet
+from generate.llm import LLMError
+from generate.spec_excel import Sheet
 from l5x.writer import write_routine
 
 

@@ -7,7 +7,7 @@ import re
 import time
 from dataclasses import dataclass, field
 
-from inputs.llm import LLMError
+from generate.llm import LLMError
 from udt.model import MEMBER_TYPES, UdtDef, UdtError, check, format_spec, parse_spec
 
 MAX_TOKENS = 2000  # one line per member: room for about 60 members with descriptions

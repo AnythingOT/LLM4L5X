@@ -1,0 +1,210 @@
+LLM4L5X: every folder and file, with what it is.
+Made by `python -m eval.structure` from the folders' README.md and the files' docstrings;
+a test fails when this file is out of date. Edit those, then run the command again.
+
+.gitattributes             Line endings: .bat files keep CRLF
+.gitignore                 Files git leaves out
+app.py                     Start the app: python app.py, then http://127.0.0.1:5000
+CITATION.cff               How to credit this project (GitHub: Cite this repository)
+cli.py                     Command line: compile, explain, inspect, validate, fix, ask, survey and more (python cli.py -h)
+LICENSE                    GNU GPL v3.0 only
+pytest.ini                 pytest settings
+README.md                  What it does and how to start
+requirements.txt           Python packages, exact versions
+ruff.toml                  Code checks (ruff)
+start.bat                  Windows: double-click to install the packages once and start the app
+start.sh                   Linux/macOS: the same as start.bat
+STRUCTURE.txt              This map
+THIRD_PARTY_NOTICES.md     Licences of the packages and icons this project uses
+.github/
+  workflows/
+    ci.yml                 CI: code checks and tests on every push
+core/                      The engine everything else stands on: LogicSpec, the compiler, rung text, the scan simulator, UDT memory layout.
+  __init__.py
+  ascii.py                 ASCII rung text <-> neutral text.
+  catalog.py               Instruction catalog: loads instructions.yaml and lets L5X content extend it (AOIs).
+  compiler.py              Compile LogicSpec into ladder rungs.
+  describe.py              Deterministic English read-back of LogicSpec.
+  instructions.yaml
+  logicspec.py             LogicSpec: the small boolean language the LLM writes instead of rung text.
+  README.md
+  rung.py                  Ladder neutral text: AST, parser and printer.
+  rung_compare.py          Do two sets of rungs behave the same?
+  simulator.py             A small Logix scan simulator for testing compiled rungs.
+  udt_layout.py            UDT memory layout: byte size as Studio 5000 lays it out, and the member order that wastes no padding.
+  validator.py             Import checks on rungs, independent of where they came from (model, compiler, project): syntax, operand count and types, tags that exist, instruction names for the target version.
+devices/                   Device models: what the field devices do when the program drives them (pumps, motors, valves), so a program can run without the machine.
+  __init__.py              Device models: what the field devices do when the PLC drives them.
+  devices.py               Device models: motor/pump with or without run feedback, 2-position valve (single or double solenoid, 0, 1 or 2 limit switches).
+  plant.py                 A plant: a set of devices stepped together, loaded from YAML, with PLANT: tags for tests.
+  README.md
+docs/
+  DESIGN.md                How it works inside, and why
+  DEVELOPMENT.md           For developers: layout, tests, the instruction suite
+  DEVICES.md               A plant model plays the field devices: it reads the PLC's command tags and writes the feedback a real device would give, after the time a real device takes.
+  GUIDE.md                 For users: every feature in detail
+  HANDOVER.md              Start here when picking the work up: map of the code, working rules, results
+  IOLIST.md                `generate/iolist.py` reads an Excel I/O list.
+  LIBRARY.md               A block is one YAML file that gives a device everything at once: rungs, tag types, a plant model and scenario tests.
+  PROFILE.md               A YAML file with the rules that differ per company.
+  ROADMAP.md               What is done and what is next
+  TESTCASES.md             Requirement-level tests for the logic, with a plant model, in OpenVnV's step language.
+eval/                      Measuring quality, for developers: the model's scores, the always-correct oracle run, the instruction suite, the public corpus, and this repository's map.
+  __init__.py
+  corpus_sources.txt
+  expected_workbook.py     A requirements workbook that is also a test: every row has an Expected rung.
+  fetch_corpus.py          Fetch the public L5X exports listed in eval/corpus_sources.txt into a folder, for tests/test_corpus.py.
+  mutation.py              Mutation check for the behaviour comparator: break correct rungs on purpose and count how often the comparator notices.
+  oracle_run.py            Stand-in "always-correct" model: run a test workbook with each row answered by its expected rung.
+  README.md
+  requests.yaml
+  run.py                   Score a model on eval/requests.yaml by meaning, not text.
+  structure.py             Write STRUCTURE.txt: every folder and file of the repository, each with one line on what it is.
+  suite.py                 Instruction-coverage test suite: English requests with expected rungs.
+  suite_run.py             Run the instruction suite and write a report.
+examples/
+  pump_station.spec
+  tank_plant.yaml
+explain/                   From existing logic to words and pictures: rungs back to LogicSpec, ladder drawings, rung comments.
+  __init__.py
+  comments.py              Write the plain-English read of each rung into the L5X as its rung comment.
+  decompiler.py            Turn existing rungs back into LogicSpec.
+  equivalence.py           Do two LogicSpec programs do the same thing?
+  ladder.py                Draw a rung as a ladder diagram (SVG), the way Logix Designer lays it out: left and right power rails, contacts and coils as symbols, every other instruction as a box with its operands, branches as parallel legs, outputs pushed to the right rail.
+  README.md
+  survey.py                Survey a folder of L5X exports: does our parser, catalog and decompiler agree with real files? Used to confirm format details and find gaps.
+generate/                  From what the user gives to LogicSpec or UDTs: the local model, its prompt and checks, and the Excel readers.
+  __init__.py
+  examples.yaml
+  gbnf.py                  Per-request GBNF grammar (llama.cpp) for LogicSpec.
+  iolist.py                An I/O list: every field signal, its tag, its address and what it is.
+  llm/
+    __init__.py            Plain English -> LogicSpec with a local model through Ollama.
+    checks.py              Output checks that send the model back: unrequested latches, OR-splits, stray RISE, unnamed outputs.
+    clients.py             Model clients: Ollama and OpenAI-compatible local servers (llama.cpp, LM Studio).
+    generator.py           Request -> LogicSpec -> compiled rungs, with retries on any failed check.
+    names.py               Tag names in requests and specs: what the user wrote, what the model wrote.
+    prompt.py              The system prompt and the examples and tags each request is shown.
+  README.md
+  spec_excel.py            A requirements workbook: each sheet is one routine, each row one requirement (one or more rungs).
+  udt_llm.py               Plain English -> UDT.
+gui/                       The local web app: pages and the JSON API behind them.
+  __init__.py              The local web GUI: pages and the JSON API behind them.
+  energize.py              Energize: run a whole program with its plant, live, before any controller is involved.
+  jobs.py                  Long work in the background (a requirements workbook can take minutes on a CPU): the page starts a job, then polls it for progress and the result.
+  logic.py                 Logic in the chat box: plain English (through the model), LogicSpec, or rung text (neutral or ASCII).
+  project.py               The attached L5X: summary, plain-English read of every rung, validation, cross reference.
+  README.md
+  spec.py                  A requirements workbook -> one routine per sheet, row by row, in the background.
+  state.py                 What the GUI remembers between requests, and the settings sent with each request.
+  static/
+    app.js
+    common.js
+    devices.js
+    energize.js
+    favicon.ico
+    lint.js
+    settings.js
+    style.css
+    tests.js
+  templates/
+    base.html
+    devices.html
+    energize.html
+    help.html
+    index.html
+    lint.html
+    settings.html
+    tests.html
+  udts.py                  UDTs: create (text form, Excel or plain English) and optimize (the attached file's UDTs).
+l5x/                       Read and write Studio 5000 L5X files: the only place that knows the XML.
+  __init__.py
+  reader.py                Read an L5X export into plain Python structures.
+  README.md
+  writer.py                Deterministic L5X writer for Rung and Routine imports.
+  xref.py                  Cross-reference: which rung reads or writes which tag.
+library/                   Reusable blocks: one file gives a device's rungs, tags, device model and test cases.
+  __init__.py              Reusable blocks: one file gives a device's rungs, tags, plant model and tests.
+  block.py                 Block files: parameters with defaults, rung patterns, tag types, plant entry and scenario patterns.
+  blocks/
+    alarm_latch.yaml
+    motor.yaml
+    valve2pos.yaml
+  README.md
+lint/                      The 50 programming rules (CRT/ERR/WAR/INF), the company profile, and auto-fix where a fix is certain.
+  __init__.py              Static checks against a fixed checklist of PLC programming rules (CRT/ERR/WAR/INF codes).
+  autofix.py               Fix what the lint finds, where a fix is certain, and say plainly what each fix changes.
+  checks_io.py             Physical I/O rules: unmapped points, aliases, point comments, electronic keying.
+  checks_lifecycle.py      Module lifecycle rules, from the catalog-number list in lifecycle.json.
+  checks_logic.py          Rung rules: they need only the rungs and the tag types, so they also run on freshly generated logic.
+  checks_project.py        Controller, task, program and AOI rules: they need the whole project.
+  checks_tags.py           Tag rules: naming, data types, presets, usage, descriptions.
+  checks_udt.py            Data type rules: padding, member order, unused definitions, member descriptions.
+  context.py               Everything a rule needs, built once from a Project: rung list with locations, tag lookup by scope, operand types, operand roles from the instruction catalog.
+  lifecycle.json
+  paths.py                 Path questions on the rung AST (core.rung): what is guaranteed to run before an instruction on its power path, which sequences and branches a rung has.
+  profile.py               A company coding-standards profile: rules that differ per company, checked like any other rule.
+  README.md
+  registry.py              Check functions register here with the codes they can emit.
+  rules.py                 The rule checklist: codes, titles, descriptions, scope.
+testcases/                 Test cases: requirement-level checks run against the program and its device models, with a traceable record and a PDF report.
+  __init__.py              Test cases: requirement-level checks run against the logic and its device models, in OpenVnV's step language.
+  backend.py               Where a scenario runs.
+  dsl.py                   The step language: text in, Scenario objects out.
+  evidence.py              Evidence of a test run: requirements, traceability, results step by step, and what exactly was tested.
+  README.md
+  report_pdf.py            The test report as a PDF, made from a run record (testcases/evidence.py) and nothing else.
+  runner.py                Run scenarios on a Backend and record what happened, step by step.
+tests/                     pytest: one file per area.
+  fixtures/
+    guardlogix_cell.L5X
+    lint_project.L5X
+    sample_project.L5X
+    studio_single_udt.L5X
+    udt_program.L5X
+  helpers.py               Shared test helpers: random LogicSpec expressions, reference evaluation, and a tiny GBNF interpreter so generated grammars can be checked without llama.cpp.
+  README.md
+  test_app.py              GUI back end: the JSON API behind the chat page.
+  test_ascii.py
+  test_autofix.py          Lint auto-fix: what is safe is proven so, what changes behaviour says so, the rest of the file is untouched.
+  test_catalog.py
+  test_compiler.py
+  test_corpus.py           Every feature over a folder of real L5X exports.
+  test_corpus_sources.py   The list of public exports CI fetches: pinned, permissively licensed, never one of ours.
+  test_decompiler.py
+  test_devices.py
+  test_devices_page.py     Device models on their own page, and the Lint page's name.
+  test_energize.py
+  test_eval.py
+  test_evidence.py         Test evidence: requirements from the instruction sheet, traceability, run records, the PDF report.
+  test_gbnf.py
+  test_iolist.py
+  test_l5x.py
+  test_ladder.py           Ladder diagrams: valid SVG, the right symbols, outputs on the right rail.
+  test_library.py
+  test_lint.py             Lint rules.
+  test_llm.py              English -> LogicSpec loop, with a fake model (no Ollama needed).
+  test_logicspec.py
+  test_oracle.py           The always-correct stand-in: no check may send a right answer back.
+  test_oracle_report.py    The oracle report: an unanswerable row is listed once, by Excel row with its Rung number.
+  test_profile.py
+  test_rung.py
+  test_rung_comments.py    Download the attached L5X with the English read as rung comments: only missing comments are added.
+  test_rung_compare.py
+  test_security.py         Data must not leave this PC by accident: the model address, the page banner, big files.
+  test_simulator.py
+  test_spec.py             Requirements workbook -> routines: reading the sheet, and the background build (model stubbed).
+  test_start_script.py     start.sh: packages live outside the download, installed once and again only when requirements.txt changes.
+  TEST_STATUS.md           Internal results only: what has been measured, how, and what has not been verified.
+  test_structure.py        The shape of the repository: which folder may import which, a README per folder, STRUCTURE.txt current.
+  test_suite.py
+  test_testcases.py
+  test_udt.py              UDTs: the text form, checks, writing new UDTs, Excel, reordering attached exports.
+  test_validate.py
+udt/                       UDTs: create them (text form, Excel, plain English through `generate`) and reorder an export's UDTs so no memory is wasted.
+  __init__.py
+  excel.py                 UDTs from an Excel sheet: one row per member.
+  model.py                 A UDT as a list of members, the checks Studio 5000 applies to one, and the small text form the model writes:
+  optimize.py              Reorder the members of the UDTs in an attached export so no padding is wasted.
+  README.md
+  writer.py                Write new UDTs as Studio 5000 DataType exports (Import Data Type), members in the order that wastes no padding.

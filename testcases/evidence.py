@@ -59,7 +59,7 @@ class Requirement:
 
 def requirements_from_workbook(data: bytes) -> list[Requirement]:
     """The instruction sheet's requirements, in the order they first appear."""
-    from inputs.spec_excel import read_requirements
+    from generate.spec_excel import read_requirements
     out: dict[str, Requirement] = {}
     for sheet in read_requirements(data):
         for row in sheet.rows:

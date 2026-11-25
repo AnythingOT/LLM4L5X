@@ -21,8 +21,8 @@ from dataclasses import dataclass, field
 from core.rung import walk
 from l5x.reader import Project, read_l5x
 from lint.context import Context
-from udt import layout
-from udt.layout import HOST_PREFIX, M
+from core import udt_layout as layout
+from core.udt_layout import HOST_PREFIX, M
 from l5x.writer import EXPORT_OPTIONS
 from udt.writer import host_name
 

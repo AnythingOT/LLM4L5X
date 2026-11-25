@@ -7,7 +7,7 @@ from test_energize import FILES, PLANT, SCENARIOS, _upload
 def web(tmp_path):
     import app as gui
     from gui import ENERGIZE
-    from scenario.evidence import RunStore
+    from testcases.evidence import RunStore
     gui.app.config["TESTING"] = True
     gui.app.config["RUNS"] = RunStore(tmp_path / "runs")  # never the real runs/ folder
     ENERGIZE.clear()

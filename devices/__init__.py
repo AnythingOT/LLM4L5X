@@ -1,4 +1,4 @@
-"""Plant models: what the field devices do when the PLC drives them.
+"""Device models: what the field devices do when the PLC drives them.
 
 A plant model reads the PLC's command tags, waits the way real equipment waits, and writes the
 feedback tags back: a pump's run contact closes a second after its contactor is energized; a valve

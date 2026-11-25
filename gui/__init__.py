@@ -18,9 +18,9 @@ from gui import jobs, logic, project, spec, state, udts
 from gui.state import SESSION
 from core.rung import RungSyntaxError, parse_rung
 from explain.ladder import to_svg
-from inputs.llm import BACKENDS, LLMError
+from generate.llm import BACKENDS, LLMError
 from l5x.reader import read_l5x
-from inputs.spec_excel import SpecSheetError, read_requirements, sample
+from generate.spec_excel import SpecSheetError, read_requirements, sample
 from udt.excel import is_udt_sheet, read_excel, template
 from udt.model import UdtError
 
@@ -58,7 +58,7 @@ def create_app() -> Flask:
     app = Flask(__name__)
     app.config["MAX_CONTENT_LENGTH"] = MAX_UPLOAD
     # test run records (evidence): one file each, written once, next to the app unless told otherwise
-    from scenario.evidence import ROOT, RunStore
+    from testcases.evidence import ROOT, RunStore
     app.config["RUNS"] = RunStore(os.environ.get("LLM4L5X_RUNS") or ROOT / "runs")
 
     @app.before_request
@@ -79,7 +79,7 @@ def create_app() -> Flask:
 
     @app.get("/lint")
     def lint_page():
-        return render_template("rules.html", page="lint")
+        return render_template("lint.html", page="lint")
 
     @app.get("/rules")  # the page's old name: links and bookmarks still work
     def rules_page():
@@ -176,7 +176,7 @@ def create_app() -> Flask:
         """Each device model as the page lists it: what it reads, what it answers, how long it takes."""
         from dataclasses import fields
 
-        from plant import load_plant
+        from devices import load_plant
         if not text.strip():
             return []
         out = []
@@ -189,7 +189,7 @@ def create_app() -> Flask:
     @app.post("/api/devices/save")
     def devices_save():
         """Device models alone: checked now, kept, and the live program answers with them."""
-        from plant import load_plant
+        from devices import load_plant
         devices = (request.get_json(silent=True) or {}).get("devices", "")
         try:
             if devices.strip():
@@ -222,8 +222,8 @@ def create_app() -> Flask:
     @app.post("/api/tests/save")
     def tests_save():
         """Device models and test cases: checked now, so a mistake shows here, not when the tests run."""
-        from plant import load_plant
-        from scenario import parse_scenarios
+        from devices import load_plant
+        from testcases import parse_scenarios
         body = request.get_json(silent=True) or {}
         devices, tests = body.get("devices", ENERGIZE.get("devices", "")), body.get("tests", "")
         try:
@@ -246,13 +246,13 @@ def create_app() -> Flask:
         book = ENERGIZE.get("reqbook")
         if not book:
             return None
-        from scenario.evidence import requirements_from_workbook
+        from testcases.evidence import requirements_from_workbook
         return {"name": book[0], "count": len(requirements_from_workbook(book[1]))}
 
     @app.post("/api/tests/requirements")
     def tests_requirements():
         """The user requirements workbook (the instruction sheet): where the requirements come from."""
-        from scenario.evidence import requirements_from_workbook
+        from testcases.evidence import requirements_from_workbook
         f = request.files.get("file")
         if f is None:
             return jsonify(error="no file"), 400
@@ -269,8 +269,8 @@ def create_app() -> Flask:
     @app.post("/api/tests/run")
     def tests_run():
         """Run every test case, keep the evidence (runs/), and answer with the matrix and results."""
-        from scenario import report
-        from scenario.evidence import run_record
+        from testcases import report
+        from testcases.evidence import run_record
         ses = ENERGIZE.get("session")
         if ses is None:
             return jsonify(error="load a program first"), 400
@@ -283,7 +283,7 @@ def create_app() -> Flask:
                             requirements=ENERGIZE.get("reqbook"), scan_ms=ses.scan_ms)
         app.config["RUNS"].save(record)
         s = record["summary"]
-        from scenario import trace
+        from testcases import trace
         return jsonify(passed=s["passed"], total=s["test_cases"], report=report(results), run_id=record["id"],
                        trace={k: [list(x) for x in v] for k, v in trace(results).items()},
                        summary=s, matrix=record["matrix"], gaps=record["gaps"], results=record["results"])
@@ -294,7 +294,7 @@ def create_app() -> Flask:
 
     @app.get("/api/tests/runs/<run_id>/report.pdf")
     def tests_report(run_id):
-        from scenario.report_pdf import build_pdf
+        from testcases.report_pdf import build_pdf
         record = app.config["RUNS"].get(run_id)
         if record is None:
             return jsonify(error="no such run"), 404

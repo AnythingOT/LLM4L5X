@@ -12,7 +12,7 @@ Expected rung in the scan simulator (equivalent rungs count as right). Sheets:
 Every expected answer is checked before it is written: the LogicSpec that says the same thing
 is compiled and must behave like the Expected rung, so the sheet holds no impossible rows.
 
-    python -m eval.test_workbook out.xlsx [--seed 3] [--rows 12] [--level 1|2] [--corpus folder_of_L5X]
+    python -m eval.expected_workbook out.xlsx [--seed 3] [--rows 12] [--level 1|2] [--corpus folder_of_L5X]
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from core.catalog import default_catalog
 from core.compiler import Compiler
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import Branch, Instr, Rung, Series, format_rung, parse_rung, walk
-from eval.rung_compare import Side, _refs, compare
+from core.rung_compare import Side, _refs, compare
 from eval.suite import make_case
 
 TIMED = {"TON", "TOF", "RTO", "CTU", "CTD"}
@@ -159,7 +159,7 @@ def nonsense(rung: Rung, tag_types: dict[str, str] | None = None) -> str | None:
 
 def real_world_sheet(folder: Path, rng: random.Random, want: int, written: set[str] | None = None) -> list[tuple]:
     from explain.decompiler import try_decompile
-    from explain.describe import describe_statement
+    from core.describe import describe_statement
     from l5x.reader import read_l5x
     plain = re.compile(r"^[A-Za-z_]\w*(\.(DN|EN|TT|ACC|PRE))?$")
     pool = []

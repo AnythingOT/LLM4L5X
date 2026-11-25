@@ -8,7 +8,7 @@ import pytest
 
 import lint
 from l5x.reader import read_l5x
-from udt import layout
+from core import udt_layout as layout
 from udt.excel import read_excel, template
 from udt.model import UdtDef, UdtError, UdtMember, check, format_spec, parse_spec
 from udt.optimize import analyse, file_name, file_names, full_program, single_file, zip_files
@@ -241,7 +241,7 @@ class FakeClient:
 
 def test_grammar_accepts_the_examples_and_rejects_prose():
     from helpers import Grammar
-    from inputs.udt_llm import EXAMPLES, grammar
+    from generate.udt_llm import EXAMPLES, grammar
     g = Grammar(grammar(["Valve_UDT"]))
     for _, spec in EXAMPLES:
         assert g.accepts(spec), spec
@@ -250,7 +250,7 @@ def test_grammar_accepts_the_examples_and_rejects_prose():
 
 
 def test_generate_retries_with_the_problem_and_returns_checked_udts():
-    from inputs.udt_llm import generate
+    from generate.udt_llm import generate
     bad = 'UDT Motor "m";\nFlags BOOL[20] "flags";'
     good = '```\nUDT Motor "m";\nFlags BOOL[32] "flags";\nSpeed REAL "rpm";\n```'
     c = FakeClient([bad, good])

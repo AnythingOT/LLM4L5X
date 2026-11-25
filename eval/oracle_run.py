@@ -16,10 +16,10 @@ import sys
 
 from core.logicspec import format_spec
 from core.rung import parse_rung
-from eval.test_workbook import presets_of
+from eval.expected_workbook import presets_of
 from explain.decompiler import try_decompile
 from gui import jobs, spec, state
-from inputs.spec_excel import read_requirements
+from generate.spec_excel import read_requirements
 
 
 class Oracle:

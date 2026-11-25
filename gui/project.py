@@ -8,7 +8,7 @@ from core.logicspec import format_spec
 from core.validator import validate_project
 from explain.comments import add_rung_comments
 from explain.decompiler import try_decompile
-from explain.describe import describe_statement
+from core.describe import describe_statement
 from gui.state import SESSION
 import lint
 

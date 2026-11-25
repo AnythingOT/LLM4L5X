@@ -3,7 +3,7 @@
 Two kinds of fix:
 
 * **safe**: the program behaves exactly as before. A rung fix is safe only if the scan simulator runs
-  the routine before and after the fix and sees no difference (eval/rung_compare); a routine it cannot run
+  the routine before and after the fix and sees no difference (core/rung_compare); a routine it cannot run
   makes the fix a "changes" one, with the reason. Deleting a tag is safe only if nothing outside the
   logic can reach it (External Access None, not produced or consumed).
 * **changes**: the fix changes behaviour on purpose (it removes a fault or a hidden bug). Each one is
@@ -170,7 +170,7 @@ class AutoFix:
 
     def _same_behaviour(self, key, change: Callable[[list[Rung]], list[Rung]]) -> tuple[bool, str]:
         """Run the routine before and after `change` in the scan simulator."""
-        from eval.rung_compare import Side, compare
+        from core.rung_compare import Side, compare
         slots = [s for s in self.slots[key] if not s.deleted]
         if any(s.rung is None for s in slots):
             return False, "not checked: a rung of this routine could not be read"

@@ -3,7 +3,7 @@
 #   python cli.py eval eval/requests.yaml --model phi4-mini
 # Add requests in your own plant's wording; 30-50 gives a useful comparison.
 # Optional "tags" gives the model existing project tags to use: {name: type}.
-# These requests deliberately differ from inputs/examples.yaml so they test
+# These requests deliberately differ from generate/examples.yaml so they test
 # generalisation, not copying.
 
 - request: Run the agitator when the start button is pressed and keep it running until the stop button is pressed.

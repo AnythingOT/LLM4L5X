@@ -72,7 +72,7 @@ Ollama's `qwen3.6:35b-a3b` is the same model but untested here. If you use it, s
 
 **Attach your project's .L5X first.** The model is then shown your real tags (matched by name and description) and asked to use them. A new tag that looks like a typo of an existing one is flagged (*"did you mean Pump_Run?"*). If the request names a tag and the logic uses a look-alike in its place (`Flow_SP` for `Flow_Setpoint`), the model is sent back; if it still does it on its last attempt, the row **fails** instead of building with the wrong tag.
 
-Improve results without fine-tuning by adding examples in your plant's wording to `inputs/examples.yaml`. The most similar ones are shown to the model for each request.
+Improve results without fine-tuning by adding examples in your plant's wording to `generate/examples.yaml`. The most similar ones are shown to the model for each request.
 
 To compare models by measurement, see [DEVELOPMENT.md](DEVELOPMENT.md#comparing-models).
 
@@ -260,7 +260,7 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 **Tests** (top bar) holds the test cases, next to the program Energize runs (load it on either page).
 
 - **Test cases** set inputs, wait and expect outputs, each tied to a requirement ID. Format:
-  [SCENARIOS.md](SCENARIOS.md) (the file format still says `SCENARIO`).
+  [TESTCASES.md](TESTCASES.md) (the file format still says `SCENARIO`).
 - **Load requirements**: the instruction sheet (the requirements workbook the program was built from).
   A requirement is a Req ID with the text of its rows; a row with no Req ID is a requirement of its own
   ("Pump row 6"); INFRA rows serve none. Without it, the requirements are the Req IDs the rungs and test
@@ -288,7 +288,7 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 ## Device models
 
 **Devices** (top bar) holds the device models: stand-ins for the machine. A pump's running contact closes
-a second after it is commanded; a valve's limit switches follow its solenoids. Format: [PLANT.md](PLANT.md).
+a second after it is commanded; a valve's limit switches follow its solenoids. Format: [DEVICES.md](DEVICES.md).
 
 - **Save** checks them, keeps them, and the loaded program answers with them at once; Energize and Tests
   both use them.

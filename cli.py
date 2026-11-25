@@ -25,8 +25,8 @@ from l5x.xref import cross_reference
 from core.logicspec import SpecError, format_spec, parse_spec
 from core.compiler import Compiler
 from explain.decompiler import try_decompile
-from explain.describe import describe_statement
-from inputs.gbnf import build_gbnf
+from core.describe import describe_statement
+from generate.gbnf import build_gbnf
 from core.ascii import AsciiSyntaxError, format_ascii, looks_like_ascii, parse_ascii
 from core.rung import RungSyntaxError, format_rung, parse_rung
 from core.validator import errors, validate
@@ -240,14 +240,14 @@ def cmd_fix(a) -> int:
 
 
 def _client(a):
-    from inputs.llm import make_client
+    from generate.llm import make_client
     return make_client(a.backend, a.url, a.model, think=False if a.no_think else None,
                        allow_remote=getattr(a, "allow_remote", False))
 
 
 def cmd_ask(a) -> int:
     """Plain English -> LogicSpec (local model) -> rungs, optionally L5X."""
-    from inputs.llm import Generator, LLMError
+    from generate.llm import Generator, LLMError
     project = read_l5x(Path(a.project)) if a.project else None
     revision = a.revision or (project.software_revision if project else None) or "32.04"
     try:
@@ -294,8 +294,8 @@ def cmd_probe(a) -> int:
     """Find out which part breaks grammar-constrained answers on a llama-server."""
     import urllib.error
     import urllib.request
-    from inputs.gbnf import build_gbnf
-    from inputs.llm import check_url
+    from generate.gbnf import build_gbnf
+    from generate.llm import check_url
     url = check_url((a.url or "http://127.0.0.1:8080").rstrip("/"), a.allow_remote) + "/v1/chat/completions"
     ask = [{"role": "user", "content": "Write LogicSpec: turn on Motor_Run while Start_PB is on."}]
     spec_grammar = build_gbnf({"Motor_Run": "BOOL", "Start_PB": "BOOL"}, allow_new_tags=False)

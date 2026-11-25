@@ -119,10 +119,10 @@ def _self_test(b: Block) -> None:
     if bad:
         raise LibraryError(f"{b.name}: its rungs fail rule {bad[0].code}: {bad[0].message}")
     if inst.plant:
-        from plant import load_plant
+        from devices import load_plant
         load_plant(yaml.safe_dump({"devices": [inst.plant]}))
     if inst.scenarios.strip():
-        from scenario import parse_scenarios
+        from testcases import parse_scenarios
         parse_scenarios(inst.scenarios)
 
 

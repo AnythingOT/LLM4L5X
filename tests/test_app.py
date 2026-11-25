@@ -115,7 +115,7 @@ def test_pasted_rungs_download_with_inferred_tags(client):
 
 
 def test_english_goes_to_the_model(client, monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     monkeypatch.setattr(llm.OllamaClient, "chat", lambda self, m: "Pump_Run := (Start_PB OR Pump_Run) AND NOT Stop_PB;")
     d = post(client, "start the pump with start and keep it running until stop", model="fake-model")
     assert d["kind"] == "generated" and d["model"] == "fake-model"
@@ -125,7 +125,7 @@ def test_english_goes_to_the_model(client, monkeypatch):
 
 
 def test_english_when_ollama_is_down(client, monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     def down(self, m):
         raise llm.LLMError("Cannot reach Ollama at http://127.0.0.1:11434. Is Ollama running?")
     monkeypatch.setattr(llm.OllamaClient, "chat", down)
@@ -134,14 +134,14 @@ def test_english_when_ollama_is_down(client, monkeypatch):
 
 
 def test_broken_logicspec_is_not_sent_to_the_model(client, monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     monkeypatch.setattr(llm.OllamaClient, "chat", lambda self, m: (_ for _ in ()).throw(AssertionError("called")))
     d = post(client, "X := A AND B OR C;")
     assert d["kind"] == "error" and "parentheses" in d["message"]
 
 
 def test_model_list_endpoint(client, monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     monkeypatch.setattr(llm.OllamaClient, "list_models", lambda self: ["phi4-mini:latest", "qwen3.6:35b-a3b"])
     d = client.post("/api/llm/models", json={"settings": {"backend": "ollama"}}).get_json()
     assert d["ok"] and d["models"] == ["phi4-mini:latest", "qwen3.6:35b-a3b"] and d["url"].endswith(":11434")
@@ -153,7 +153,7 @@ def test_model_list_endpoint(client, monkeypatch):
 
 
 def test_english_through_llamacpp_backend_uses_grammar(client, monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     seen = {}
     def chat(self, messages, grammar=None, **kw):
         seen["grammar"] = grammar

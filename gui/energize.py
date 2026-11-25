@@ -18,7 +18,7 @@ from dataclasses import dataclass, field
 from core import simulator as sim
 from core.rung import Instr, Rung, base_tag, is_literal, walk
 from l5x.reader import read_l5x
-from scenario import SimBackend, parse_scenarios, report, run_scenarios, trace
+from testcases import SimBackend, parse_scenarios, report, run_scenarios, trace
 
 SKIPPED_ROUTINES = {"MAP_IN", "MAP_OUT"}
 _CALLS = {"JSR", "SBR", "RET"}
@@ -65,7 +65,7 @@ class Session:
     presets: dict = field(default_factory=dict)  # {"T.PRE": 5000} from the tags' data: rungs may show "?"
 
     def _new_backend(self) -> SimBackend:
-        from plant import load_plant
+        from devices import load_plant
         plant = load_plant(self.plant_text) if self.plant_text.strip() else None
         be = SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms)
         be.sim.trace = True  # the page draws where power flows in each rung
