@@ -141,7 +141,9 @@ function build(j) {
         : 'Nothing answers the outputs yet: add device models on the Devices page';
     const files = (j.names || []).join(', ');
     const plain = j.outputs.filter((t) => !isMember(t)).length;
-    $('enSummary').textContent = `${files}: ${j.rungs.length} rungs, ${j.inputs.length} inputs, ${plain} outputs`
+    const n = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+    $('enChange').textContent = files || 'Program';
+    $('enSummary').textContent = `${n(j.rungs.length, 'rung')}, ${n(j.inputs.length, 'input')}, ${n(plain, 'output')}`
         + (j.structs.length ? `, ${j.structs.length} ${j.structs.length === 1 ? 'timer or counter' : 'timers and counters'}` : '')
         + (j.feedbacks.length ? `, ${j.feedbacks.length} from the device models` : '');
     document.querySelectorAll('.en-filter').forEach((f) => { f.value = ''; });
@@ -175,14 +177,24 @@ function show(snap) {
         li.querySelector('.en-bar').setAttribute('aria-valuenow', String(Math.round(pct)));
         li.classList.toggle('done', isOn(t[`${n}.DN`]));
     }
-    // the ladder, as Logix Designer shows it online: a contact passes power, a coil is on, a rung is true
+    // the ladder, as Logix Designer shows it online: a contact passes power, a coil is on, a rung is true.
+    // Steady, it is still green. Where something changed this scan, power runs along its new path once,
+    // left to right, and a coil that came on pulses once: the eye goes to what changed, nothing else moves.
+    const motion = !first && !REDUCED.matches;
     document.querySelectorAll('#enRungs .lad-el').forEach((g) => {
         const v = isOn(t[g.dataset.tag]);
         const k = g.dataset.kind;
-        g.classList.toggle('live', k === 'XIC' ? v : k === 'XIO' ? !v : v);
+        const live = k === 'XIC' ? v : k === 'XIO' ? !v : v;
+        if (motion && live && !g.classList.contains('live') && g.querySelector('.lad-glow')) {
+            g.style.setProperty('--d', `${SWEEP_MS}ms`);  // once power has reached it
+            replay(g, 'pulse');
+        }
+        g.classList.toggle('live', live);
     });
     document.querySelectorAll('#enRungs .en-rung').forEach((f) => {
         const i = Number(f.dataset.i);
+        const svg = f.querySelector('svg');
+        const box = svg && motion ? svg.getBoundingClientRect() : null;
         f.classList.toggle('lit', !!snap.power[i]);
         // where power flows, from the simulator's trace of this scan: "path:in" / "path:out" of an element
         const flow = (snap.flow || [])[i] || {};
@@ -194,6 +206,12 @@ function show(snap) {
                 const bits = path === '' ? 3 : (flow[path] || 0);
                 on = side === 'in' ? !!(bits & 1) : !!(bits & 2);
             }
+            if (box && on && !ln.classList.contains('pwr') && box.width) {  // newly powered: draw it on
+                const r = ln.getBoundingClientRect();
+                ln.style.setProperty('--len', `${Math.max(r.width, r.height, 1)}`);
+                ln.style.setProperty('--d', `${Math.round((SWEEP_MS * (r.left - box.left)) / box.width)}ms`);
+                replay(ln, 'sweep');
+            }
             ln.classList.toggle('pwr', on);
         });
         f.querySelectorAll('text[data-live]').forEach((tx) => {  // a timer's or counter's accumulator, live
@@ -204,6 +222,16 @@ function show(snap) {
     const notes = snap.notes || [];
     $('enNotes').replaceChildren(...notes.map((n) => el('li', '', n)));
     $('enNotes').hidden = !notes.length;
+    first = false;
+}
+const SWEEP_MS = 320;  // power crosses a whole rung in this time
+const REDUCED = window.matchMedia('(prefers-reduced-motion: reduce)');
+let first = true;  // the first picture of a program is shown as it is, without motion
+function replay(node, cls) {  // run a one-time animation, again if it is still on from a change just before
+    node.classList.remove(cls);
+    void node.getBoundingClientRect();  // restart the CSS animation
+    node.classList.add(cls);
+    node.addEventListener('animationend', () => node.classList.remove(cls), { once: true });
 }
 
 async function step(ms) {
@@ -265,9 +293,21 @@ $('enChange').onclick = () => {
     $('enSetup').hidden = false;
     $('enFiles').focus();
 };
+$('enUnload').onclick = async () => {
+    stop();
+    pending = {};
+    try { await fetch('/api/energize', { method: 'DELETE' }); } catch { /* the page is cleared anyway */ }
+    $('enLive').hidden = true;
+    $('enSetup').hidden = false;
+    $('enRungs').replaceChildren();
+    $('enFiles').value = '';
+    $('enFiles').onchange();
+    msg('Program unloaded. Device models and test cases are kept for the next one.');
+};
 
 function open_(j) {  // a loaded program: build the page from it and show its live state
     build(j);
+    first = true;
     show(j.snapshot);
     $('enSetup').hidden = true;
     $('enLive').hidden = false;
