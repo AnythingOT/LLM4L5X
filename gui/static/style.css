@@ -163,6 +163,10 @@ footer { font-size: .78rem; text-align: center; color: var(--muted); padding: 10
     white-space: pre-wrap; word-break: break-all;
 }
 .rung-comment { color: var(--ink-2); font-size: .88rem; }
+/* a rung's own comment, as Studio 5000 shows it above the rung; then the explanation */
+.own-comment { font-size: .88rem; color: var(--ink); padding: 2px 8px; border-left: 3px solid var(--line-strong); background: var(--sunken); }
+.explained { display: flex; gap: 8px; align-items: baseline; margin: 2px 0 4px; }
+.explained-label { flex: none; font-size: .7rem; font-weight: 600; color: var(--muted); border: 1px solid var(--line); border-radius: 9px; padding: 0 7px; }
 .readback { margin: 0; padding-left: 1.15rem; }
 .readback li { margin: 3px 0; }
 .status-line { font-family: var(--head-font); font-weight: 600; font-size: 1.02rem; }
@@ -280,6 +284,12 @@ body.dark-mode .code { color: #0e1520; }
 .chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
 .chips[hidden], .chips [hidden] { display: none; }
 .chips-label { font-size: .8rem; color: var(--muted); margin: 0 2px 0 4px; }
+.chip-pair { display: inline-flex; }
+.chip-pair[hidden] { display: none; }
+.chip-pair .chip:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.chip-pair .chip-dl { border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 0 9px; text-decoration: none; }
+/* what the attached file can do: its own row under the examples */
+.chips-file { padding-top: 6px; border-top: 1px dashed var(--line); }
 .chip {
     font: inherit; font-size: .8rem; height: 26px; padding: 0 11px;
     display: inline-flex; align-items: center;
@@ -326,33 +336,10 @@ body.dark-mode .code { color: #0e1520; }
 .mode-toggle button.active { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: var(--shadow); }
 #inputWrapper.dragging .input-with-buttons { border-style: dashed; border-color: var(--amber); }
 
-/* ---------- help popup ---------- */
-.modal {
-    display: none;
-    position: fixed;
-    z-index: 1000;
-    inset: 0;
-    background: var(--overlay);
-    align-items: center;
-    justify-content: center;
-    padding: 2vh 2vw;
-}
-.modal.show { display: flex; }
-.modal-content {
-    background: var(--surface);
-    color: var(--ink);
-    padding: 20px 24px;
-    border-radius: 8px;
-    position: relative;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, .3);
-    max-height: 96vh;
-    overflow: auto;
-    scrollbar-width: thin;
-}
-.help-content { width: min(980px, 96vw); padding: 16px 22px 14px; }
-.help-head { display: flex; align-items: center; gap: 12px; }
-.help-head h2 { margin: 0; font-size: 1.2rem; flex: 1; }
-.help-head .close-button { position: static; margin: 0; }
+/* ---------- help page ---------- */
+.help-main { width: min(1200px, 100%); }
+.help-card { padding: 16px 22px 14px; }
+.help-card .help-legend { margin-top: 0; }
 .help-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; font-size: .8rem; color: var(--muted); margin: 6px 0 12px; }
 .help-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .help-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: .8rem; line-height: 1.45; }
@@ -373,10 +360,6 @@ body.dark-mode .code { color: #0e1520; }
 .by.fixed { color: var(--ok); border: 1px solid var(--ok); }
 .help-foot { margin: 10px 0 0; font-size: .78rem; color: var(--ink-2); }
 .help-foot.muted { margin-top: 4px; color: var(--muted); }
-.modal-content h2 { margin: 0 0 4px; font-size: 1.4rem; }
-.modal-description { margin: 0 0 14px; font-size: .82rem; color: var(--muted); }
-.close-button { position: absolute; top: 8px; right: 12px; font-size: 1.5rem; border: 0; background: transparent; cursor: pointer; color: var(--muted); }
-.close-button:hover { color: var(--ink); }
 
 /* ---------- full pages: settings, rules ---------- */
 .page-main { width: min(1200px, 100%); margin-top: 52px; padding: 24px 20px 8px; }

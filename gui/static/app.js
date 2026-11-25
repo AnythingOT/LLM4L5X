@@ -42,40 +42,49 @@ async function updateBadge() {
     } catch { dot.className = 'dot bad'; }
 }
 
-// ---------------------------------------------------------------- help popup and examples row
-const helpModal = $('helpModal');
-function openHelp() { helpModal.classList.add('show'); }
-$('helpButton').onclick = openHelp;
-helpModal.querySelector('.close-button').onclick = () => helpModal.classList.remove('show');
-helpModal.onclick = (e) => { if (e.target === helpModal) helpModal.classList.remove('show'); };
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape') helpModal.classList.remove('show'); });
+// ---------------------------------------------------------------- help page and examples rows
+function openHelp() { window.location.href = '/help'; }  // leaving with a request on its way asks first
 
 const chips = $('chips');
+let chipsOpen = false;
 function setChips(open) {
+    chipsOpen = open;
     chips.hidden = !open;
     $('examplesButton').setAttribute('aria-expanded', String(open));
     $('examplesButton').classList.toggle('active', open);
     store.set('llm4l5x.chips', open);
+    showProject();
 }
-$('examplesButton').onclick = () => setChips(chips.hidden);
-setChips(store.get('llm4l5x.chips', false));
+$('examplesButton').onclick = () => setChips(!chipsOpen);
 
 // ---------------------------------------------------------------- Logic / UDT mode
+// Each mode keeps its own draft: switching shows the other mode's text, and switching back brings this one
+// back, so a click on the wrong mode loses nothing. An attached L5X belongs to both modes (explain its rungs,
+// optimize its UDTs), except a UDT export, which has no rungs: it shows in UDT mode only, and stays attached.
 const PLACEHOLDER = {
     logic: 'Describe the logic, or paste rungs in neutral or ASCII text',
     udt: 'Describe a UDT, for example: a motor with run and fault bits and a speed',
 };
+const DRAFT_KEY = 'llm4l5x.drafts';
 let mode = store.get('llm4l5x.mode', 'logic');
 function setMode(m) {
-    mode = m === 'udt' ? 'udt' : 'logic';
+    const next = m === 'udt' ? 'udt' : 'logic';
+    if (next !== mode) {
+        const drafts = tab.get(DRAFT_KEY) || {};
+        drafts[mode] = inputBox.value;
+        tab.set(DRAFT_KEY, drafts);
+        inputBox.value = drafts[next] || '';
+        onInput();
+    }
+    mode = next;
     store.set('llm4l5x.mode', mode);
     document.querySelectorAll('#modeToggle button').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
     document.querySelectorAll('.logic-only').forEach((e) => (e.hidden = mode !== 'logic'));
     document.querySelectorAll('.udt-only').forEach((e) => (e.hidden = mode !== 'udt'));
     inputBox.placeholder = PLACEHOLDER[mode];
+    showProject();
 }
 document.querySelectorAll('#modeToggle button').forEach((b) => (b.onclick = () => { setMode(b.dataset.mode); inputBox.focus(); }));
-setMode(mode);
 
 // ---------------------------------------------------------------- message helpers
 function scrollDown() { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
@@ -297,7 +306,8 @@ const render = {
     },
 
     project(d) {
-        setProject(d.filename, d.programs, d.default_program);
+        setProject(d.filename, d.programs, d.default_program, d.target);
+        if (d.target === 'DataType') setMode('udt');
         if (d.revision_major) {
             settings = loadSettings();
             settings.revision = `${d.revision_major}.00`;
@@ -337,10 +347,16 @@ const render = {
             const page = d.rows.slice(shown, shown + PAGE);
             shown += page.length;
             const svgs = await ladders(page.map((r) => ({ text: r.text, number: r.number })));
+            // as in Studio 5000, the words come above the rung: its own comment, then what it does
             page.forEach((r, i) => {
                 list.appendChild(el('div', { cls: 'finding-where', text: r.where }));
+                if (r.comment) list.appendChild(el('div', { cls: 'own-comment', text: r.comment }));
+                list.appendChild(r.english
+                    ? el('div', { cls: 'rung-comment explained' },
+                        el('span', { cls: 'explained-label', text: r.comment ? 'What it does' : 'Generated' }),
+                        el('span', { text: r.english.join(' ') }))
+                    : el('div', { cls: 'warn', text: `Not explained: ${r.why}` }));
                 list.appendChild(svgs[i] ? drawing(svgs[i]) : code((form === 'ascii' && r.ascii) ? r.ascii : r.text));
-                list.appendChild(el('div', { cls: r.english ? 'rung-comment' : 'warn', text: r.english ? r.english.join(' ') : `Not explained: ${r.why}` }));
             });
             more.textContent = `Show the next ${Math.min(PAGE, d.rows.length - shown)} of ${d.rows.length - shown} left`;
             more.hidden = shown >= d.rows.length;
@@ -348,8 +364,19 @@ const render = {
         more.onclick = next;
         parts.push(list, more);
         next();
-        const text = d.rows.map((r) => `${r.where}\n  ${r.english ? r.english.join('\n  ') : 'not explained: ' + r.why}`).join('\n');
+        const text = d.rows.map((r) => `${r.where}${r.comment ? `\n  Comment: ${r.comment}` : ''}`
+            + `\n  ${r.english ? r.english.join('\n  ') : 'not explained: ' + r.why}`).join('\n');
         const row = el('div', { cls: 'btn-row' });
+        // the explanations as rung comments, only where a rung has none; the label says what the file will get
+        if (d.can_comment) {
+            const stem = (d.filename || 'Project').replace(/\.l5x$/i, '');
+            const label = d.commented ? `Add ${plural(d.can_comment, 'missing rung comment')} (.L5X)` : 'Download L5X with rung comments';
+            const b = button(label, () => { window.location.href = '/api/project/commented'; });
+            b.classList.add('primary');
+            b.title = `${stem}_commented.L5X: each rung without a comment gets its explanation, starting AUTO:. `
+                + 'Comments someone wrote are kept as they are; nothing else in the file changes.';
+            row.appendChild(b);
+        }
         row.appendChild(copyButton(() => text, 'Copy explanations'));
         row.appendChild(button('Download .txt', () => download('Explained.txt', text)));
         parts.push(row);
@@ -583,6 +610,7 @@ function show(d) { (render[d.kind] || render.error)(d.kind in render ? d : { mes
 async function send(text) {
     settings = loadSettings();
     if (/^\s*(help|\?)\s*$/i.test(text)) { openHelp(); return; }
+    if (/^\s*(cls|clear)\s*$/i.test(text)) { clearChat(); return; }
     addUser(text);
     const command = /^\s*(summary|decompile|validate|optimize|xref)\b/i.test(text);
     const english = !command && !/:=|;/.test(text) && !/^\s*\w+\s*\(/.test(text) && !/^\s*(XIC|XIO|SOR|BST)\b/i.test(text);
@@ -615,17 +643,30 @@ function submit() {
     send(text);
 }
 document.querySelectorAll('button.chip').forEach((c) => {  // <a class="chip"> are plain downloads
-    c.onclick = () => {
+    c.onclick = async () => {
         if (c.dataset.send) send(c.dataset.send);
-        else { inputBox.value = c.dataset.text; onInput(); inputBox.focus(); }
+        else if (c.dataset.attach) {  // a sample workbook: attach it as if it had been chosen with Attach
+            try {
+                const res = await fetch(c.dataset.attach);
+                if (!res.ok) throw new Error(`${res.status}`);
+                upload(new File([await res.blob()], c.dataset.name));
+            } catch (e) { render.error({ message: `Could not get the sample: ${e.message}` }); }
+        } else { inputBox.value = c.dataset.text; onInput(); inputBox.focus(); }
     };
 });
 
 // ---------------------------------------------------------------- project attach / detach
-function setProject(name, programs, preferred) {
-    $('projectBadge').hidden = !name;
-    $('projectName').textContent = name || '';
-    document.querySelectorAll('.project-only').forEach((c) => (c.hidden = !name));
+let attached = { name: null, target: null };
+function showProject() {
+    const visible = !!attached.name && !(attached.target === 'DataType' && mode === 'logic');
+    $('projectBadge').hidden = !visible;
+    $('projectName').textContent = attached.name || '';
+    $('fileChips').hidden = !(visible && chipsOpen);
+    document.querySelectorAll('#fileChips .rungs-only').forEach((c) => (c.hidden = attached.target === 'DataType'));
+}
+function setProject(name, programs, preferred, target) {
+    attached = { name: name || null, target: target || null };
+    showProject();
     if (programs && programs.length) {
         settings = loadSettings();
         if (!programs.includes(settings.program)) { settings.program = preferred || programs[0]; saveSettings(settings); }
@@ -644,7 +685,7 @@ async function upload(file) {
         wait.remove();
         if (res.status === 413) return render.error({ message: 'The file is larger than the 50 MB limit.' });
         const d = await res.json();
-        if (excel && d.kind === 'udt_created') setMode('udt');
+        if (excel && d.kind === 'udt_created') setMode('udt');  // keeps each mode's draft
         if (excel && d.kind === 'spec_started') setMode('logic');
         show(d);
     } catch (e) {
@@ -664,11 +705,15 @@ $('detachButton').onclick = async () => {
 inputWrapper.addEventListener('drop', (e) => { const f = e.dataTransfer.files[0]; if (f) upload(f); });
 
 // ---------------------------------------------------------------- start
+setMode(mode);
+setChips(store.get('llm4l5x.chips', false));
 (async () => {
     try {
         const s = await (await fetch('/api/status')).json();
-        setProject(s.project, s.programs, s.default_program);
+        setProject(s.project, s.programs, s.default_program, s.target);
     } catch { /* server not ready */ }
+    inputBox.value = (tab.get(DRAFT_KEY) || {})[mode] || '';
+    onInput();
     updateBadge();
     await intro();
     resumeJob();
@@ -735,6 +780,17 @@ function specSummary(res, row) {
         row.appendChild(el('div', { cls: 'err', text: 'No rows were built, so there is nothing to download.' }));
     }
 }
+
+// ---------------------------------------------------------------- clear the screen (cls)
+// Clears what is on the screen and starts again from the first screen. The attached file stays (detach it
+// with its x), and a requirements run still building keeps going on the server, but is no longer shown.
+function clearChat() {
+    tab.del(JOB_KEY);
+    chatWindow.replaceChildren();
+    window.scrollTo({ top: 0 });
+    intro();
+}
+$('clearButton').onclick = clearChat;
 
 // ---------------------------------------------------------------- first screen
 const EXAMPLE = {

@@ -78,14 +78,17 @@ To compare models by measurement, see [DEVELOPMENT.md](DEVELOPMENT.md#comparing-
 
 ## The app
 
-Three pages, light and dark. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** (rails, contacts, coils, instruction boxes with their operands, branches) next to its plain-English read-back. Press the help button in the header for what it can do; the list button next to **Send** shows examples and project commands.
+Three pages, light and dark. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** (rails, contacts, coils, instruction boxes with their operands, branches) next to its plain-English read-back. The **Help** page (? in the header, or type `help`) says what each part does; the list button next to **Send** shows examples, and under them what the attached file can do.
 
 - **Chat** (`/`)
   - **Plain English → ladder** (needs a model). Read-back, the rungs drawn as ladder, their text, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
   - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the ladder, what each rung does in English, the checks and **Download**.
   - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `optimize`, `xref TagName`.
+  - **Explain all rungs** shows, above each rung as Studio 5000 does, its own comment and then what it does. Rungs without a comment can get theirs written in: **Download L5X with rung comments** (no rung commented yet) or **Add N missing rung comments (.L5X)** (some are). Each added comment starts `AUTO:`; comments someone wrote are kept, and nothing else in the file changes.
+  - **Clear** in the header, or `cls`, clears the screen. The attached file stays (remove it with its ×).
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
-  - **Logic | UDT** switch in the input box. In UDT mode you create data types (below).
+  - **Logic | UDT** switch in the input box. In UDT mode you create data types (below). Each mode keeps its own unsent text, so switching back brings it back. An attached L5X is used in both modes, except a UDT export, which has no rungs: it shows in UDT mode only.
+  - The Excel samples in the examples list are attached when clicked (the run starts at once); the ↓ next to each downloads it to edit in Excel.
 - **Settings** (`/settings`): model (backend, address, model, thinking, context window), output (rung text form, download type, names, version, tag scope), Advanced (timer operand style, helper tag prefix, rung comments). Saved in the browser as you change them.
 - **Lint** (`/lint`; `/rules` still works): the 50 lint rules, grouped, with search and severity filter; switch each on or off.
 

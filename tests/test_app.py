@@ -294,3 +294,12 @@ def test_ladder_shows_presets_from_the_attached_project(client):
     assert d["kind"] == "project"
     svg = client.post("/api/ladder", json={"rungs": [{"text": "XIC(Go)TON(Fill_TMR,?,?);"}]}).get_json()["svgs"][0]
     assert ">5000</text>" in svg
+
+
+def test_help_is_a_page_and_status_names_the_target(client):
+    r = client.get("/help")
+    assert r.status_code == 200 and b"What LLM4L5X does" in r.data and b'class="page-main help-main"' in r.data
+    assert b"helpModal" not in client.get("/").data  # no popup left on the chat page
+    raw = (FIX.parent / "studio_single_udt.L5X").read_bytes()
+    client.post("/api/project", data={"file": (io.BytesIO(raw), "B322.L5X")}, content_type="multipart/form-data")
+    assert client.get("/api/status").get_json()["target"] == "DataType"  # the page shows it in UDT mode only
