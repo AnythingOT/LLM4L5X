@@ -10,7 +10,7 @@
 <a id="modelBadge" class="model-badge" href="/settings" title="Model connection - click to change">
     <span id="modelDot" class="dot"></span><span id="modelBadgeText">model</span>
 </a>
-<button id="helpButton" class="icon-btn" title="Help" aria-label="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><path d="M12 17.2h.01"/></svg></button>
+<button id="clearButton" class="icon-btn" title="Clear the chat (or type cls). The attached file stays." aria-label="Clear the chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg><span class="label">Clear</span></button>
 {% endblock %}
 
 {% block body %}
@@ -28,13 +28,15 @@
             <button class="chip udt-only" data-text="A motor UDT: running and faulted bits, speed in rpm, run hours, the last fault code and 32 alarm bits." hidden>motor UDT</button>
             <button class="chip udt-only" data-text="A tank with level and temperature, a high level alarm, and two pumps that each have a run command, a running feedback and a speed setpoint." hidden>tank with pumps</button>
             <button class="chip udt-only" data-text='UDT Valve "On/off valve";&#10;Open_Cmd BOOL "Open command";&#10;Opened_LS BOOL "Open limit switch";&#10;Travel_TMR TIMER "Travel time";' hidden>UDT text form</button>
-            <a class="chip logic-only" href="/api/spec/sample" download>Requirements Excel sample</a>
-            <a class="chip udt-only" href="/api/udt/template" download hidden>UDT Excel sample</a>
-            <span class="chips-label project-only" hidden>Attached file:</span>
-            <button class="chip project-only" data-send="summary" hidden>summary</button>
-            <button class="chip project-only" data-send="decompile" hidden>explain all rungs</button>
-            <button class="chip project-only" data-send="validate" hidden>validate</button>
-            <button class="chip project-only" data-send="optimize" hidden>optimize UDTs</button>
+            <span class="chip-pair logic-only"><button class="chip" data-attach="/api/spec/sample" data-name="Requirements_sample.xlsx" title="Attach the sample workbook and build it">Requirements Excel sample</button><a class="chip chip-dl" href="/api/spec/sample" download title="Download the sample to edit it in Excel" aria-label="Download the requirements sample">&#8595;</a></span>
+            <span class="chip-pair udt-only" hidden><button class="chip" data-attach="/api/udt/template" data-name="UDT_sample.xlsx" title="Attach the sample sheet and build its UDTs">UDT Excel sample</button><a class="chip chip-dl" href="/api/udt/template" download title="Download the sample to edit it in Excel" aria-label="Download the UDT sample">&#8595;</a></span>
+        </div>
+        <div class="chips chips-file project-only" id="fileChips" hidden>
+            <span class="chips-label">Attached file:</span>
+            <button class="chip" data-send="summary">summary</button>
+            <button class="chip rungs-only" data-send="decompile">explain all rungs</button>
+            <button class="chip rungs-only" data-send="validate">validate</button>
+            <button class="chip" data-send="optimize">optimize UDTs</button>
         </div>
         <div class="input-with-buttons">
             <button id="attachButton" class="tool-btn" title="Attach an .L5X export, or an Excel sheet of UDTs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg><span class="label">Attach</span></button>
@@ -50,62 +52,5 @@
     </div>
 </main>
 
-<div id="helpModal" class="modal" role="dialog" aria-labelledby="helpTitle">
-    <div class="modal-content help-content">
-        <div class="help-head">
-            <h2 id="helpTitle">What LLM4L5X does</h2>
-            <button class="close-button" title="Close" aria-label="Close">&times;</button>
-        </div>
-        <p class="help-legend">Runs offline on this PC.
-            <span><span class="by model">Model</span> written by the local model</span>
-            <span><span class="by fixed">Fixed code</span> deterministic: same input, same result</span></p>
-        <table class="help-table">
-            <colgroup><col class="c-in"><col class="c-out"><col class="c-by"></colgroup>
-            <thead><tr><th>You give</th><th>You get</th><th>Done by</th></tr></thead>
-            <tbody>
-                <tr><td><b>Plain English</b><span class="eg">Start the pump with the start button and keep it running until stop is pressed.</span></td>
-                    <td>Ladder rungs, read-back in English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
-                    <td><span class="by model">Model</span></td></tr>
-                <tr><td><b>Plain English</b>, UDT mode<span class="eg">A motor with run and fault bits, speed and 32 alarms.</span></td>
-                    <td>UDT in the order that wastes no memory; <code>Name.L5X</code></td>
-                    <td><span class="by model">Model</span></td></tr>
-                <tr><td><b>Rung text</b><span class="eg">Neutral <code>XIC(a)[XIC(b) ,XIO(c) ]OTE(d);</code></span><span class="eg">ASCII <code>XIC a BST XIC b NXB XIO c BND OTE d</code></span></td>
-                    <td>Ladder, English, checks; <code>Routine.L5X</code> or <code>Rung.L5X</code></td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-                <tr><td><b>Requirements Excel</b><span class="eg">Sheet = routine, row = requirement</span></td>
-                    <td>One routine per sheet, requirement as rung comment; <code>.L5X</code> or zip</td>
-                    <td><span class="by model">Model</span><span class="eg">Rows with rung text: fixed code</span></td></tr>
-                <tr><td><b>UDT Excel</b><span class="eg">Row = member</span></td>
-                    <td>UDTs, checked and ordered; <code>Name.L5X</code> or zip</td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-                <tr><td><b>L5X export</b><span class="eg">Controller, program, routine, rungs or UDT</span></td>
-                    <td><b>Explain all rungs</b>, <b>xref</b> a tag, <b>Validate</b> (import checks and coding rules, UDT rules included), <b>Optimize UDTs</b>. New logic uses its tags.</td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-            </tbody>
-        </table>
-        <h3 class="help-sub">Other pages</h3>
-        <table class="help-table">
-            <colgroup><col class="c-in"><col class="c-out"><col class="c-by"></colgroup>
-            <tbody>
-                <tr><td><b><a href="/energize">Energize</a></b><span class="eg">L5X routines or the Routines.zip of a run</span></td>
-                    <td>The whole program running on this PC: flip inputs, watch the ladder light up, outputs, timers and counters</td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-                <tr><td><b><a href="/tests">Tests</a></b><span class="eg">Test cases, each tied to a requirement</span></td>
-                    <td>Each test case run against the program, pass or fail per requirement</td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-                <tr><td><b><a href="/devices">Devices</a></b><span class="eg">Device models: pumps, valves</span></td>
-                    <td>What answers each output, and after how long: used by Energize and Tests</td>
-                    <td><span class="by fixed">Fixed code</span></td></tr>
-                <tr><td><b><a href="/lint">Lint</a></b>, <b><a href="/settings">Settings</a></b></td>
-                    <td>Which checks run; the model, text form and download type</td>
-                    <td></td></tr>
-            </tbody>
-        </table>
-        <p class="help-foot">The model only writes logic; fixed code draws, checks and writes every file, so check the
-            read-back before you import. Samples: the list button next to Send.</p>
-        <p class="help-foot muted">Planned: documentation from an attached program; translating comments, descriptions
-            and tag names to English.</p>
-    </div>
-</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

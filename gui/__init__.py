@@ -85,6 +85,10 @@ def create_app() -> Flask:
     def rules_page():
         return redirect("/lint", code=301)
 
+    @app.get("/help")
+    def help_page():
+        return render_template("help.html", page="help")
+
     @app.get("/energize")
     def energize_page():
         return render_template("energize.html", page="energize")
@@ -356,10 +360,20 @@ def create_app() -> Flask:
         SESSION.detach()
         return jsonify(kind="info", message="File detached. New tags are no longer checked against it.")
 
+    @app.get("/api/project/commented")
+    def commented():
+        if SESSION.raw is None:
+            return jsonify(kind="error", message="No attached file."), 400
+        body, name, added = project.commented_l5x()
+        r = _file(body, name, "application/xml")
+        r.headers["X-Added"] = str(added)
+        return r
+
     @app.get("/api/status")
     def status():
         p = SESSION.project
-        return jsonify(project=SESSION.filename, programs=sorted({r.program for r in p.routines}) if p else [],
+        return jsonify(project=SESSION.filename, target=p.target_type if p else None,
+                       programs=sorted({r.program for r in p.routines}) if p else [],
                        default_program=project.default_program())
 
     # ------------------------------------------------------------ UDT files
