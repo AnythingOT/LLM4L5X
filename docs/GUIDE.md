@@ -78,14 +78,18 @@ To compare models by measurement, see [DEVELOPMENT.md](DEVELOPMENT.md#comparing-
 
 ## The app
 
-Three pages, light and dark. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** (rails, contacts, coils, instruction boxes with their operands, branches) next to its plain-English read-back. The **Help** page (? in the header, or type `help`) says what each part does; the list button next to **Send** shows examples, and under them what the attached file can do.
+A workbench, as in VS Code, light and dark. The **activity bar** on the left switches views (Chat, Energize, Tests, Devices, Lint; Help, Settings and the theme at the bottom). The **status bar** at the bottom shows the model and whether it answers, the attached file and its version, the Energize clock and the last test run; each opens its view. Every rung, generated, pasted or read from your file, is drawn as a **ladder diagram** next to its plain-English read-back. **Help** (or type `help`) says what each part does; the list button next to **Send** shows examples, and under them what the attached file can do.
 
-- **Chat** (`/`)
+- **Chat** (`/`): explorer, editor, panel and chat.
+  - **Explorer** (left): the attached L5X as a tree: controller (summary, tasks, controller tags), programs with their routines (*main* marks the main routine) and program tags, UDTs, AOIs and the I/O tree. Click an item to open it in the editor: a routine shows every rung with its comment, what it does and its ladder; a UDT its members; an AOI its parameters, local tags and logic; a module its catalog number, slot and I/O tags; tags a table you can filter.
+  - **Editor** (middle): one tab per open item or result. Each request's result (rungs, a summary, a validation, UDTs) opens as a tab of its own; the chat keeps one line that opens it again. Explorer tabs come back after a reload.
+  - **Panel** (under the editor): **Problems** (import checks and rule findings of the last result; click one to open its rung), **Output** (what was asked, built and downloaded), **Test results** (the last run, with its PDF report). Drag its edge to resize it; the arrow folds it away.
+  - **Chat** (right): requests and short answers. Drag the edges between the panes to resize them; the sizes are kept. Below 1100 px wide the explorer folds away (the ☰ button in the tab bar brings it back); on a narrow window the chat goes under the editor.
   - **Plain English → ladder** (needs a model). Read-back, the rungs drawn as ladder, their text, tags, checks. **Copy** gives the rung text in the form chosen in Settings (neutral or ASCII); **Download** gives `Routine.L5X` or `Rung.L5X`, also chosen in Settings.
   - **Paste rungs** in either form: neutral `XIC(a)[XIC(b) ,XIO(c) ]OTE(d);` (as in L5X) or ASCII `XIC a BST XIC b NXB XIO c BND OTE d` (one rung per line; `SOR … EOR` accepted). You get the ladder, what each rung does in English, the checks and **Download**.
   - **Attach an `.L5X`** (controller, program, routine or rung export; button or drag-and-drop). New logic then uses your real tags, AOIs and version. Commands: `summary`, `decompile` (every rung in English), `validate`, `optimize`, `xref TagName`.
   - **Explain all rungs** shows, above each rung as Studio 5000 does, its own comment and then what it does. Rungs without a comment can get theirs written in: **Download L5X with rung comments** (no rung commented yet) or **Add N missing rung comments (.L5X)** (some are). Each added comment starts `AUTO:`; comments someone wrote are kept, and nothing else in the file changes.
-  - **Clear** in the header, or `cls`, clears the screen. The attached file stays (remove it with its ×).
+  - **Clear** (the bin in the chat's header), or `cls`, clears the chat. The attached file and the open tabs stay (remove the file with its × in the explorer).
   - LogicSpec, the language the model writes, is not shown. Typing it still works, for testing.
   - **Logic | UDT** switch in the input box. In UDT mode you create data types (below). Each mode keeps its own unsent text, so switching back brings it back. An attached L5X is used in both modes, except a UDT export, which has no rungs: it shows in UDT mode only.
   - The Excel samples in the examples list are attached when clicked (the run starts at once); the ↓ next to each downloads it to edit in Excel.

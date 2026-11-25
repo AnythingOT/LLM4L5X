@@ -89,3 +89,46 @@ function flashSaved() {
     clearTimeout(savedTimer);
     savedTimer = setTimeout(() => (n.textContent = ''), 1500);
 }
+
+// ---------------------------------------------------------------- status bar (every view)
+// The model, the attached file, the Energize program and the last test run, in one line at the bottom.
+// Read when the page opens and every few seconds; a view that changes one of them calls refreshStatus().
+let statusModelChecked = 0;
+async function refreshStatus() {
+    const set = (id, text, title) => {
+        const e = $(id);
+        if (!e) return;
+        e.hidden = !text;
+        e.textContent = text || '';
+        if (title) e.title = title;
+    };
+    try {
+        const s = await (await fetch('/api/status')).json();
+        set('sbFile', s.project ? `${s.project}${s.revision ? `  v${String(s.revision).split('.')[0]}` : ''}` : '',
+            'The attached L5X: open it in the explorer');
+        set('sbSim', s.sim && s.sim.loaded ? `Energize ${(s.sim.now_ms / 1000).toFixed(1)} s` : '',
+            s.sim && s.sim.loaded ? `Running ${s.sim.names.join(', ')}` : '');
+        const r = s.last_run && s.last_run.summary;
+        set('sbTests', r ? `Tests ${r.passed} of ${r.test_cases} pass` : '', 'The last test run');
+        const t = $('sbTests');
+        if (t && r) t.classList.toggle('bad', r.passed !== r.test_cases);
+    } catch { /* the server is restarting: keep what is shown */ }
+    if (Date.now() - statusModelChecked > 30000) {  // the model server is asked less often
+        statusModelChecked = Date.now();
+        const s = loadSettings();
+        const label = BACKEND_INFO[s.backend] ? BACKEND_INFO[s.backend].label : s.backend;
+        const text = $('sbModelText');
+        const dot = $('sbModelDot');
+        if (!text) return;
+        text.textContent = s.backend === 'llamacpp' ? label : `${s.model || 'default model'} on ${label}`;
+        try {
+            const d = await fetchModels(s);
+            dot.className = 'dot ' + (d.ok ? 'ok' : 'bad');
+            if (d.ok && s.backend === 'llamacpp' && d.models.length) text.textContent = `${d.models[0]} on ${label}`;
+            $('sbModel').title = d.ok ? `Connected: ${d.url}. Click to change.` : `${d.error}. Click to change.`;
+        } catch { dot.className = 'dot bad'; }
+    }
+}
+refreshStatus();
+setInterval(refreshStatus, 4000);
+window.addEventListener('focus', () => { statusModelChecked = 0; refreshStatus(); });

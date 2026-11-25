@@ -367,6 +367,28 @@ def create_app() -> Flask:
         SESSION.detach()
         return jsonify(kind="info", message="File detached. New tags are no longer checked against it.")
 
+    @app.get("/api/project/tree")
+    def project_tree():
+        return jsonify(project.tree())
+
+    @app.get("/api/project/routine")
+    def project_routine():
+        if SESSION.project is None:
+            return jsonify(kind="error", message="No attached file."), 400
+        try:
+            return jsonify(project.routine(request.args.get("program", ""), request.args.get("name", "")))
+        except KeyError as e:
+            return jsonify(kind="error", message=str(e.args[0])), 404
+
+    @app.get("/api/project/item")
+    def project_item():
+        if SESSION.project is None:
+            return jsonify(kind="error", message="No attached file."), 400
+        try:
+            return jsonify(project.item(request.args.get("kind", ""), request.args.get("name", "")))
+        except KeyError as e:
+            return jsonify(kind="error", message=str(e.args[0])), 404
+
     @app.get("/api/project/commented")
     def commented():
         if SESSION.raw is None:
@@ -378,10 +400,17 @@ def create_app() -> Flask:
 
     @app.get("/api/status")
     def status():
+        """What every page's status bar shows: the attached file, the Energize program, the last test run."""
         p = SESSION.project
+        ses = ENERGIZE.get("session")
+        runs = app.config["RUNS"].list()
         return jsonify(project=SESSION.filename, target=p.target_type if p else None,
+                       revision=p.software_revision if p else None,
                        programs=sorted({r.program for r in p.routines}) if p else [],
-                       default_program=project.default_program())
+                       default_program=project.default_program(),
+                       sim={"loaded": True, "names": ENERGIZE.get("names", []),
+                            "now_ms": ses.backend.now_ms if ses and ses.backend else 0} if ses else {"loaded": False},
+                       last_run=runs[0] if runs else None)
 
     # ------------------------------------------------------------ UDT files
 

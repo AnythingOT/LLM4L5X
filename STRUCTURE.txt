@@ -106,6 +106,7 @@ gui/                       The local web app: pages and the JSON API behind them
     devices.js
     energize.js
     favicon.ico
+    ide.js
     lint.js
     settings.js
     style.css
@@ -182,6 +183,7 @@ tests/                     pytest: one file per area.
   test_energize.py
   test_eval.py
   test_evidence.py         Test evidence: requirements from the instruction sheet, traceability, run records, the PDF report.
+  test_explorer.py         The explorer: the attached file as a tree, and each item opened for the editor.
   test_gbnf.py
   test_iolist.py
   test_l5x.py

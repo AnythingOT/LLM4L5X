@@ -7,27 +7,40 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
 </head>
-<body class="{% block bodyclass %}{% endblock %}">
-    <header class="header">
-        <span class="brand">
+{# The workbench, as in VS Code: a title bar, the activity bar (one icon per view) on the left, the view,
+   and the status bar. Icons drawn from or after Feather (MIT): see THIRD_PARTY_NOTICES.md #}
+<body class="shell {% block bodyclass %}{% endblock %}">
+    <header class="titlebar">
+        <a class="brand" href="/" title="LLM4L5X: the chat, the explorer and the editor">
             <span class="logo"><span class="logo-anything">Anything</span><span class="logo-ot">OT</span></span>
-            <a class="app-name {% if page == 'chat' %}active{% endif %}" href="/" title="The chat: logic, UDTs and attached files">LLM4L5X</a>
-        </span>
+            <span class="app-name">LLM4L5X</span>
+        </a>
         {% block header_middle %}{% endblock %}
-        <nav class="header-right">
-            {# icons drawn from or after Feather (MIT): see THIRD_PARTY_NOTICES.md #}
-            {% block header_right %}{% endblock %}
-            <a class="icon-btn {% if page == 'energize' %}active{% endif %}" href="/energize" title="Energize: run the whole program, flip its inputs, watch the ladder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span class="label">Energize</span></a>
-            <a class="icon-btn {% if page == 'tests' %}active{% endif %}" href="/tests" title="Tests: test cases run against the program, pass or fail per requirement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/><path d="M7.5 15h9"/></svg><span class="label">Tests</span></a>
-            <a class="icon-btn {% if page == 'devices' %}active{% endif %}" href="/devices" title="Device models: what answers each output, and after how long"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 10h3l3-2v8l-3-2h-3"/><path d="M7 7V5h4v2"/></svg><span class="label">Devices</span></a>
-            <a class="icon-btn {% if page == 'lint' %}active{% endif %}" href="/lint" title="Lint: the 50 rules, switch them on or off"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span class="label">Lint</span></a>
-            <a class="icon-btn {% if page == 'help' %}active{% endif %}" href="/help" title="Help: what each part does" aria-label="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><path d="M12 17.2h.01"/></svg></a>
-            <a class="icon-btn {% if page == 'settings' %}active{% endif %}" href="/settings" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></a>
-            <button id="toggleTheme" class="icon-btn" title="Dark or light" aria-label="Dark or light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
-        </nav>
+        <div class="titlebar-right">{% block header_right %}{% endblock %}</div>
     </header>
-    {% block body %}{% endblock %}
-    <footer>Runs locally with a local model, completely offline. Test before it runs in production.</footer>
+    <div class="workbench">
+        <nav class="activity" aria-label="Views">
+            <a class="act {% if page == 'chat' %}active{% endif %}" href="/" title="Chat: logic and UDTs, the explorer and the editor" aria-label="Chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/></svg><span>Chat</span></a>
+            <a class="act {% if page == 'energize' %}active{% endif %}" href="/energize" title="Energize: run the whole program, flip its inputs, watch the ladder" aria-label="Energize"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span>Energize</span></a>
+            <a class="act {% if page == 'tests' %}active{% endif %}" href="/tests" title="Tests: test cases run against the program, pass or fail per requirement" aria-label="Tests"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/><path d="M7.5 15h9"/></svg><span>Tests</span></a>
+            <a class="act {% if page == 'devices' %}active{% endif %}" href="/devices" title="Device models: what answers each output, and after how long" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="7" width="12" height="10" rx="2"/><path d="M15 10h3l3-2v8l-3-2h-3"/><path d="M7 7V5h4v2"/></svg><span>Devices</span></a>
+            <a class="act {% if page == 'lint' %}active{% endif %}" href="/lint" title="Lint: the 50 rules, switch them on or off" aria-label="Lint"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg><span>Lint</span></a>
+            <span class="act-gap"></span>
+            <a class="act {% if page == 'help' %}active{% endif %}" href="/help" title="Help: what each part does" aria-label="Help"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.2a2.6 2.6 0 0 1 5 .9c0 1.7-2.5 2.3-2.5 3.9"/><path d="M12 17.2h.01"/></svg><span>Help</span></a>
+            <a class="act {% if page == 'settings' %}active{% endif %}" href="/settings" title="Settings: the model, the output, the rules" aria-label="Settings"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg><span>Settings</span></a>
+            <button id="toggleTheme" class="act" title="Dark or light" aria-label="Dark or light"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg><span>Theme</span></button>
+        </nav>
+        <div class="view">
+            {% block body %}{% endblock %}
+        </div>
+    </div>
+    <footer class="statusbar" aria-label="Status">
+        <a id="sbModel" class="sb-item" href="/settings" title="The model: click to change"><span id="sbModelDot" class="dot"></span><span id="sbModelText">Model</span></a>
+        <a id="sbFile" class="sb-item" href="/" hidden></a>
+        <a id="sbSim" class="sb-item" href="/energize" hidden></a>
+        <a id="sbTests" class="sb-item" href="/tests" hidden></a>
+        <span class="sb-item sb-right" title="Nothing leaves this PC unless you point Settings at another computer">Offline · local model</span>
+    </footer>
     <script src="{{ url_for('static', filename='common.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
