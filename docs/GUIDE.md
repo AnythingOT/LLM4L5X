@@ -232,10 +232,17 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 - **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
   a tag the files do not declare is a bit if the logic uses it as a contact or coil.
 - **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online, from the simulator's own
-  trace of each scan: a wire is green and moving up to where power stops (a dashed green line in the
-  key), the left rail (the supply) is always green, a true contact and a coil that is on are drawn in green,
-  and a coil that is on glows. A rung that is true has a green right rail and number. Timer and counter
-  boxes show their accumulator live instead of `?`. With "reduce motion" set in the system, nothing moves.
+  trace of each scan: a wire is green up to where power stops, and the left rail (the supply) is always
+  green. Right after loading or **Reset**, before the first scan, the ladder already shows where the first
+  scan would send power (the clock stays at 0.00 s). An instruction that is true is green, as in Logix
+  Designer online, even where no power reaches it: a closed contact behind an open one is still green
+  (*instruction true* in the key). A coil that is on glows. A rung that is true has a green right rail and
+  number. Timer and counter boxes show their accumulator live instead of `?`.
+- Motion only where something changed: when a change gives a wire power, power runs along it once, left
+  to right (about a third of a second across a rung), and a coil that comes on pulses once. Otherwise
+  nothing moves. With "reduce motion" set in the system, nothing moves at all.
+- The loaded program's name is next to the clock: click it to load other files, or × to unload it.
+  Device models and test cases stay for the next program.
 - Long tag names are shortened in the middle (`BUG01_SFT…UP_LIMIT_LF`), so the end that tells them apart
   stays; the full name is in the tooltip.
 - **Outputs:** a bit is a lamp, a number its value. **Timers and counters** show the accumulator against

@@ -209,3 +209,21 @@ def test_the_page_gets_where_power_flows_in_each_rung():
     assert snap["flow"][0] == {"0.0.0": 3, "0.1.0": 1, "0": 3, "1": 3, "2": 3} and snap["power"] == [True]
     snap = s.step(0, {"Start": 0, "Stop": 1})
     assert snap["flow"][0] == {"0.0.0": 1, "0.1.0": 3, "0": 3, "1": 1, "2": 0} and snap["power"] == [False]
+
+
+def test_a_program_just_loaded_shows_where_the_first_scan_sends_power(web):
+    # the ladder is not grey at 0 ms: the wires from the rail carry power before the first scan has run
+    j = _upload(web, [routine("R", "[XIC(Start) ,XIC(Run) ]XIO(Stop)OTE(Run);")], plant="", scenarios="").get_json()
+    snap = j["snapshot"]
+    assert snap["now_ms"] == 0 and snap["flow"] and snap["flow"][0]["0"] & 1  # the first contact's input
+    assert snap["power"] == [False]  # and nothing else is pretended: Start is off, so Run is off
+    again = web.post("/api/energize/step", json={"reset": True}).get_json()
+    assert again["now_ms"] == 0 and again["flow"] == snap["flow"]
+
+
+def test_unload_takes_the_program_off_and_keeps_device_models_and_test_cases(web):
+    _upload(web, FILES)
+    assert web.delete("/api/energize").get_json() == {"loaded": False}
+    st = web.get("/api/energize/state").get_json()
+    assert st["loaded"] is False and st["device_text"] == PLANT and st["test_text"] == SCENARIOS
+    assert web.post("/api/energize/step", json={}).get_json()["error"] == "load a program first"

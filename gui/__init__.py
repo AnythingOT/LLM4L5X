@@ -152,6 +152,13 @@ def create_app() -> Flask:
             return jsonify(error=str(e)), 400
         return jsonify(_loaded(ENERGIZE["session"]))
 
+    @app.delete("/api/energize")
+    def energize_unload():
+        """Take the program off the page. Device models and test cases stay: they are kept for the next one."""
+        for k in ("session", "files", "file_names", "names"):
+            ENERGIZE.pop(k, None)
+        return jsonify(loaded=False)
+
     @app.get("/api/energize/state")
     def energize_state():
         """What a page shows when it is opened again: the loaded program, or nothing yet."""

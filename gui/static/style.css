@@ -609,7 +609,13 @@ label.en-name { cursor: pointer; }
 
 .en-ladder { min-width: 0; }
 .en-key { display: inline-flex; align-items: center; gap: 6px; font-size: .78rem; }
-.en-swatch { display: inline-block; width: 18px; height: 0; border-top: 2.4px dashed var(--ok); }
+.en-swatch { display: inline-block; width: 18px; height: 0; border-top: 2.4px solid var(--ok); }
+.en-true { display: inline-block; width: 8px; height: 12px; border-left: 3px solid var(--ok); border-right: 3px solid var(--ok); }
+.en-program { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); height: var(--field-h); }
+.en-prog-name { font: inherit; font-family: var(--mono); font-size: .8rem; border: 0; background: transparent; color: var(--ink); cursor: pointer; padding: 0 4px 0 10px; max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.en-prog-name:hover { text-decoration: underline; }
+.en-unload { border: 0; background: transparent; color: var(--muted); font-size: 1.1rem; cursor: pointer; padding: 0 9px 0 4px; }
+.en-unload:hover { color: var(--err); }
 .en-coil { display: inline-block; width: 16px; height: 11px; border-radius: 6px; background: var(--ok-soft); border: 1px solid var(--ok); }
 #enRungs { overflow-x: auto; }
 .en-routine { font-size: .82rem; color: var(--ink-2); margin: 14px 0 2px; padding-bottom: 3px; border-bottom: 1px solid var(--line); }
@@ -623,21 +629,24 @@ label.en-name { cursor: pointer; }
 .en-rung.lit svg.ladder .lad-right { stroke: var(--ok); }
 .en-rung.lit svg.ladder .lad-num { fill: var(--ok); font-weight: 700; }
 /* power flow, from the simulator's trace: a wire is green and moving up to where power stops */
-#enRungs svg.ladder line.pwr { stroke: var(--ok); stroke-width: 2.4; stroke-dasharray: 7 5; animation: lad-flow .7s linear infinite; }
-#enRungs svg.ladder .lad-rail.pwr, #enRungs svg.ladder .lad-left { stroke-dasharray: none; animation: none; }
-@keyframes lad-flow { to { stroke-dashoffset: -12; } }
+#enRungs svg.ladder line.pwr { stroke: var(--ok); stroke-width: 2.4; }
+/* a wire that just got power: drawn on from its left end, later the further right it is (the --d delay) */
+#enRungs svg.ladder line.pwr.sweep { stroke-dasharray: var(--len); animation: lad-sweep 140ms ease-out var(--d) both; }
+@keyframes lad-sweep { from { stroke-dashoffset: var(--len); } to { stroke-dashoffset: 0; } }
 /* a contact true, a coil on: the symbol itself (not its wires) in green, thicker; a coil also glows */
 #enRungs svg.ladder .lad-el.live .lad-sym { stroke: var(--ok); stroke-width: 3; }
 #enRungs svg.ladder .lad-el.live text { fill: var(--ok); }
 #enRungs svg.ladder .lad-el.live .lad-glow { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1;
-    animation: lad-glow 1.8s ease-in-out infinite; }
-@keyframes lad-glow {
-    0%, 100% { filter: drop-shadow(0 0 2px color-mix(in srgb, var(--ok) 45%, transparent)); }
-    50% { filter: drop-shadow(0 0 7px color-mix(in srgb, var(--ok) 85%, transparent)); }
+    filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ok) 55%, transparent)); }
+/* a coil that just came on: one pulse */
+#enRungs svg.ladder .lad-el.pulse .lad-glow { animation: lad-pulse 600ms ease-out var(--d, 0ms) backwards; }
+@keyframes lad-pulse {
+    0% { filter: drop-shadow(0 0 0 transparent); }
+    40% { filter: drop-shadow(0 0 9px color-mix(in srgb, var(--ok) 90%, transparent)); }
+    100% { filter: drop-shadow(0 0 3px color-mix(in srgb, var(--ok) 55%, transparent)); }
 }
 @media (prefers-reduced-motion: reduce) {
-    #enRungs svg.ladder line.pwr { animation: none; stroke-dasharray: none; }
-    #enRungs svg.ladder .lad-el.live .lad-glow { animation: none; filter: drop-shadow(0 0 4px var(--ok)); }
+    #enRungs svg.ladder line.pwr.sweep, #enRungs svg.ladder .lad-el.pulse .lad-glow { animation: none; }
 }
 
 .en-devices-note { margin: 10px 0 0; font-size: .82rem; }

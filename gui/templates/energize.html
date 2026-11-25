@@ -27,10 +27,13 @@
             <button id="enStep" class="btn">Step 100 ms</button>
             <button id="enReset" class="btn">Reset</button>
             <span class="en-clock" aria-live="off"><b id="enTime">0.00</b> s</span>
+            <span class="en-program">
+                <button id="enChange" class="en-prog-name" title="Change program: load other files"></button>
+                <button id="enUnload" class="en-unload" title="Unload the program" aria-label="Unload the program">&times;</button>
+            </span>
             <span id="enSummary" class="muted en-summary"></span>
             <span id="enLiveMsg" class="en-live-msg" role="alert"></span>
             <a id="enDevices" class="btn" href="/devices"></a>
-            <button id="enChange" class="btn">Change program</button>
         </div>
         <ul id="enNotes" class="en-notes" hidden></ul>
 
@@ -45,6 +48,7 @@
             <section class="card en-ladder" aria-labelledby="enRungHead">
                 <div class="en-io-head"><h2 id="enRungHead">Rungs</h2>
                     <span class="muted en-key"><i class="en-swatch"></i>power flows</span>
+                    <span class="muted en-key" title="Green as in Logix Designer online: a contact whose bit makes it pass power, even where no power reaches it"><i class="en-true"></i>instruction true</span>
                     <span class="muted en-key"><i class="en-coil"></i>coil on</span></div>
                 <div id="enRungs"></div>
             </section>

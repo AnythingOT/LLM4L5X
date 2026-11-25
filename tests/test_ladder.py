@@ -21,6 +21,9 @@ def test_contacts_coil_and_rails():
     assert {"Start", "Run", "Stop", "Motor", "0"} <= set(texts(root))
     rails = [ln.get("class") for ln in root.iterfind(".//s:line", NS) if "lad-rail" in ln.get("class", "")]
     assert rails == ["lad-rail lad-left", "lad-rail lad-right"]  # a live page keeps the supply (left) energized
+    # the rails are drawn last, on top: no wire end shows over the (always green) supply rail
+    drawn = [c.get("class") for c in root if c.tag.endswith("line") or c.tag.endswith("g")]
+    assert drawn[-2:] == ["lad-rail lad-left", "lad-rail lad-right"]
     assert len(root.findall(".//s:line[@class='lad-bar']", NS)) == 2  # one branch: two vertical bars
     assert len(root.findall(".//s:path", NS)) == 1  # the coil
 
