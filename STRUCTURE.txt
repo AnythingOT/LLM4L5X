@@ -5,8 +5,9 @@ a test fails when this file is out of date. Edit those, then run the command aga
 .gitattributes             Line endings: .bat files keep CRLF
 .gitignore                 Files git leaves out
 app.py                     Start the app: python app.py, then http://127.0.0.1:5000
+CITATION.cff               How to credit this project (GitHub: Cite this repository)
 cli.py                     Command line: compile, explain, inspect, validate, fix, ask, survey and more (python cli.py -h)
-LICENSE                    MIT licence
+LICENSE                    GNU GPL v3.0 only
 pytest.ini                 pytest settings
 README.md                  What it does and how to start
 requirements.txt           Python packages, exact versions
