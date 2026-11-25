@@ -32,6 +32,6 @@ def test_device_models_have_their_own_page_and_save(web):
 
 
 def test_lint_page_and_its_old_address(web):
-    assert web.get("/lint").status_code == 200 and b"<h1>Lint</h1>" in web.get("/lint").data
+    assert web.get("/lint").status_code == 200 and b"Rule groups" in web.get("/lint").data and b"<title>Lint" in web.get("/lint").data
     r = web.get("/rules")
     assert r.status_code == 301 and r.headers["Location"].endswith("/lint")

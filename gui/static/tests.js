@@ -123,13 +123,13 @@ async function history() {
         $('tsHistoryBox').hidden = !runs.length;
         $('tsHistory').replaceChildren(...runs.slice(0, 20).map((r) => {
             const tr = el('tr');
-            const a = el('a', '', 'Report (PDF)');
+            const a = el('a', '', 'PDF');
             a.href = `/api/tests/runs/${encodeURIComponent(r.id)}/report.pdf`;
             const link = el('td');
             link.append(a);
             const s = r.summary || {};
-            tr.append(el('td', 'ts-id', r.id), el('td', 'ts-reqs', (r.program || []).join(', ')),
-                el('td', '', `${s.passed} of ${s.test_cases} pass`), link);
+            tr.title = `${r.id}: ${(r.program || []).join(', ')}`;
+            tr.append(el('td', 'ts-id', r.id), el('td', s.passed === s.test_cases ? 'ok' : 'err', `${s.passed}/${s.test_cases}`), link);
             return tr;
         }));
     } catch { /* no runs yet */ }

@@ -81,10 +81,12 @@ function addBot(...children) {
     if (route) {
         const r = route;
         route = null;
+        if (r.key && tabs.has(r.key)) closeTab(r.key);  // a new summary replaces the old one
         const doc = openTab(r.key || null, r.title, r.kind, (d) => children.forEach((c) => c && d.appendChild(c)));
         if (r.quiet) return doc;
-        const line = el('button', { cls: 'chat-link' }, el('span', { cls: 'sum', text: r.summary }),
-            el('span', { cls: 'open', text: `Open ${r.title}` }));
+        const line = el('button', { cls: 'chat-link', title: `Open the ${r.title} tab` },
+            el('span', { cls: 'sum' }, el('b', { text: r.title }), document.createTextNode(`  ${r.summary}`)),
+            el('span', { cls: 'open', text: 'Open' }));
         line.onclick = () => activateTab(doc.dataset.tab);
         chatWindow.appendChild(el('div', { cls: 'chat-message bot' }, line));
         scrollDown();
@@ -612,7 +614,7 @@ const ROUTES = {
     generated: (d) => ({ title: 'Generated', kind: 'Rungs', summary: rungSummary(d) }),
     compiled: (d) => ({ title: 'Compiled', kind: 'Rungs', summary: rungSummary(d) }),
     rungs: (d) => ({ title: 'Pasted rungs', kind: 'Rungs', summary: rungSummary(d) }),
-    project: (d) => ({ title: d.filename, kind: 'Summary', summary: `Attached ${d.filename}: ${n_(d.routines.length, 'routine')}, ${n_(d.udts.length, 'UDT')}` }),
+    project: (d) => ({ title: d.filename, kind: 'Summary', key: 'summary', summary: `${n_(d.routines.length, 'routine')}, ${n_(d.udts.length, 'UDT')}` }),
     decompiled: (d) => ({ title: `Explained ${d.filename || ''}`.trim(), kind: 'Read', summary: `${d.ok} of ${n_(d.total, 'rung')} explained` }),
     validated: (d) => ({ title: 'Validation', kind: 'Checks', summary: validationSummary(d) }),
     udt_created: (d) => ({ title: d.udts.length === 1 ? d.udts[0].name : n_(d.udts.length, 'UDT'), kind: 'UDT', summary: `${n_(d.udts.length, 'UDT')} from ${d.source}` }),
@@ -691,6 +693,7 @@ function showProject() {
     const visible = !!attached.name && !(attached.target === 'DataType' && mode === 'logic');
     $('projectBadge').hidden = !visible;
     $('projectName').textContent = attached.name || '';
+    $('detachButton').title = attached.name ? `Detach ${attached.name}` : 'Detach the file';
     $('fileChips').hidden = !(visible && chipsOpen);
     document.querySelectorAll('#fileChips .rungs-only').forEach((c) => (c.hidden = attached.target === 'DataType'));
 }
@@ -699,7 +702,7 @@ function setProject(name, programs, preferred, target) {
     attached = { name: name || null, target: target || null };
     showProject();
     if (changed) {
-        if (!name) closeItemTabs();
+        closeItemTabs();
         loadTree();
         refreshStatus();
     }
@@ -834,6 +837,7 @@ const EXAMPLE = {
     text: '[XIC(Start_PB) ,XIC(Pump_Run) ]XIO(Stop_PB)XIO(Pump_Fault)OTE(Pump_Run);',
 };
 async function intro() {
+    if (tabs.size) return;  // tabs came back from before a reload: no Welcome over them
     const [svg] = await ladders([{ text: EXAMPLE.text, number: 0 }]);
     openTab('welcome', 'Welcome', '', (doc) => {
         const box = el('section', { cls: 'intro' });

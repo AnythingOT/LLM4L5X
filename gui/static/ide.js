@@ -64,12 +64,12 @@ function openTab(key, title, kind, build, opts = {}) {
         return tabs.get(key).doc;
     }
     const id = key || `t${++tabSeq}`;
+    if (id !== 'welcome' && tabs.has('welcome')) closeTab('welcome');  // the Welcome tab gives way to the first real one
     const doc = el('div', { cls: 'doc' });
     doc.dataset.tab = id;
     doc.setAttribute('role', 'tabpanel');
     const close = el('span', { cls: 'tx', text: '×', title: 'Close' });
-    const btn = el('button', { cls: 'tab', title }, kind ? el('span', { cls: 'tk', text: kind }) : null,
-        el('span', { cls: 'tt', text: title }), close);
+    const btn = el('button', { cls: 'tab', title: kind ? `${kind}: ${title}` : title }, el('span', { cls: 'tt', text: title }), close);
     btn.setAttribute('role', 'tab');
     btn.onclick = (e) => (e.target === close ? closeTab(id) : activateTab(id));
     btn.onauxclick = (e) => { if (e.button === 1) closeTab(id); };
@@ -111,8 +111,8 @@ function closeTab(id) {
     }
 }
 
-function closeItemTabs() {
-    for (const [id, t] of [...tabs]) if (t.item) closeTab(id);
+function closeItemTabs() {  // the attached file changed: its tabs (summary, routines, UDTs ...) go with it
+    for (const [id, t] of [...tabs]) if (t.item || id === 'summary') closeTab(id);
 }
 
 // ---------------------------------------------------------------- panel: problems, output, test results

@@ -117,7 +117,8 @@ def create_app() -> Flask:
                     feedbacks=ses.feedbacks, skipped=ses.skipped, devices=_count_devices(ses),
                     rungs=[{"routine": p.routine, "number": p.number, "text": p.text, "svg": s}
                            for p, s in zip(ses.places, svgs)],
-                    has_scenarios=bool(ses.scenarios_text.strip()), **extra)
+                    has_scenarios=bool(ses.scenarios_text.strip()), routines=ses.routines,
+                    exclude=sorted(ENERGIZE.get("exclude", [])), **extra)
 
     def _count_devices(ses) -> int:
         be = ses.backend
@@ -127,7 +128,7 @@ def create_app() -> Flask:
         """(Re)build the session from the shared program, device models and test cases."""
         from gui import energize
         ENERGIZE["session"] = energize.load(ENERGIZE["files"], ENERGIZE.get("devices", ""),
-                                            ENERGIZE.get("tests", ""))
+                                            ENERGIZE.get("tests", ""), exclude=set(ENERGIZE.get("exclude", [])))
 
     @app.post("/api/energize/load")
     def energize_load():
@@ -144,7 +145,12 @@ def create_app() -> Flask:
                 files.append(data)
                 file_names.append(f.filename)
         before = dict(ENERGIZE)
-        ENERGIZE.update(files=files, file_names=file_names, names=[f.filename for f in request.files.getlist("files")])
+        try:
+            exclude = [str(k) for k in json.loads(request.form.get("exclude") or "[]")]
+        except ValueError:
+            return jsonify(error="exclude must be a JSON list of Program/Routine names"), 400
+        ENERGIZE.update(files=files, file_names=file_names, names=[f.filename for f in request.files.getlist("files")],
+                        exclude=exclude)
         for field_, key in (("plant", "devices"), ("scenarios", "tests")):  # optional here; the Tests page sets them
             if field_ in request.form:
                 ENERGIZE[key] = request.form[field_]
@@ -153,13 +159,31 @@ def create_app() -> Flask:
         except Exception as e:  # noqa: BLE001 - a bad file is the user's to fix: say what is wrong
             ENERGIZE.clear()
             ENERGIZE.update(before)  # the program that was loaded stays loaded
-            return jsonify(error=str(e)), 400
+            return jsonify(error=str(e), routines=getattr(e, "routines", [])), 400
+        return jsonify(_loaded(ENERGIZE["session"]))
+
+    @app.post("/api/energize/exclude")
+    def energize_exclude():
+        """Run the loaded files again with other routines left out (the ticks on the page)."""
+        if "files" not in ENERGIZE:
+            return jsonify(error="load a program first"), 400
+        exclude = (request.get_json(silent=True) or {}).get("exclude", [])
+        if not isinstance(exclude, list):
+            return jsonify(error="exclude must be a list of Program/Routine names"), 400
+        before = ENERGIZE.get("exclude", [])
+        ENERGIZE["exclude"] = [str(k) for k in exclude]
+        try:
+            _reload()
+        except Exception as e:  # noqa: BLE001 - the previous ticks stay, and the page says why
+            ENERGIZE["exclude"] = before
+            _reload()
+            return jsonify(error=str(e), routines=getattr(e, "routines", [])), 400
         return jsonify(_loaded(ENERGIZE["session"]))
 
     @app.delete("/api/energize")
     def energize_unload():
         """Take the program off the page. Device models and test cases stay: they are kept for the next one."""
-        for k in ("session", "files", "file_names", "names"):
+        for k in ("session", "files", "file_names", "names", "exclude"):
             ENERGIZE.pop(k, None)
         return jsonify(loaded=False)
 

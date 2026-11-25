@@ -29,9 +29,63 @@ async function post(url, body, form) {
     const r = await fetch(url, form ? { method: 'POST', body: form }
         : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) });
     const j = await r.json().catch(() => ({ error: `HTTP ${r.status}` }));
-    if (!r.ok || j.error) throw new Error(j.error || j.message || `HTTP ${r.status}`);
+    if (!r.ok || j.error) {
+        const e = new Error(j.error || j.message || `HTTP ${r.status}`);
+        e.routines = j.routines || null;
+        throw e;
+    }
     return j;
 }
+
+// ---------------------------------------------------------------- routines: ticked ones run
+// Every routine of the files, with why the simulator cannot run it. Unticking leaves a routine out (a JSR to
+// it is passed over, and the run says so), so the rest of a program can run when one routine cannot.
+let routines = [];
+let loadedOk = false;  // the server holds these files: a change of ticks reloads there, without sending them again
+function drawRoutines(list, untickProblems) {
+    routines = list || [];
+    const ul = $('enRoutines');
+    ul.replaceChildren();
+    $('enRoutinesEmpty').hidden = routines.length > 0;
+    for (const r of routines) {
+        const mapping = (r.problem || '').startsWith('mapping');
+        const li = el('li', 'tick' + (r.problem ? ' has-problem' : ''));
+        const box = el('input');
+        box.type = 'checkbox';
+        box.checked = mapping ? false : (untickProblems && r.problem ? false : r.included);
+        box.disabled = mapping;
+        box.dataset.key = r.key;
+        box.id = `rt-${r.key}`;
+        box.onchange = ticksChanged;
+        const label = el('label', 'tick-label');
+        label.htmlFor = box.id;
+        label.append(el('span', 'tick-name', r.name), el('span', 'tick-n', mapping ? 'mapping' : String(r.rungs)));
+        li.append(box, label);
+        if (r.problem && !mapping) li.appendChild(el('span', 'tick-problem', r.problem));
+        li.title = `${r.program} / ${r.name}${r.problem ? `: ${r.problem}` : ''}`;
+        ul.appendChild(li);
+    }
+    ticksChanged();
+}
+function excluded() {
+    return [...$('enRoutines').querySelectorAll('input[type=checkbox]:not(:disabled)')].filter((b) => !b.checked).map((b) => b.dataset.key);
+}
+function ticksChanged() {
+    const now = excluded().sort().join('|');
+    const was = routines.filter((r) => !r.included && !(r.problem || '').startsWith('mapping')).map((r) => r.key).sort().join('|');
+    $('enApply').hidden = !routines.length || (loadedOk && now === was);
+}
+$('enApply').onclick = async () => {
+    stop();
+    $('enApply').disabled = true;
+    try {
+        if (loadedOk) open_(await post('/api/energize/exclude', { exclude: excluded() }));
+        else await loadFiles();
+    } catch (e) {
+        msg(e.message, true);
+        if (e.routines) drawRoutines(e.routines, false);
+    } finally { $('enApply').disabled = false; }
+};
 
 const isOn = (v) => v === true || (typeof v === 'number' && v !== 0);
 function num(v) {
@@ -290,15 +344,16 @@ $('enReset').onclick = async () => {
 };
 $('enChange').onclick = () => {
     stop();
-    $('enSetup').hidden = false;
-    $('enFiles').focus();
+    $('enFiles').click();
 };
 $('enUnload').onclick = async () => {
     stop();
     pending = {};
     try { await fetch('/api/energize', { method: 'DELETE' }); } catch { /* the page is cleared anyway */ }
     $('enLive').hidden = true;
-    $('enSetup').hidden = false;
+    $('enEmpty').hidden = false;
+    loadedOk = false;
+    drawRoutines([], false);
     $('enRungs').replaceChildren();
     $('enFiles').value = '';
     $('enFiles').onchange();
@@ -306,25 +361,40 @@ $('enUnload').onclick = async () => {
 };
 
 function open_(j) {  // a loaded program: build the page from it and show its live state
+    loadedOk = true;
     build(j);
     first = true;
     show(j.snapshot);
-    $('enSetup').hidden = true;
+    drawRoutines(j.routines, false);
+    $('enApply').textContent = 'Run the ticked routines';
     $('enLive').hidden = false;
+    $('enEmpty').hidden = true;
+}
+
+async function loadFiles() {
+    const form = new FormData();
+    for (const f of $('enFiles').files) form.append('files', f);
+    form.append('exclude', JSON.stringify(routines.length ? excluded() : []));
+    msg('Loading...');
+    const j = await post('/api/energize/load', null, form);
+    msg('');
+    open_(j);
 }
 
 $('enLoad').onclick = async () => {
     stop();
-    const form = new FormData();
-    for (const f of $('enFiles').files) form.append('files', f);
-    msg('Loading...');
     $('enLoad').disabled = true;
+    routines = [];  // new files: their own routines, all ticked
     try {
-        const j = await post('/api/energize/load', null, form);
-        msg('');
-        open_(j);
+        await loadFiles();
     } catch (e) {
+        // the routines it cannot run come back unticked: one click runs the rest
+        loadedOk = false;
         msg(e.message, true);
+        if (e.routines && e.routines.length) {
+            drawRoutines(e.routines, true);
+            $('enApply').textContent = 'Run without the unticked routines';
+        }
     } finally {
         $('enLoad').disabled = !$('enFiles').files.length;
     }

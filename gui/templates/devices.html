@@ -1,43 +1,34 @@
 {% extends "base.html" %}
 {% block title %}Devices{% endblock %}
-{% block bodyclass %}page{% endblock %}
+{% block bodyclass %}ide-page{% endblock %}
 {% block body %}
-<main class="page-main ts-main">
-    <div class="page-head">
-        <h1>Device models</h1>
-        <span class="muted">Stand-ins for the machine: a pump's running contact closes a second after it is
-            commanded, a valve's limit switch follows its solenoid. Energize and Tests both use them.</span>
-    </div>
-
-    <section class="card ts-program" aria-label="Program">
-        <div class="en-pick">
-            <span id="dvProgram" class="ts-program-name">No program loaded</span>
-            <a class="btn" href="/energize">Open Energize</a>
-        </div>
-    </section>
-
-    <div class="ts-editors">
-        <section class="card">
-            <label class="ts-label" for="dvText">Device models</label>
-            <p class="muted ts-help">One line per device. Types: pump or motor (cmd, running, overload, start_ms,
-                stop_ms) and valve (open_cmd, close_cmd, open_ls, closed_ls, travel_ms). Format: docs/DEVICES.md.</p>
-            <textarea id="dvText" class="ts-text" rows="16" spellcheck="false" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}&#10;  - {name: XV201, type: valve, open_cmd: XV201_Open, open_ls: XV201_ZSO, closed_ls: XV201_ZSC, travel_ms: 3000}"></textarea>
-            <div class="ts-actions">
-                <button id="dvSave" class="btn primary">Save</button>
-                <span id="dvMsg" class="muted" role="status"></span>
-            </div>
+<div class="wbv">
+    <aside class="wbv-side" aria-label="Devices">
+        <div class="pane-head"><span class="pane-title">Program</span></div>
+        <section class="side-sec">
+            <span id="dvProgram" class="side-name">No program loaded</span>
+            <div class="side-row"><a class="btn small" href="/energize">Open Energize</a></div>
         </section>
-        <section class="card">
-            <h2 class="ts-label">What each device does</h2>
-            <p class="muted ts-help">From the saved models: the output each one reads, the input it answers, and
-                how long it takes.</p>
-            <table class="ts-table dv-table">
-                <thead><tr><th>Device</th><th>Reads (PLC output)</th><th>Answers (PLC input)</th><th>Time</th></tr></thead>
+        <div class="pane-head"><span class="pane-title">What each device does</span></div>
+        <section class="side-sec side-list">
+            <table class="ts-table dv-table side-table">
+                <thead><tr><th>Device</th><th>Reads</th><th>Answers</th><th>Time</th></tr></thead>
                 <tbody id="dvList"></tbody>
             </table>
-            <p id="dvEmpty" class="muted ts-help">No device models yet.</p>
+            <p id="dvEmpty" class="side-note">No device models yet.</p>
         </section>
+    </aside>
+    <div class="wbv-main">
+        <div class="wbv-toolbar">
+            <button id="dvSave" class="btn primary">Save</button>
+            <span id="dvMsg" class="muted" role="status"></span>
+            <span class="toolbar-end side-note">One line per device: pump or motor (cmd, running, overload, start_ms, stop_ms),
+                valve (open_cmd, close_cmd, open_ls, closed_ls, travel_ms). Format: docs/DEVICES.md.</span>
+        </div>
+        <div class="wb-split">
+            <textarea id="dvText" class="wb-editor" spellcheck="false" aria-label="Device models" placeholder="devices:&#10;  - {name: P101, type: pump, cmd: P101_Cmd, running: P101_Running, start_ms: 1000}&#10;  - {name: XV201, type: valve, open_cmd: XV201_Open, open_ls: XV201_ZSO, closed_ls: XV201_ZSC, travel_ms: 3000}"></textarea>
+        </div>
     </div>
-</main>
+</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='devices.js') }}"></script>{% endblock %}

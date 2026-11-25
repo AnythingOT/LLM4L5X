@@ -1,74 +1,78 @@
 {% extends "base.html" %}
 {% block title %}Energize{% endblock %}
-{% block bodyclass %}page{% endblock %}
+{% block bodyclass %}ide-page{% endblock %}
 {% block body %}
-<main class="page-main en-main">
-    <div class="page-head">
-        <h1>Energize</h1>
-        <span class="muted">Run the whole program on this PC, with device models in place of the machine, before it
-            goes near a controller.</span>
-    </div>
-
-    <section class="card en-setup" id="enSetup">
-        <div class="en-pick">
+<div class="wbv">
+    <aside class="wbv-side" aria-label="Program">
+        <div class="pane-head"><span class="pane-title">Program</span></div>
+        <section class="side-sec" id="enSetup">
             <input id="enFiles" class="en-file" type="file" multiple accept=".L5X,.l5x,.zip" />
-            <label for="enFiles" class="btn">Choose files</label>
-            <span id="enFileNames" class="muted">L5X routines, a project export, or the Routines.zip from a requirements run</span>
-            <button id="enLoad" class="btn primary" disabled>Load</button>
-        </div>
-        <p class="muted en-devices-note">Outputs that need an answer from the machine (a pump's running contact, a
-            valve's limit switch) get one from the <a href="/devices">device models</a>.</p>
-        <p id="enMsg" class="en-msg" role="status"></p>
-    </section>
-
-    <section id="enLive" hidden>
-        <div class="en-toolbar" role="toolbar" aria-label="Simulation">
-            <button id="enRun" class="btn en-run" aria-pressed="false">Run</button>
-            <button id="enStep" class="btn">Step 100 ms</button>
-            <button id="enReset" class="btn">Reset</button>
-            <span class="en-clock" aria-live="off"><b id="enTime">0.00</b> s</span>
-            <span class="en-program">
-                <button id="enChange" class="en-prog-name" title="Change program: load other files"></button>
-                <button id="enUnload" class="en-unload" title="Unload the program" aria-label="Unload the program">&times;</button>
-            </span>
-            <span id="enSummary" class="muted en-summary"></span>
-            <span id="enLiveMsg" class="en-live-msg" role="alert"></span>
-            <a id="enDevices" class="btn" href="/devices"></a>
-        </div>
-        <ul id="enNotes" class="en-notes" hidden></ul>
-
-        <div class="en-bench">
-            <aside class="card en-io" aria-labelledby="enInHead">
-                <div class="en-io-head"><h2 id="enInHead">Inputs</h2>
-                    <input type="search" class="en-filter" placeholder="Filter" aria-label="Filter inputs" data-for="enInputs" /></div>
-                <p class="muted en-hint">Switch a bit; type a number and press Enter.</p>
-                <ul id="enInputs" class="en-tags"></ul>
-            </aside>
-
-            <section class="card en-ladder" aria-labelledby="enRungHead">
-                <div class="en-io-head"><h2 id="enRungHead">Rungs</h2>
-                    <span class="muted en-key"><i class="en-swatch"></i>power flows</span>
-                    <span class="muted en-key" title="Green as in Logix Designer online: a contact whose bit makes it pass power, even where no power reaches it"><i class="en-true"></i>instruction true</span>
-                    <span class="muted en-key"><i class="en-coil"></i>coil on</span></div>
-                <div id="enRungs"></div>
-            </section>
-
-            <aside class="card en-io" aria-labelledby="enOutHead">
-                <div class="en-io-head"><h2 id="enOutHead">Outputs</h2>
-                    <input type="search" class="en-filter" placeholder="Filter" aria-label="Filter outputs" data-for="enOutputs enStructs enFeedback" /></div>
-                <ul id="enOutputs" class="en-tags"></ul>
-                <h3 id="enStructHead" hidden>Timers and counters</h3>
-                <ul id="enStructs" class="en-tags"></ul>
-                <h3 id="enFeedHead" hidden>From the device models</h3>
-                <ul id="enFeedback" class="en-tags"></ul>
-            </aside>
-        </div>
-
-        <details class="en-skipped" id="enSkippedBox" hidden>
-            <summary class="muted">Not run in simulation</summary>
-            <ul id="enSkipped" class="muted"></ul>
+            <div class="side-row">
+                <label for="enFiles" class="btn small">Choose files</label>
+                <button id="enLoad" class="btn small primary" disabled>Load</button>
+            </div>
+            <span id="enFileNames" class="side-note">L5X routines, a project export, or the Routines.zip from a requirements run</span>
+            <p id="enMsg" class="en-msg" role="status"></p>
+        </section>
+        <div class="pane-head"><span class="pane-title">Routines</span><span class="pane-hint">ticked ones run</span></div>
+        <section class="side-sec side-list" id="enRoutineBox">
+            <ul id="enRoutines" class="tick-list"></ul>
+            <p id="enRoutinesEmpty" class="side-note">Load a program to see its routines.</p>
+            <button id="enApply" class="btn small primary" hidden>Run the ticked routines</button>
+        </section>
+        <details class="en-skipped side-sec" id="enSkippedBox" hidden>
+            <summary class="side-note">Not run in simulation</summary>
+            <ul id="enSkipped" class="side-note"></ul>
         </details>
-    </section>
-</main>
+        <div class="side-sec"><p class="side-note">Outputs that need an answer from the machine (a pump's running
+            contact, a valve's limit switch) get one from the <a href="/devices">device models</a>.</p></div>
+    </aside>
+
+    <div class="wbv-main">
+        <div class="wb-empty" id="enEmpty">
+            <h1>Energize</h1>
+            <p>Run the whole program on this PC, with device models in place of the machine, before it goes near a
+                controller. Choose its files on the left: L5X routines, a project export, or a Routines.zip.</p>
+        </div>
+        <section id="enLive" class="en-live" hidden>
+            <div class="wbv-toolbar" role="toolbar" aria-label="Simulation">
+                <button id="enRun" class="btn en-run" aria-pressed="false">Run</button>
+                <button id="enStep" class="btn">Step 100 ms</button>
+                <button id="enReset" class="btn">Reset</button>
+                <span class="en-clock" aria-live="off"><b id="enTime">0.00</b> s</span>
+                <span class="en-program">
+                    <button id="enChange" class="en-prog-name" title="Change program: load other files"></button>
+                    <button id="enUnload" class="en-unload" title="Unload the program" aria-label="Unload the program">&times;</button>
+                </span>
+                <span id="enSummary" class="muted en-summary"></span>
+                <span id="enLiveMsg" class="en-live-msg" role="alert"></span>
+                <a id="enDevices" class="btn small toolbar-end" href="/devices"></a>
+            </div>
+            <ul id="enNotes" class="en-notes" hidden></ul>
+            <div class="en-bench">
+                <section class="en-ladder" aria-labelledby="enRungHead">
+                    <div class="en-legend"><h2 id="enRungHead" class="sr-only">Rungs</h2>
+                        <span class="en-key"><i class="en-swatch"></i>power flows</span>
+                        <span class="en-key" title="Green as in Logix Designer online: a contact whose bit makes it pass power, even where no power reaches it"><i class="en-true"></i>instruction true</span>
+                        <span class="en-key"><i class="en-coil"></i>coil on</span></div>
+                    <div id="enRungs"></div>
+                </section>
+                <aside class="en-io-pane" aria-label="Inputs and outputs">
+                    <div class="pane-head"><span class="pane-title" id="enInHead">Inputs</span>
+                        <input type="search" class="en-filter" placeholder="Filter" aria-label="Filter inputs" data-for="enInputs" /></div>
+                    <p class="side-note en-hint">Switch a bit; type a number and press Enter.</p>
+                    <ul id="enInputs" class="en-tags"></ul>
+                    <div class="pane-head"><span class="pane-title" id="enOutHead">Outputs</span>
+                        <input type="search" class="en-filter" placeholder="Filter" aria-label="Filter outputs" data-for="enOutputs enStructs enFeedback" /></div>
+                    <ul id="enOutputs" class="en-tags"></ul>
+                    <h3 id="enStructHead" class="en-sub" hidden>Timers and counters</h3>
+                    <ul id="enStructs" class="en-tags"></ul>
+                    <h3 id="enFeedHead" class="en-sub" hidden>From the device models</h3>
+                    <ul id="enFeedback" class="en-tags"></ul>
+                </aside>
+            </div>
+        </section>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='energize.js') }}"></script>{% endblock %}

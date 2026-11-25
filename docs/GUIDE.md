@@ -224,12 +224,20 @@ python cli.py rung "XIC a BST XIC b NXB XIO c BND OTE d"
 
 ## Energize: run the whole program before any controller
 
-**Energize** (top bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run.
+**Energize** (activity bar) loads L5X routines, a project export or the `Routines.zip` from a requirements run.
 The program stays loaded: leave the page (or use Tests) and come back, and it is as you left it (Run
 pauses while you are away). Outputs that need an answer from the machine get it from the device models on
 the **Tests** page.
 
-The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**.
+On the left, the **program** (its files) and its **routines**; in the middle the **rungs**; on the right
+the **inputs** and **outputs**. Tests, Devices and Lint have the same frame: a side pane for what you pick
+from, a toolbar, and the work.
+
+- **Routines: ticked ones run.** When a routine has an instruction the simulator does not have, the load
+  says which and why, and comes back with those routines unticked: **Run without the unticked routines**
+  runs the rest. A JSR to a routine left out is passed over (as MAP_IN is), and the routine is listed under
+  **Not run in simulation**, so a run never looks like the whole program when it is not. Change the ticks
+  at any time; **Run the ticked routines** applies them.
 
 - The routines run as on the controller, with `Sim_Mode = 1`: a subroutine runs when a `JSR` calls it
   (its rungs stay dark in a scan that does not call it, and its outputs keep their values), and every
@@ -238,8 +246,8 @@ The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**
 - Add-On Instructions run their own ladder logic, per instance: inputs in, logic when the rung is true,
   outputs out, the rung goes on with EnableOut. A source-protected AOI cannot be run and stops the load.
 - `CPT` and `CMP` expressions, `OSR` and `OSF` are simulated too. An instruction the simulator does not
-  have (PID, MSG, string instructions ...) stops the load with a list: skipping it would make the program
-  look like it works.
+  have (PID, MSG, string instructions ...) is never skipped quietly: its routine is listed with the reason,
+  and runs only when you untick it.
 - How far the simulator matches a real controller is measured instruction by instruction against Logix
   Emulate (`eval/conformance.py`); the results are in `tests/TEST_STATUS.md`.
 - **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
