@@ -1,34 +1,38 @@
 {% extends "base.html" %}
 {% block title %}Lint{% endblock %}
-{% block bodyclass %}page{% endblock %}
+{% block bodyclass %}ide-page{% endblock %}
 {% block body %}
-<main class="page-main">
-    <div class="page-head">
-        <h1>Lint</h1>
-        <span class="muted"><span id="ruleCount"></span> Saved in this browser; used by <b>validate</b> and by the checks on generated rungs. <span id="savedNote" class="saved-note"></span></span>
-        <div class="page-actions">
-            <button id="enableAll" class="btn">All on</button>
-            <button id="disableAll" class="btn">All off</button>
-            <a class="btn primary" href="/">Back to chat</a>
+<div class="wbv">
+    <aside class="wbv-side" aria-label="Rule groups">
+        <div class="pane-head"><span class="pane-title">Rule groups</span></div>
+        <nav id="ruleIndex" class="rule-index side-sec" aria-label="Rule groups"></nav>
+        <section class="side-sec">
+            <div class="side-row">
+                <button id="enableAll" class="btn small">All on</button>
+                <button id="disableAll" class="btn small">All off</button>
+            </div>
+            <p class="side-note"><span id="ruleCount"></span> Saved in this browser; used by <b>validate</b> and by
+                the checks on generated rungs. <span id="savedNote" class="saved-note"></span></p>
+        </section>
+    </aside>
+    <div class="wbv-main">
+        <div class="wbv-toolbar rule-filters">
+            <input id="ruleSearch" type="search" placeholder="Search code, title or text" spellcheck="false" aria-label="Search the rules" />
+            <div class="sev-filter" id="sevFilter">
+                <button class="sev-btn active" data-sev="">All</button>
+                <button class="sev-btn critical" data-sev="critical">Critical</button>
+                <button class="sev-btn error" data-sev="error">Error</button>
+                <button class="sev-btn warning" data-sev="warning">Warning</button>
+                <button class="sev-btn info" data-sev="info">Info</button>
+            </div>
+        </div>
+        <div class="wbv-body">
+            <p class="side-note rules-note">The code fixes the severity, so a code means the same thing in every report: you can switch a rule off, not soften it.
+                To accept one case, write <code>lint:disable=CODE</code> in that rung's comment or that tag's description.
+                <span class="badge rung">rung</span> rules also check new and pasted rungs; <span class="badge project">project</span> rules need a full controller export.</p>
+            <div id="ruleGroups"></div>
         </div>
     </div>
-    <div class="rule-filters">
-        <input id="ruleSearch" type="search" placeholder="Search code, title or text" spellcheck="false" />
-        <div class="sev-filter" id="sevFilter">
-            <button class="sev-btn active" data-sev="">All</button>
-            <button class="sev-btn critical" data-sev="critical">Critical</button>
-            <button class="sev-btn error" data-sev="error">Error</button>
-            <button class="sev-btn warning" data-sev="warning">Warning</button>
-            <button class="sev-btn info" data-sev="info">Info</button>
-        </div>
-    </div>
-    <p class="muted rules-note">The code fixes the severity, so a code means the same thing in every report: you can switch a rule off, not soften it.
-        To accept one case, write <code>lint:disable=CODE</code> in that rung's comment or that tag's description.
-        <span class="badge rung">rung</span> rules also check new and pasted rungs; <span class="badge project">project</span> rules need a full controller export.</p>
-    <div class="rules-layout">
-        <nav id="ruleIndex" class="rule-index" aria-label="Rule groups"></nav>
-        <div id="ruleGroups"></div>
-    </div>
-</main>
+</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='lint.js') }}"></script>{% endblock %}

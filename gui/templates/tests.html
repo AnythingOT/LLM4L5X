@@ -1,69 +1,66 @@
 {% extends "base.html" %}
 {% block title %}Tests{% endblock %}
-{% block bodyclass %}page{% endblock %}
+{% block bodyclass %}ide-page{% endblock %}
 {% block body %}
-<main class="page-main ts-main">
-    <div class="page-head">
-        <h1>Tests</h1>
-        <span class="muted">Test cases check the program against its requirements. Outputs that need an answer
-            from the machine get it from the <a href="/devices" id="tsDevLink">device models</a>.</span>
-    </div>
-
-    <section class="card ts-program" aria-label="Program">
-        <div class="en-pick">
-            <span id="tsProgram" class="ts-program-name">No program loaded</span>
+<div class="wbv">
+    <aside class="wbv-side" aria-label="Program and requirements">
+        <div class="pane-head"><span class="pane-title">Program</span></div>
+        <section class="side-sec">
+            <span id="tsProgram" class="side-name">No program loaded</span>
             <input id="tsFiles" class="en-file" type="file" multiple accept=".L5X,.l5x,.zip" />
-            <label for="tsFiles" class="btn">Load a program</label>
-            <a class="btn" href="/energize" id="tsOpen" hidden>Open in Energize</a>
-        </div>
-        <div class="en-pick ts-reqs-row">
-            <span id="tsReqName" class="ts-program-name">No requirements: load the instruction sheet (the
-                requirements workbook) for the traceability matrix</span>
-            <input id="tsReqFile" class="en-file" type="file" accept=".xlsx,.xlsm" />
-            <label for="tsReqFile" class="btn">Load requirements</label>
-        </div>
-    </section>
-
-    <div class="ts-editors ts-one">
-        <section class="card">
-            <label class="ts-label" for="tsTests">Test cases</label>
-            <p class="muted ts-help">Steps that set inputs, wait, and expect outputs, each tied to a requirement ID.
-                Format: docs/TESTCASES.md.</p>
-            <textarea id="tsTests" class="ts-text" rows="14" spellcheck="false" placeholder="SCENARIO TC-01 &quot;Pump starts&quot; REQ R1&#10;  SET Start_PB = 1&#10;  EXPECT P101_Running == 1 within_ms 1500"></textarea>
+            <div class="side-row">
+                <label for="tsFiles" class="btn small">Load a program</label>
+                <a class="btn small" href="/energize" id="tsOpen" hidden>Open in Energize</a>
+            </div>
         </section>
-    </div>
+        <div class="pane-head"><span class="pane-title">Requirements</span></div>
+        <section class="side-sec">
+            <span id="tsReqName" class="side-note">No requirements: load the instruction sheet (the requirements
+                workbook) for the traceability matrix</span>
+            <input id="tsReqFile" class="en-file" type="file" accept=".xlsx,.xlsm" />
+            <div class="side-row"><label for="tsReqFile" class="btn small">Load requirements</label></div>
+        </section>
+        <div class="pane-head"><span class="pane-title">Runs</span><span class="pane-hint">never changed</span></div>
+        <section class="side-sec side-list" id="tsHistoryBox" hidden>
+            <table class="ts-table side-table"><tbody id="tsHistory"></tbody></table>
+        </section>
+        <div class="side-sec runs-empty"><p class="side-note">No runs yet. Each run is kept with its report.</p></div>
+    </aside>
 
-    <div class="ts-actions">
-        <button id="tsRun" class="btn en-run">Run tests</button>
-        <button id="tsSave" class="btn">Save</button>
-        <span id="tsMsg" class="muted" role="status"></span>
-    </div>
-
-    <section class="card ts-results" id="tsResults" hidden aria-labelledby="tsSum">
-        <div class="ts-res-head">
-            <h2 id="tsSum"></h2>
-            <a id="tsPdf" class="btn primary" href="#" download>Download report (PDF)</a>
-            <a id="tsJson" class="btn" href="#" download>Record (JSON)</a>
+    <div class="wbv-main">
+        <div class="wbv-toolbar">
+            <button id="tsRun" class="btn en-run">Run tests</button>
+            <button id="tsSave" class="btn">Save</button>
+            <span id="tsMsg" class="muted" role="status"></span>
+            <span class="toolbar-end side-note">SET, WAIT, EXPECT per requirement ID (docs/TESTCASES.md) ·
+                <a href="/devices" id="tsDevLink">device models</a></span>
         </div>
-        <p class="muted ts-help" id="tsRunId"></p>
-        <h3>Traceability matrix</h3>
-        <table class="ts-table ts-matrix">
-            <thead><tr><th>Requirement</th><th>Text</th><th>Rungs</th><th>Test cases</th><th>Result</th></tr></thead>
-            <tbody id="tsMatrix"></tbody>
-        </table>
-        <div id="tsGapsBox" hidden><h3>Gaps</h3><ul id="tsGaps" class="ts-gaps"></ul></div>
-        <h3>Test cases</h3>
-        <table class="ts-table">
-            <thead><tr><th>Test case</th><th>Requirements</th><th>Result</th></tr></thead>
-            <tbody id="tsCases"></tbody>
-        </table>
-        <details class="ts-report"><summary class="muted">Full report</summary><pre id="tsReport"></pre></details>
-    </section>
-
-    <section class="card ts-history" id="tsHistoryBox" hidden>
-        <h3>Earlier runs <span class="muted">kept in the runs folder, never changed</span></h3>
-        <table class="ts-table"><tbody id="tsHistory"></tbody></table>
-    </section>
-</main>
+        <div class="wb-split">
+            <textarea id="tsTests" class="wb-editor" spellcheck="false" aria-label="Test cases" placeholder="SCENARIO TC-01 &quot;Pump starts&quot; REQ R1&#10;  SET Start_PB = 1&#10;  EXPECT P101_Running == 1 within_ms 1500"></textarea>
+            <section class="wb-results" id="tsResults" hidden aria-labelledby="tsSum">
+                <div class="pane-head ts-res-head">
+                    <span class="pane-title" id="tsSum"></span>
+                    <a id="tsPdf" class="btn small primary" href="#" download>Report (PDF)</a>
+                    <a id="tsJson" class="btn small" href="#" download>Record (JSON)</a>
+                </div>
+                <div class="wb-results-body">
+                    <p class="side-note" id="tsRunId"></p>
+                    <h3>Traceability matrix</h3>
+                    <table class="ts-table ts-matrix">
+                        <thead><tr><th>Requirement</th><th>Text</th><th>Rungs</th><th>Test cases</th><th>Result</th></tr></thead>
+                        <tbody id="tsMatrix"></tbody>
+                    </table>
+                    <div id="tsGapsBox" hidden><h3>Gaps</h3><ul id="tsGaps" class="ts-gaps"></ul></div>
+                    <h3>Test cases</h3>
+                    <table class="ts-table">
+                        <thead><tr><th>Test case</th><th>Requirements</th><th>Result</th></tr></thead>
+                        <tbody id="tsCases"></tbody>
+                    </table>
+                    <details class="ts-report"><summary class="muted">Full report</summary><pre id="tsReport"></pre></details>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
 {% endblock %}
 {% block scripts %}<script src="{{ url_for('static', filename='tests.js') }}"></script>{% endblock %}

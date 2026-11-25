@@ -272,3 +272,46 @@ def test_energize_runs_add_on_instruction_logic_and_cpt():
     snap = s.step(500)
     assert snap["tags"]["Motor"] == 1 and snap["tags"]["Speed"] == 750
     assert snap["power"] == [True, True]
+
+
+def test_unticked_routines_are_left_out_and_said_so():
+    main = routine("MainRoutine", MAIN)
+    tank_bad = routine("Tank", "XIC(Level_HH)MSG(Msg1);\nXIC(Start_PB)OTE(Pump);")
+    with pytest.raises(EnergizeError) as e:
+        load([main, tank_bad])
+    rts = {r["name"]: r for r in e.value.routines}
+    assert rts["Tank"]["problem"].startswith("MSG") and rts["MainRoutine"]["problem"] is None
+    s = load([main, tank_bad], exclude={"MainProgram/Tank"})
+    assert "Tank: left out (unticked)" in s.skipped and all(p.routine != "Tank" for p in s.places)
+    assert {r["name"]: r["included"] for r in s.routines}["Tank"] is False
+    s.step(100)  # MainRoutine's JSR(Tank) passes over the routine left out
+
+
+def test_the_page_sends_the_ticks(web):
+    from io import BytesIO
+    bad = routine("Tank", "XIC(Level_HH)MSG(Msg1);")
+    main = routine("MainRoutine", MAIN)
+    r = web.post("/api/energize/load", data={"files": [(BytesIO(main.encode()), "Main.L5X"), (BytesIO(bad.encode()), "Tank.L5X")]},
+                 content_type="multipart/form-data")
+    assert r.status_code == 400 and any(x["name"] == "Tank" and x["problem"] for x in r.get_json()["routines"])
+    r = web.post("/api/energize/load", data={"files": [(BytesIO(main.encode()), "Main.L5X"), (BytesIO(bad.encode()), "Tank.L5X")],
+                                             "exclude": '["MainProgram/Tank"]'}, content_type="multipart/form-data")
+    j = r.get_json()
+    assert r.status_code == 200 and j["exclude"] == ["MainProgram/Tank"] and any(not x["included"] for x in j["routines"])
+
+
+def test_ticks_change_on_the_loaded_program(web):
+    from io import BytesIO
+    main = routine("MainRoutine", "JSR(Tank,0);\nXIC(Go)OTE(Lamp);")
+    tank = routine("Tank", "XIC(Start_PB)OTE(Pump);")
+    web.post("/api/energize/load", data={"files": [(BytesIO(main.encode()), "Main.L5X"), (BytesIO(tank.encode()), "Tank.L5X")]},
+             content_type="multipart/form-data")
+    j = web.post("/api/energize/exclude", json={"exclude": ["MainProgram/Tank"]}).get_json()
+    assert j["exclude"] == ["MainProgram/Tank"] and all(r["routine"] != "Tank" for r in j["rungs"])
+    j = web.post("/api/energize/exclude", json={"exclude": []}).get_json()
+    assert any(r["routine"] == "Tank" for r in j["rungs"])
+
+
+def test_a_jsr_names_a_routine_not_an_input():
+    s = load([routine("MainRoutine", "JSR(Tank,0);"), routine("Tank", "XIC(Start_PB)OTE(Pump);")])
+    assert s.inputs == ["Start_PB"]

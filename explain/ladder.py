@@ -113,9 +113,10 @@ class _Layout:
         else:
             mark = _COILS[name]
             hw = 6 if len(mark) <= 1 else len(mark) * CHAR / 2 + 5  # brackets wide enough for the mark
-            # a light fill behind the coil: shown when it is on (a live page), so "on" is not colour of a line only
-            parts.insert(0, f'<rect x="{c - hw - 9:.1f}" y="{WIRE - 13}" width="{2 * hw + 18:.1f}" height="26" '
-                            'rx="13" class="lad-glow"/>')
+            # the space between the brackets, filled when the coil is on (a live page), as Logix Designer online
+            # shows it: "on" is then more than the colour of a line
+            parts.insert(0, f'<rect x="{c - hw + 1:.1f}" y="{WIRE - 8}" width="{2 * hw - 2:.1f}" height="16" '
+                            'rx="2" class="lad-glow"/>')
             parts += [_line(0, WIRE, c - hw - 5, WIRE, at=f"{path}:in"), _line(c + hw + 5, WIRE, w, WIRE, at=f"{path}:out"),
                       f'<path d="M{c - hw:.1f},{WIRE - 10} q-6,10 0,20 M{c + hw:.1f},{WIRE - 10} q6,10 0,20" class="lad-sym"/>']
             if mark:

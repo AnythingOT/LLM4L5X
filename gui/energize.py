@@ -27,7 +27,9 @@ _FIRST_ARG_WRITES = {"OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RE
 
 
 class EnergizeError(ValueError):
-    pass
+    def __init__(self, message: str, routines: list[dict] | None = None):
+        super().__init__(message)
+        self.routines = routines or []  # every routine and why it cannot run: the page offers to leave those out
 
 
 def _writes(i: Instr, aois: dict | None = None) -> list[str]:
@@ -70,6 +72,7 @@ class Session:
     backend: SimBackend | None = None
     presets: dict = field(default_factory=dict)  # {"T.PRE": 5000} from the tags' data: rungs may show "?"
     program: dict = field(default_factory=dict)  # routine_of, aois, types, skip: how the routines call each other
+    routines: list = field(default_factory=list)  # every routine of the files: included, and why not
 
     def _new_backend(self) -> SimBackend:
         from devices import load_plant
@@ -120,10 +123,15 @@ class Session:
                              "error": r.error} for r in results]}
 
 
-def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str = "", scan_ms: float = 10.0
-         ) -> Session:
+def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str = "", scan_ms: float = 10.0,
+         exclude: set[str] | frozenset = frozenset()) -> Session:
+    """exclude: "Program/Routine" keys the user unticked. They are left out, and a JSR to one of them is passed
+    over, as MAP_IN is: the run says so, so it never looks like the whole program ran when it did not."""
     from core.rung import format_rung
     rungs, places, skipped, unsupported, routine_of = [], [], [], [], []
+    routines: list[dict] = []  # every routine of the files, for the page's list of ticks
+    left_out = {k.upper() for k in exclude}
+    left_out_names: set[str] = set()
     presets: dict[str, int] = {}
     aois: dict[str, sim.AoiDef] = {}
     types: dict[str, str] = {}
@@ -140,46 +148,69 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
         for rt in project.routines:
             if rt.program.startswith("AOI:"):
                 continue  # an AOI's logic runs inside each call, above
+            key = f"{rt.program}/{rt.name}"
+            entry = {"key": key, "program": rt.program, "name": rt.name, "rungs": len(rt.rungs),
+                     "included": True, "problem": None}
+            routines.append(entry)
             if rt.name.upper() in SKIPPED_ROUTINES:
+                entry.update(included=False, problem="mapping: not run in simulation (Sim_Mode = 1)")
                 skipped.append(f"{rt.name}: not run in simulation (Sim_Mode = 1)")
                 continue
+            if not rt.is_ladder:
+                entry["problem"] = f"{rt.type or 'not ladder'}: the simulator runs ladder only"
+            problems = []
             for n, info in enumerate(rt.rungs):
                 r = info.rung
                 if r is None:
-                    unsupported.append(f"{rt.name} rung {n}: could not be read")
+                    problems.append(f"{rt.name} rung {n}: could not be read")
                     continue
                 names = {i.name.upper() for i in walk(r.body)}
                 bad = sorted(x for x in names - _SUPPORTED if aois.get(x) is None)
                 if bad:
-                    unsupported.append(f"{rt.name} rung {n}: {', '.join(bad)}")
-                    continue
-                rungs.append(r)
-                routine_of.append(f"{rt.program}/{rt.name}")
-                places.append(Place(rt.name, n, format_rung(r)))
+                    problems.append(f"{rt.name} rung {n}: {', '.join(bad)}")
+            if problems and not entry["problem"]:
+                entry["problem"] = problems[0].split(": ", 1)[1] + (f" (+{len(problems) - 1} more)" if len(problems) > 1 else "")
+            if key.upper() in left_out:
+                entry["included"] = False
+                left_out_names.add(rt.name.upper())
+                skipped.append(f"{rt.name}: left out (unticked)")
+                continue
+            if not rt.is_ladder:
+                continue  # an ST or FBD routine: listed, never run; a JSR to it is caught below
+            unsupported += problems
+            if problems:
+                continue
+            for n, info in enumerate(rt.rungs):
+                rungs.append(info.rung)
+                routine_of.append(key)
+                places.append(Place(rt.name, n, format_rung(info.rung)))
     # a JSR must find its routine among the ladder routines loaded (an ST or FBD routine cannot run here)
     loaded = {k.upper() for k in routine_of}
     for r, key in zip(rungs, routine_of):
         prog = key.split("/", 1)[0]
         for i in walk(r.body):
-            if i.name.upper() == "JSR" and i.args and i.args[0].upper() not in SKIPPED_ROUTINES \
+            if i.name.upper() == "JSR" and i.args and i.args[0].upper() not in SKIPPED_ROUTINES | left_out_names \
                     and f"{prog}/{i.args[0]}".upper() not in loaded:
                 unsupported.append(f"JSR to {i.args[0]}: that routine is not a ladder routine in these files")
     if unsupported:
         raise EnergizeError("the simulator cannot run every rung, so it would not behave like the controller: "
-                            + "; ".join(unsupported[:10]) + (" ..." if len(unsupported) > 10 else ""))
+                            + "; ".join(unsupported[:10]) + (" ..." if len(unsupported) > 10 else "")
+                            + ". Untick the routines it cannot run to run the rest.", routines)
     if not rungs:
-        raise EnergizeError("no ladder rungs to run")
+        raise EnergizeError("no ladder rungs to run", routines)
     live_aois = {k: v for k, v in aois.items() if v is not None}
     written = {base_tag(w) for r in rungs for i in walk(r.body) for w in _writes(i, live_aois) if not is_literal(w)}
     written.discard(None)  # a '?' operand names no tag
     # a timer or counter is a structure: its elapsed/count and done bits are what a person watches
     structs = {i.args[0] for r in rungs for i in walk(r.body)
                if sim._V36.get(i.name.upper(), i.name.upper()) in _STRUCTS and i.args}
-    read = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
+    # what the logic reads; a JSR names a routine and a count, not tags
+    read = {base_tag(a) for r in rungs for i in walk(r.body) if i.name.upper() != "JSR"
+            for a in i.args if not is_literal(a)}
     outputs = sorted(t for t in written if t not in structs) + [f"{t}.{m}" for t in sorted(structs)
                                                                 for m in ("ACC", "DN")]
     program = {"routine_of": routine_of, "aois": live_aois,
-               "types": types, "skip": SKIPPED_ROUTINES}
+               "types": types, "skip": SKIPPED_ROUTINES | left_out_names}
     s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms, presets=presets,
                 program=program)
     try:
@@ -191,6 +222,7 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
     s.feedbacks = sorted(probe.plant.feedbacks()) if probe.plant else []
     s.inputs = sorted(read - written - set(s.feedbacks) - {"Sim_Mode"} - {None})
     s.backend = probe
+    s.routines = routines
     return s
 
 
