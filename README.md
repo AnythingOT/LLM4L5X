@@ -1,7 +1,5 @@
 # LLM4L5X
 
-[![CI](https://github.com/AnythingOT/LLM4L5X/actions/workflows/ci.yml/badge.svg)](https://github.com/AnythingOT/LLM4L5X/actions/workflows/ci.yml)
-
 Ladder logic and UDTs for Rockwell Studio 5000, from plain English, rung text or Excel, as L5X files you import;
 then run the logic on your PC against device models and test cases before it goes near a controller.
 Runs on your PC with a local model, completely offline. Nothing leaves the PC.
@@ -43,11 +41,8 @@ Samples of both Excel files are in the app: the list button next to **Send**.
 
 ## The model
 
-What worked for us: **Qwen3.6-35B-A3B** ([`UD-Q4_K_M` GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF), about 22 GB)
-on **llama.cpp**, CPU only, 64 GB RAM: about 12 s a request. On our instruction suite it got 238 of 240 right
-(scored by behaviour in the simulator, not by text). Read that number for what it is: the suite's requests
-are generated from templates that name every tag exactly, for 24 instructions. How it does on an engineer's
-own wording, and with smaller models, is not measured yet.
+What we use: **Qwen3.6-35B-A3B** ([`UD-Q4_K_M` GGUF](https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF), about 22 GB)
+on **llama.cpp**, CPU only, 64 GB RAM, about 12 s a request.
 Start it in its own window and keep that window open:
 
 ```
@@ -65,24 +60,8 @@ Ollama works too: set *Thinking* to off in Settings. Details: [docs/GUIDE.md](do
 
 ## Status
 
-Measured on 858 public L5X exports (6,959 rungs) in CI, November 2026:
-
-| | |
-|---|---|
-| Rungs read | 98.9% |
-| Rungs explained in English | 55%. The rest use instructions the explainer does not have yet (CPT, string instructions, AOI calls) |
-| Routines Energize can run whole | 49%. The simulator has 36 of the 124 catalog instructions: bits, timers, counters, compare, math, move. Missing ones (CPT, string instructions, AOI bodies, MSG, PID) stop the load with a list, never a silent skip |
-
-- **Verified in Studio 5000:** generated routines and rungs import; UDTs from Excel and routines from a requirements Excel import.
-- **Not verified yet:** a timer keeps its preset after import; tag values survive a whole-program UDT reorder
-  (test on a copy).
-- **The simulator is ours.** It has not yet been compared instruction by instruction with a real controller
-  or Logix Emulate. Until it is, a passing test says the logic is right in our simulator, not on the controller.
-- Generation covers 24 instructions; real programs also need JSR, CPT, AOI calls, MSG and PID, written by hand today.
-- Tested on Windows by one user. CI runs on Linux.
-
-A requirements Excel with an *Expected rung* column scores the model row by row; `python -m eval.expected_workbook`
-makes one. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+Not released: no version has been tested enough to be called one. Internal test results, and what is
+not verified yet, are in [tests/TEST_STATUS.md](tests/TEST_STATUS.md).
 
 Planned: documentation written from an attached program; translating comments, descriptions and tag names to English.
 

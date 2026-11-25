@@ -191,6 +191,7 @@ tests/                     pytest: one file per area.
   test_simulator.py
   test_spec.py             Requirements workbook -> routines: reading the sheet, and the background build (model stubbed).
   test_start_script.py     start.sh: packages live outside the download, installed once and again only when requirements.txt changes.
+  TEST_STATUS.md           Internal results only: what has been measured, how, and what has not been verified.
   test_structure.py        The shape of the repository: which folder may import which, a README per folder, STRUCTURE.txt current.
   test_suite.py
   test_testcases.py
