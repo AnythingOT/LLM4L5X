@@ -46,8 +46,10 @@ page (#50).
 4. **Blocks in the workbook.** A row (or a Device/Block column) says "P101 is a Motor"; the compiler
    instantiates the block, and its device model and test cases are collected for Energize and Tests.
    *Done when* a workbook with block rows builds, and Tests runs the collected test cases green.
-5. **Logix Emulate run.** A pylogix backend with the four test-case methods (has, read, write, advance)
-   and the device models stepped in the poll loop; same test cases as the simulator. Emulate runs in real
+5. **Logix Emulate run.** *Started:* `testcases/emulate.py` (pylogix backend, device models stepped in the
+   poll loop) and `eval/conformance.py` (the simulator against Emulate, case by case). *Next:* run the
+   conformance on the owner's Emulate and fix what differs; then the Tests page runs on Emulate too.
+   Emulate runs in real
    time: no fast-forward, and EXPECT timings need a tolerance (the poll loop adds tens of ms). L5X import
    and download through the Logix Designer SDK (the owner has the licence). Probably shared with OpenVnV.
    *Done when* the tank test cases pass on Emulate unchanged.
@@ -75,8 +77,9 @@ page (#50).
 9. **OpenVnV** (separate private repo): backend interface + fake PLC + unit tests, command-line runner
    with exit codes and JUnit/JSON, Excel import, tag picker from L5X, step templates. Same test-case
    format as here; qualification suite (must-pass / must-fail) as tool validation evidence.
-10. **Simulator coverage**: JSR and AOI bodies (~95% of public rungs), CPT, strings; measure on the public
-   corpus first; then a conformance suite against Emulate, kept as the simulator's validation record.
+10. **Simulator coverage**: *done:* JSR, AOI logic, CPT, CMP, OSR/OSF (routines runnable whole on the public
+   corpus: 49% to 74%, `python -m eval.test_status`). *Next:* CONCAT/RTOS and the other string
+   instructions, ALMD, GSV; MSG and PID stay out (they need the network and a process).
 11. **Hash-pinned requirements**, generated on the laptop (`pip-compile --generate-hashes`).
 12. **"Validated with" record**: Studio 5000 version, date, workbook, Verify errors/warnings.
 13. **Test-case file format name**: accept `TESTCASE` as well as `SCENARIO`, if wanted (existing files

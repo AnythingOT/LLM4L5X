@@ -48,7 +48,7 @@ def files() -> list[str]:
         names = [n for n in out if n and (ROOT / n).exists()]
     except (OSError, subprocess.CalledProcessError):
         names = [str(p.relative_to(ROOT)).replace("\\", "/") for p in ROOT.rglob("*") if p.is_file()]
-    return sorted(n for n in names if not SKIP_DIRS & set(n.split("/")) and n != "STRUCTURE.txt") + ["STRUCTURE.txt"]
+    return sorted({n for n in names if not SKIP_DIRS & set(n.split("/")) and n != "STRUCTURE.txt"}) + ["STRUCTURE.txt"]
 
 
 def first_line(text: str) -> str:
