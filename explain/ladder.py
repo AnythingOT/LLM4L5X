@@ -180,11 +180,12 @@ def to_svg(rung: Rung, catalog: Catalog | None = None, number: int | None = None
     width, height = left + body + RAIL, max(cond.h, outs.h) + 10
     right = left + body
     parts = [
-        _line(left, 4, left, height - 4, "lad-rail lad-left"),  # left: the power supply
-        _line(right, 4, right, height - 4, "lad-rail lad-right"),
         _shift(cond.parts, left, 4),
         _line(left + cond.w, WIRE + 4, right - outs.w, WIRE + 4, at=f"{split - 1}:out" if split else "rail"),
         _shift(outs.parts, right - outs.w, 4),
+        # the rails last: drawn on top, so the end of a wire never shows over the supply rail
+        _line(left, 4, left, height - 4, "lad-rail lad-left"),  # left: the power supply
+        _line(right, 4, right, height - 4, "lad-rail lad-right"),
     ]
     if number is not None:
         parts.append(_text(RAIL + 10, WIRE + 8, str(number), "lad-num"))

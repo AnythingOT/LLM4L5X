@@ -85,6 +85,10 @@ def create_app() -> Flask:
     def rules_page():
         return redirect("/lint", code=301)
 
+    @app.get("/help")
+    def help_page():
+        return render_template("help.html", page="help")
+
     @app.get("/energize")
     def energize_page():
         return render_template("energize.html", page="energize")
@@ -151,6 +155,13 @@ def create_app() -> Flask:
             ENERGIZE.update(before)  # the program that was loaded stays loaded
             return jsonify(error=str(e)), 400
         return jsonify(_loaded(ENERGIZE["session"]))
+
+    @app.delete("/api/energize")
+    def energize_unload():
+        """Take the program off the page. Device models and test cases stay: they are kept for the next one."""
+        for k in ("session", "files", "file_names", "names"):
+            ENERGIZE.pop(k, None)
+        return jsonify(loaded=False)
 
     @app.get("/api/energize/state")
     def energize_state():
@@ -356,10 +367,20 @@ def create_app() -> Flask:
         SESSION.detach()
         return jsonify(kind="info", message="File detached. New tags are no longer checked against it.")
 
+    @app.get("/api/project/commented")
+    def commented():
+        if SESSION.raw is None:
+            return jsonify(kind="error", message="No attached file."), 400
+        body, name, added = project.commented_l5x()
+        r = _file(body, name, "application/xml")
+        r.headers["X-Added"] = str(added)
+        return r
+
     @app.get("/api/status")
     def status():
         p = SESSION.project
-        return jsonify(project=SESSION.filename, programs=sorted({r.program for r in p.routines}) if p else [],
+        return jsonify(project=SESSION.filename, target=p.target_type if p else None,
+                       programs=sorted({r.program for r in p.routines}) if p else [],
                        default_program=project.default_program())
 
     # ------------------------------------------------------------ UDT files

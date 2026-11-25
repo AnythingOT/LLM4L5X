@@ -11,6 +11,8 @@ This module has no Flask: the page (and tests) drive it through load, step and r
 
 from __future__ import annotations
 
+import copy
+
 from dataclasses import dataclass, field
 
 from core import simulator as sim
@@ -89,7 +91,13 @@ class Session:
     def snapshot(self) -> dict:
         be = self.backend
         tags = {t: be.read(t) for t in self.inputs + self.outputs + self.feedbacks + self.watched}
-        return {"now_ms": be.now_ms, "tags": tags, "power": list(be.sim.power), "flow": list(be.sim.flow),
+        sim = be.sim
+        if not sim.flow and self.rungs:
+            # nothing scanned yet (just loaded or reset): the ladder shows where the first scan would send power,
+            # worked out on a copy, so the program itself stays at 0 ms, unscanned
+            sim = copy.deepcopy(sim)
+            sim.scan(0)
+        return {"now_ms": be.now_ms, "tags": tags, "power": list(sim.power), "flow": list(sim.flow),
                 "notes": be.plant.notes() if be.plant else []}
 
     def results(self) -> list:

@@ -6,6 +6,7 @@ from core.ascii import format_ascii
 from core.catalog import major_version
 from core.logicspec import format_spec
 from core.validator import validate_project
+from explain.comments import add_rung_comments
 from explain.decompiler import try_decompile
 from core.describe import describe_statement
 from gui.state import SESSION
@@ -51,7 +52,8 @@ def decompile() -> dict:
     for rt in p.routines:
         for x in rt.rungs:
             row = {"where": f"{rt.program} / {rt.name} / Rung {x.number}", "number": x.number, "text": x.text,
-                   "ascii": format_ascii(x.rung) if x.rung is not None else None}
+                   "ascii": format_ascii(x.rung) if x.rung is not None else None,
+                   "comment": (x.comment or "").strip() or None, "key": [rt.program, rt.name, x.number]}
             if x.rung is None:
                 row["why"] = f"parse error: {x.parse_error}"
             else:
@@ -63,7 +65,18 @@ def decompile() -> dict:
                     row["why"] = why
             rows.append(row)
     return {"kind": "decompiled", "rows": rows, "ok": ok, "total": len(rows),
-            "filename": SESSION.filename, "target": p.target_type}
+            "filename": SESSION.filename, "target": p.target_type,
+            "commented": sum(1 for r in rows if r["comment"]),
+            "can_comment": sum(1 for r in rows if not r["comment"] and r.get("english"))}
+
+
+def commented_l5x() -> tuple[bytes, str, int]:
+    """The attached file with the English read written into every rung that has no comment."""
+    explained = {tuple(r["key"]): " ".join(r["english"]) for r in decompile()["rows"]
+                 if r.get("english") and not r["comment"]}
+    body, added = add_rung_comments(SESSION.raw, explained)
+    stem = SESSION.filename.rsplit(".", 1)[0]
+    return body, f"{stem}_commented.L5X", added
 
 
 def validate(s: dict) -> dict:
