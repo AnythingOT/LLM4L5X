@@ -1,10 +1,10 @@
 """Energize: run a whole program with its plant, live, before any controller is involved.
 
-Every routine runs once per scan, in file order, with Sim_Mode = 1. MAP_IN and MAP_OUT are skipped:
-in simulation the plant model owns the mapped inputs and the field outputs stay off. A rung that only
-calls a subroutine (JSR) is skipped too, because every routine already runs each scan. Any other
-instruction the simulator does not know stops the load with a list, rather than being skipped
-quietly: a missing instruction would make the program look like it works when it does not.
+The routines run as on the controller, with Sim_Mode = 1: a subroutine runs when a JSR calls it, every
+routine no JSR calls runs each scan in file order, and Add-On Instructions run their own logic. MAP_IN and
+MAP_OUT are skipped: in simulation the plant model owns the mapped inputs and the field outputs stay off.
+Any instruction the simulator does not know stops the load with a list, rather than being skipped quietly:
+a missing instruction would make the program look like it works when it does not.
 
 This module has no Flask: the page (and tests) drive it through load, step and run_scenarios.
 """
@@ -21,24 +21,30 @@ from l5x.reader import read_l5x
 from testcases import SimBackend, parse_scenarios, report, run_scenarios, trace
 
 SKIPPED_ROUTINES = {"MAP_IN", "MAP_OUT"}
-_CALLS = {"JSR", "SBR", "RET"}
 _SUPPORTED = set(sim._HANDLERS) | set(sim._COMPARE) | set(sim._MATH) | set(sim._V36)
 _STRUCTS = {"TON", "TOF", "RTO", "CTU", "CTD"}
-_FIRST_ARG_WRITES = {"OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "ONS", "CLR"}
+_FIRST_ARG_WRITES = {"OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "ONS", "CLR", "OSR", "OSF"}
 
 
 class EnergizeError(ValueError):
     pass
 
 
-def _writes(i: Instr) -> list[str]:
+def _writes(i: Instr, aois: dict | None = None) -> list[str]:
     n = sim._V36.get(i.name.upper(), i.name.upper())
+    d = (aois or {}).get(n)
+    if d is not None and i.args:  # an AOI call writes its instance, and the tags of its Output and InOut parameters
+        return [i.args[0]] + [op for (_, usage), op in zip(d.params, i.args[1:]) if usage.upper() != "INPUT"]
     if n in _FIRST_ARG_WRITES and i.args:
         return [i.args[0]]
     if n in sim._MATH and len(i.args) > 2:
         return [i.args[2]]
     if n in ("MOV", "COP") and len(i.args) > 1:
         return [i.args[1]]
+    if n == "CPT" and i.args:
+        return [i.args[0]]
+    if n in ("OSR", "OSF") and len(i.args) > 1:
+        return [i.args[0], i.args[1]]
     return []
 
 
@@ -63,11 +69,12 @@ class Session:
     watched: list[str] = field(default_factory=list)  # other tags the page shows live: contacts, coils, presets
     backend: SimBackend | None = None
     presets: dict = field(default_factory=dict)  # {"T.PRE": 5000} from the tags' data: rungs may show "?"
+    program: dict = field(default_factory=dict)  # routine_of, aois, types, skip: how the routines call each other
 
     def _new_backend(self) -> SimBackend:
         from devices import load_plant
         plant = load_plant(self.plant_text) if self.plant_text.strip() else None
-        be = SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms)
+        be = SimBackend(self.rungs, {**self.presets, "Sim_Mode": 1}, plant, self.scan_ms, **self.program)
         be.sim.trace = True  # the page draws where power flows in each rung
         return be
 
@@ -116,13 +123,23 @@ class Session:
 def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str = "", scan_ms: float = 10.0
          ) -> Session:
     from core.rung import format_rung
-    rungs, places, skipped, unsupported = [], [], [], []
+    rungs, places, skipped, unsupported, routine_of = [], [], [], [], []
     presets: dict[str, int] = {}
+    aois: dict[str, sim.AoiDef] = {}
+    types: dict[str, str] = {}
     for data in l5x_files:
         project = read_l5x(data)
         # a timer or counter keeps its preset in the tag: an export (v36 and later) writes TON(T,?,?) in the rung
         presets.update({f"{name}.PRE": pre for name, pre in project.presets().items()})
+        types.update({t.name: t.datatype for t in project.tags.values() if t.datatype})
+        for a in project.aois.values():
+            aois[a.name.upper()] = _aoi_def(a, unsupported)
+        for name in project.protected_aois:
+            if name.upper() not in aois:
+                aois[name.upper()] = None  # its logic cannot be read: a call to it stops the load
         for rt in project.routines:
+            if rt.program.startswith("AOI:"):
+                continue  # an AOI's logic runs inside each call, above
             if rt.name.upper() in SKIPPED_ROUTINES:
                 skipped.append(f"{rt.name}: not run in simulation (Sim_Mode = 1)")
                 continue
@@ -132,36 +149,70 @@ def load(l5x_files: list[str | bytes], plant_text: str = "", scenarios_text: str
                     unsupported.append(f"{rt.name} rung {n}: could not be read")
                     continue
                 names = {i.name.upper() for i in walk(r.body)}
-                if names & _CALLS:
-                    if names - _CALLS <= {"XIC", "XIO"}:
-                        skipped.append(f"{rt.name} rung {n}: subroutine call (every routine runs each scan)")
-                        continue
-                bad = sorted(names - _SUPPORTED)
+                bad = sorted(x for x in names - _SUPPORTED if aois.get(x) is None)
                 if bad:
                     unsupported.append(f"{rt.name} rung {n}: {', '.join(bad)}")
                     continue
                 rungs.append(r)
+                routine_of.append(f"{rt.program}/{rt.name}")
                 places.append(Place(rt.name, n, format_rung(r)))
+    # a JSR must find its routine among the ladder routines loaded (an ST or FBD routine cannot run here)
+    loaded = {k.upper() for k in routine_of}
+    for r, key in zip(rungs, routine_of):
+        prog = key.split("/", 1)[0]
+        for i in walk(r.body):
+            if i.name.upper() == "JSR" and i.args and i.args[0].upper() not in SKIPPED_ROUTINES \
+                    and f"{prog}/{i.args[0]}".upper() not in loaded:
+                unsupported.append(f"JSR to {i.args[0]}: that routine is not a ladder routine in these files")
     if unsupported:
         raise EnergizeError("the simulator cannot run every rung, so it would not behave like the controller: "
                             + "; ".join(unsupported[:10]) + (" ..." if len(unsupported) > 10 else ""))
     if not rungs:
         raise EnergizeError("no ladder rungs to run")
-    written = {base_tag(w) for r in rungs for i in walk(r.body) for w in _writes(i) if not is_literal(w)}
+    live_aois = {k: v for k, v in aois.items() if v is not None}
+    written = {base_tag(w) for r in rungs for i in walk(r.body) for w in _writes(i, live_aois) if not is_literal(w)}
+    written.discard(None)  # a '?' operand names no tag
     # a timer or counter is a structure: its elapsed/count and done bits are what a person watches
     structs = {i.args[0] for r in rungs for i in walk(r.body)
                if sim._V36.get(i.name.upper(), i.name.upper()) in _STRUCTS and i.args}
     read = {base_tag(a) for r in rungs for i in walk(r.body) for a in i.args if not is_literal(a)}
     outputs = sorted(t for t in written if t not in structs) + [f"{t}.{m}" for t in sorted(structs)
                                                                 for m in ("ACC", "DN")]
-    s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms, presets=presets)
-    probe = s._new_backend()  # validates the plant and scenarios before the page shows anything
+    program = {"routine_of": routine_of, "aois": live_aois,
+               "types": types, "skip": SKIPPED_ROUTINES}
+    s = Session(rungs, places, [], outputs, [], skipped, plant_text, scenarios_text, scan_ms, presets=presets,
+                program=program)
+    try:
+        probe = s._new_backend()  # validates the plant and scenarios before the page shows anything
+    except sim.SimError as e:  # the first scan already fails (a divide by zero ...): say so, do not crash
+        raise EnergizeError(f"the first scan stopped: {e}") from None
     if scenarios_text.strip():
         parse_scenarios(scenarios_text)
     s.feedbacks = sorted(probe.plant.feedbacks()) if probe.plant else []
     s.inputs = sorted(read - written - set(s.feedbacks) - {"Sim_Mode"} - {None})
     s.backend = probe
     return s
+
+
+def _aoi_def(a, unsupported: list[str]) -> sim.AoiDef | None:
+    """An AOI from the file as the simulator runs it, or None (with the reason) when it cannot run."""
+    logic = next((rt for rt in a.routines if rt.name.upper() == "LOGIC"), None)
+    if logic is None or logic.protected or not logic.is_ladder:
+        unsupported.append(f"AOI {a.name}: its logic is {'protected' if logic and logic.protected else 'not ladder'}")
+        return None
+    rungs = []
+    for n, info in enumerate(logic.rungs):
+        if info.rung is None:
+            unsupported.append(f"AOI {a.name} rung {n}: could not be read")
+            return None
+        bad = sorted({i.name.upper() for i in walk(info.rung.body)} - _SUPPORTED)
+        if bad:  # an AOI calling another AOI is checked when that one is loaded: list it, do not guess
+            unsupported.append(f"AOI {a.name} rung {n}: {', '.join(bad)}")
+            return None
+        rungs.append(info.rung)
+    defaults = {f"{t.name}.PRE": t.preset for t in a.local_tags if t.preset is not None}
+    return sim.AoiDef(a.name, [(p.name, p.usage or "Input") for p in a.call_operands()], rungs,
+                      {p.name for p in a.params} | {t.name for t in a.local_tags}, defaults)
 
 
 _BIT_INSTR = {"XIC", "XIO", "OTE", "OTL", "OTU", "ONS"}

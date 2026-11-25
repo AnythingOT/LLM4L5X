@@ -10,23 +10,26 @@ Last updated: 25 Nov 2026.
 
 | What | Result | How |
 |---|---|---|
-| Unit and integration tests | 3,183 passed (#61, with the public corpus) | `pytest` in CI, Linux |
+| Unit and integration tests | 3,183 passed on #61, with the public corpus | `pytest` in CI, Linux |
 | Oracle run: every row of the test workbook answered by its expected rung | full marks, `RETRIED 0` | `python -m eval.oracle_run`, in CI |
 | Code checks | clean | `ruff check .` |
-| Windows | not in CI; tried by one user | |
+| Windows | in CI from this change (tests without the corpus, conformance cases on the simulator); the app tried by one user | `windows-latest` |
 
-## Public L5X corpus (858 exports, 6,959 rungs, MIT/Apache repositories)
+## Public L5X corpus
 
-Measured 25 Nov 2026 on `eval/corpus_sources.txt` at its pinned commits.
+<!-- CORPUS:BEGIN (python -m eval.test_status) -->
+Measured 25 Nov 2026 with `python -m eval.test_status` on 858 exports (6,959 rungs), MIT/Apache repositories pinned in `eval/corpus_sources.txt`.
 
 | What | Result |
 |---|---|
 | Files read | 858 of 858 |
 | Rungs read (parsed) | 98.9% |
-| Rungs explained in English | 55% |
-| Ladder routines Energize can run whole | 49% (416 of 849) |
-| Instructions the simulator has | 36 of the 124 in the catalog |
-| Most common instructions it lacks | CONCAT, RTOS, CPT, AOI calls, ALMD, MSG, GSV, FOR, CMP, OSR |
+| Rungs explained in English | 54.7% |
+| Ladder routines Energize can run whole | 74.3% (631 of 849) |
+| Whole exports with ladder that Energize loads (every routine and JSR target must run) | 38.3% (69 of 180) |
+| Catalog instructions the simulator has | 41 of 124, plus JSR and readable AOI logic |
+| Most common instructions it lacks (rungs) | CONCAT (162), RTOS (153), ALMD (27), MSG (26), GSV (25), FOR (18), OP_PERMISSIVE (18), NXT (16), PF525_VFD_E_ENET (16), PID (10) |
+<!-- CORPUS:END -->
 
 ## The model (generation)
 
@@ -50,6 +53,8 @@ Measured 25 Nov 2026 on `eval/corpus_sources.txt` at its pinned commits.
 
 | What | Status |
 |---|---|
-| Instruction-by-instruction comparison with Logix Emulate | **not run yet** |
+| Conformance with Logix Emulate: 12 cases (bits, latches, edges, TON, TOF, RTO, counters, compare, math, CPT, CMP, branches) | **not run yet** (`python -m eval.conformance`, steps in its docstring) |
+| JSR, AOI logic | in the simulator; not in the conformance cases yet (they need a second routine and an AOI definition in the import) |
 
-Until this is run, a passing test or Energize run means "right in our simulator", not "right on the controller".
+Until the conformance run is done, a passing test or Energize run means "right in our simulator", not
+"right on the controller". Each difference it finds is either fixed in the simulator or listed here as a limit.

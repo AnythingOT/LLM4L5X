@@ -257,8 +257,8 @@ def _tags(holder, scope: str, path: str = "Tag") -> list[TagInfo]:
         return out
     for t in holder.findall(path):
         l5k = None
-        for d in t.findall("Data"):
-            if d.get("Format") == "L5K":
+        for d in t.findall("Data") + t.findall("DefaultData"):  # an AOI's local tag keeps its value in DefaultData
+            if d.get("Format") == "L5K" and l5k is None:
                 l5k = _text(d)
         consume = t.find("ConsumeInfo")
         mp = t.find(".//MessageParameters")

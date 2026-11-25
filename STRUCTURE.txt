@@ -25,6 +25,7 @@ core/                      The engine everything else stands on: LogicSpec, the 
   catalog.py               Instruction catalog: loads instructions.yaml and lets L5X content extend it (AOIs).
   compiler.py              Compile LogicSpec into ladder rungs.
   describe.py              Deterministic English read-back of LogicSpec.
+  expression.py            Expressions of CPT and CMP (and FAL-style math): parsed once, evaluated against the simulator's tags.
   instructions.yaml
   logicspec.py             LogicSpec: the small boolean language the LLM writes instead of rung text.
   README.md
@@ -51,6 +52,7 @@ docs/
   TESTCASES.md             Requirement-level tests for the logic, with a plant model, in OpenVnV's step language.
 eval/                      Measuring quality, for developers: the model's scores, the always-correct oracle run, the instruction suite, the public corpus, and this repository's map.
   __init__.py
+  conformance.py           Does our simulator behave like the controller? The same small programs, on both, step by step.
   corpus_sources.txt
   expected_workbook.py     A requirements workbook that is also a test: every row has an Expected rung.
   fetch_corpus.py          Fetch the public L5X exports listed in eval/corpus_sources.txt into a folder, for tests/test_corpus.py.
@@ -62,6 +64,7 @@ eval/                      Measuring quality, for developers: the model's scores
   structure.py             Write STRUCTURE.txt: every folder and file of the repository, each with one line on what it is.
   suite.py                 Instruction-coverage test suite: English requests with expected rungs.
   suite_run.py             Run the instruction suite and write a report.
+  test_status.py           Measure the public L5X corpus and write the numbers into tests/TEST_STATUS.md.
 examples/
   pump_station.spec
   tank_plant.yaml
@@ -151,6 +154,7 @@ testcases/                 Test cases: requirement-level checks run against the 
   __init__.py              Test cases: requirement-level checks run against the logic and its device models, in OpenVnV's step language.
   backend.py               Where a scenario runs.
   dsl.py                   The step language: text in, Scenario objects out.
+  emulate.py               Run test cases on Logix Emulate (or a controller) through pylogix: a backend like SimBackend.
   evidence.py              Evidence of a test run: requirements, traceability, results step by step, and what exactly was tested.
   README.md
   report_pdf.py            The test report as a PDF, made from a run record (testcases/evidence.py) and nothing else.
@@ -169,6 +173,7 @@ tests/                     pytest: one file per area.
   test_autofix.py          Lint auto-fix: what is safe is proven so, what changes behaviour says so, the rest of the file is untouched.
   test_catalog.py
   test_compiler.py
+  test_conformance.py      The conformance run (simulator against Logix Emulate) works end to end, here with a stand-in for Emulate.
   test_corpus.py           Every feature over a folder of real L5X exports.
   test_corpus_sources.py   The list of public exports CI fetches: pinned, permissively licensed, never one of ours.
   test_decompiler.py
@@ -192,6 +197,7 @@ tests/                     pytest: one file per area.
   test_rung_comments.py    Download the attached L5X with the English read as rung comments: only missing comments are added.
   test_rung_compare.py
   test_security.py         Data must not leave this PC by accident: the model address, the page banner, big files.
+  test_sim_programs.py     The simulator runs whole programs: subroutines (JSR), Add-On Instruction logic, CPT and CMP.
   test_simulator.py
   test_spec.py             Requirements workbook -> routines: reading the sheet, and the background build (model stubbed).
   test_start_script.py     start.sh: packages live outside the download, installed once and again only when requirements.txt changes.

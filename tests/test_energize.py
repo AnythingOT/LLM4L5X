@@ -17,11 +17,12 @@ FILES = [routine("MainRoutine", MAIN), routine("MAP_IN", "XIC(Local:1:I.Data.0)O
          routine("Tank", TANK), routine("MAP_OUT", "XIC(P101_Cmd)XIO(Sim_Mode)OTE(Local:2:O.Data.0);")]
 
 
-def test_whole_program_loads_with_mapping_and_calls_skipped():
+def test_whole_program_loads_with_mapping_skipped_and_calls_run():
     s = load(FILES, PLANT)
-    assert len(s.rungs) == 9 and {p.routine for p in s.places} == {"Tank"}
+    # MainRoutine's three JSR rungs are part of the program now: Tank runs because MainRoutine calls it
+    assert len(s.rungs) == 12 and [p.routine for p in s.places][:4] == ["MainRoutine"] * 3 + ["Tank"]
     assert any("MAP_IN: not run in simulation" in x for x in s.skipped)
-    assert sum("subroutine call" in x for x in s.skipped) == 3
+    assert s.program["routine_of"][3] == "MainProgram/Tank" and s.program["skip"] == {"MAP_IN", "MAP_OUT"}
     assert "Start_PB" in s.inputs and "Level_Low" in s.inputs
     assert "P101_Running" not in s.inputs and s.feedbacks == ["P101_Running"]     # the plant owns it
     assert "P101_Cmd" in s.outputs and "Sim_Mode" not in s.inputs
@@ -31,12 +32,12 @@ def test_whole_program_loads_with_mapping_and_calls_skipped():
 def test_energize_runs_logic_and_plant_live():
     s = load(FILES, PLANT)
     snap = s.step(50, {"Start_PB": 1})
-    assert snap["tags"]["Auto_Mode"] == 1 and len(snap["power"]) == 9
+    assert snap["tags"]["Auto_Mode"] == 1 and len(snap["power"]) == 12
     s.step(50, {"Start_PB": 0, "Level_Low": 1})
     assert s.snapshot()["tags"]["P101_Cmd"] == 1 and s.snapshot()["tags"]["P101_Running"] == 0
     snap = s.step(1000)
     assert snap["tags"]["P101_Running"] == 1 and snap["now_ms"] >= 1100
-    assert snap["power"][3] is True                                            # the pump rung is energized
+    assert snap["power"][6] is True                                            # the pump rung (Tank 3) is energized
     assert s.reset()["tags"]["Auto_Mode"] == 0
 
 
@@ -96,11 +97,11 @@ def test_energize_page_and_api(web):
     assert web.get("/energize").status_code == 200
     assert web.post("/api/energize/step", json={}).get_json()["error"] == "load a program first"
     j = _upload(web, FILES).get_json()
-    assert len(j["rungs"]) == 9 and "Start_PB" in j["inputs"] and j["feedbacks"] == ["P101_Running"]
+    assert len(j["rungs"]) == 12 and "Start_PB" in j["inputs"] and j["feedbacks"] == ["P101_Running"]
     assert j["rungs"][3]["routine"] == "Tank" and j["has_scenarios"]
     web.post("/api/energize/step", json={"ms": 50, "writes": {"Start_PB": 1}})
     snap = web.post("/api/energize/step", json={"ms": 1200, "writes": {"Start_PB": 0, "Level_Low": 1}}).get_json()
-    assert snap["tags"]["P101_Running"] == 1 and snap["power"][3] is True
+    assert snap["tags"]["P101_Running"] == 1 and snap["power"][6] is True
     bad = web.post("/api/energize/step", json={"writes": {"P101_Cmd": 1}})
     assert bad.status_code == 400 and "written by the logic" in bad.get_json()["error"]
     out = web.post("/api/tests/run").get_json()
@@ -133,7 +134,7 @@ def test_energize_takes_the_routines_zip_and_reports_bad_files(web):
         z.writestr("Report.txt", "not a routine")
     r = web.post("/api/energize/load", data={"files": [(io.BytesIO(buf.getvalue()), "Routines.zip")],
                                              "plant": PLANT}, content_type="multipart/form-data")
-    assert r.status_code == 200 and len(r.get_json()["rungs"]) == 9
+    assert r.status_code == 200 and len(r.get_json()["rungs"]) == 12
     r = _upload(web, FILES, plant="devices: [")
     assert r.status_code == 400 and "YAML" in r.get_json()["error"]
 
@@ -144,7 +145,7 @@ def test_a_page_opened_again_gets_the_loaded_program_back(web):
     _upload(web, FILES)
     web.post("/api/energize/step", json={"ms": 50, "writes": {"Start_PB": 1}})
     st = web.get("/api/energize/state").get_json()
-    assert st["loaded"] and st["names"] == [f"R{i}.L5X" for i in range(len(FILES))] and len(st["rungs"]) == 9
+    assert st["loaded"] and st["names"] == [f"R{i}.L5X" for i in range(len(FILES))] and len(st["rungs"]) == 12
     assert st["snapshot"]["tags"]["Start_PB"] == 1 and st["devices"] == 1  # the live state, not a fresh one
     assert st["device_text"] == PLANT and st["test_text"] == SCENARIOS
 
@@ -227,3 +228,47 @@ def test_unload_takes_the_program_off_and_keeps_device_models_and_test_cases(web
     st = web.get("/api/energize/state").get_json()
     assert st["loaded"] is False and st["device_text"] == PLANT and st["test_text"] == SCENARIOS
     assert web.post("/api/energize/step", json={}).get_json()["error"] == "load a program first"
+AOI_PROJECT = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<RSLogix5000Content SchemaRevision="1.0" SoftwareRevision="33.00" TargetName="Cell" TargetType="Controller">
+<Controller Use="Target" Name="Cell">
+<AddOnInstructionDefinitions>
+<AddOnInstructionDefinition Name="Start_Delay" Revision="1.0">
+<Parameters>
+<Parameter Name="EnableIn" DataType="BOOL" Usage="Input" Required="false" Visible="false"/>
+<Parameter Name="EnableOut" DataType="BOOL" Usage="Output" Required="false" Visible="false"/>
+<Parameter Name="Start" DataType="BOOL" Usage="Input" Required="true" Visible="true"/>
+<Parameter Name="Run" DataType="BOOL" Usage="Output" Required="true" Visible="true"/>
+</Parameters>
+<LocalTags>
+<LocalTag Name="Tmr" DataType="TIMER"><DefaultData Format="L5K"><![CDATA[[0,500,0]]]></DefaultData></LocalTag>
+</LocalTags>
+<Routines><Routine Name="Logic" Type="RLL"><RLLContent>
+<Rung Number="0" Type="N"><Text><![CDATA[XIC(Start)TON(Tmr,?,?);]]></Text></Rung>
+<Rung Number="1" Type="N"><Text><![CDATA[XIC(Tmr.DN)OTE(Run);]]></Text></Rung>
+</RLLContent></Routine></Routines>
+</AddOnInstructionDefinition>
+</AddOnInstructionDefinitions>
+<Tags>
+<Tag Name="Go" TagType="Base" DataType="BOOL"/><Tag Name="Motor" TagType="Base" DataType="BOOL"/>
+<Tag Name="SD1" TagType="Base" DataType="Start_Delay"/>
+<Tag Name="Speed" TagType="Base" DataType="DINT"/>
+</Tags>
+<Programs><Program Name="MainProgram" MainRoutineName="MainRoutine"><Routines>
+<Routine Name="MainRoutine" Type="RLL"><RLLContent>
+<Rung Number="0" Type="N"><Text><![CDATA[Start_Delay(SD1,Go,Motor);]]></Text></Rung>
+<Rung Number="1" Type="N"><Text><![CDATA[XIC(Motor)CPT(Speed,1500*2/4);]]></Text></Rung>
+</RLLContent></Routine>
+</Routines></Program></Programs>
+</Controller>
+</RSLogix5000Content>
+"""
+
+
+def test_energize_runs_add_on_instruction_logic_and_cpt():
+    s = load([AOI_PROJECT])
+    assert "Go" in s.inputs and "Motor" in s.outputs and "Speed" in s.outputs
+    s.step(100, {"Go": 1})
+    assert s.snapshot()["tags"]["Motor"] == 0  # the AOI's own timer is still timing
+    snap = s.step(500)
+    assert snap["tags"]["Motor"] == 1 and snap["tags"]["Speed"] == 750
+    assert snap["power"] == [True, True]

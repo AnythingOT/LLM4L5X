@@ -227,11 +227,17 @@ the **Tests** page.
 
 The page reads left to right like a rung: **inputs**, the **rungs**, **outputs**.
 
-- Every routine runs once per scan with `Sim_Mode = 1`. MAP_IN and MAP_OUT are not run (the plant
-  gives the feedback, field outputs stay off), and rungs that only call a subroutine are skipped
-  (listed under **Not run in simulation**).
-- An instruction the simulator does not have (PID, MSG ...) stops the load with a list: skipping it
-  would make the program look like it works.
+- The routines run as on the controller, with `Sim_Mode = 1`: a subroutine runs when a `JSR` calls it
+  (its rungs stay dark in a scan that does not call it, and its outputs keep their values), and every
+  routine no JSR calls runs each scan, in file order. MAP_IN and MAP_OUT are not run (the plant gives the
+  feedback, field outputs stay off; listed under **Not run in simulation**).
+- Add-On Instructions run their own ladder logic, per instance: inputs in, logic when the rung is true,
+  outputs out, the rung goes on with EnableOut. A source-protected AOI cannot be run and stops the load.
+- `CPT` and `CMP` expressions, `OSR` and `OSF` are simulated too. An instruction the simulator does not
+  have (PID, MSG, string instructions ...) stops the load with a list: skipping it would make the program
+  look like it works.
+- How far the simulator matches a real controller is measured instruction by instruction against Logix
+  Emulate (`eval/conformance.py`); the results are in `tests/TEST_STATUS.md`.
 - **Inputs:** a bit is a switch; a number is a field (type it, press Enter). The tag's data type decides;
   a tag the files do not declare is a bit if the logic uses it as a contact or coil.
 - **Rungs** are drawn as ladder diagrams, as Logix Designer shows them online, from the simulator's own

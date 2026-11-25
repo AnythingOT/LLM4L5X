@@ -18,3 +18,5 @@ Test cases: requirement-level checks run against the program and its device mode
 - A run record holds fingerprints (SHA-256) of the program, the test cases and the code. The PDF is
   made from the record and nothing else.
 - The report makes no regulatory claim.
+- `backend.py` runs test cases on our simulator; `emulate.py` runs them on Logix Emulate or a controller
+  through pylogix (installed separately), in real time.

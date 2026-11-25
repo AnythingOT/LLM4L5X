@@ -99,3 +99,20 @@ def test_every_rung_draws(path):
         for x in rt.rungs:
             if x.rung is not None:
                 etree.fromstring(to_svg(x.rung, cat, number=x.number).encode())
+
+
+@pytest.mark.parametrize("path", FILES, ids=[f.name for f in FILES])
+def test_energize_loads_or_says_why(path):
+    """Energize on a real export: it runs, or it refuses with a reason. Never a crash, never a silent skip."""
+    from core.simulator import SimError
+    from gui.energize import EnergizeError, load
+    try:
+        s = load([path.read_bytes()])
+    except EnergizeError as e:
+        assert str(e)
+        return
+    try:
+        s.step(100)
+        s.step(1000)
+    except SimError:
+        pass  # a run-time fault (divide by zero ...): the page shows it

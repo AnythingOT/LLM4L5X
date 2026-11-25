@@ -40,10 +40,12 @@ def presets_from_rungs(rungs: list[Rung]) -> dict[str, float]:
 
 
 class SimBackend:
-    def __init__(self, rungs: list[Rung], state: dict | None = None, plant=None, scan_ms: float = 10.0):
+    def __init__(self, rungs: list[Rung], state: dict | None = None, plant=None, scan_ms: float = 10.0,
+                 **program):
+        """program: routine_of, aois, types, skip, as the Simulator takes them (a whole program)."""
         if scan_ms <= 0:
             raise ValueError("scan_ms must be positive")
-        self.sim = Simulator(rungs, {**presets_from_rungs(rungs), **(state or {})})
+        self.sim = Simulator(rungs, {**presets_from_rungs(rungs), **(state or {})}, **program)
         self.plant = plant
         self.scan_ms = scan_ms
         self.now_ms = 0.0
