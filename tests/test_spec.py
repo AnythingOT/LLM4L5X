@@ -11,7 +11,7 @@ from openpyxl import Workbook
 import app as gui
 from gui import jobs, state as gui_state
 from gui.state import SESSION
-from inputs.spec_excel import SpecSheetError, read_requirements, routine_name, sample
+from generate.spec_excel import SpecSheetError, read_requirements, routine_name, sample
 from l5x.reader import read_l5x
 from udt.excel import is_udt_sheet, template
 
@@ -152,7 +152,7 @@ def test_expected_column_scores_rows_by_behaviour(client):
 
 
 def test_test_workbook_has_every_structure_and_an_expected_rung_per_row(tmp_path):
-    from eval.test_workbook import build
+    from eval.expected_workbook import build
     out = tmp_path / "t.xlsx"
     counts = build(out, seed=1, rows=4)
     assert set(counts) == {"Series", "Parallel", "Nested", "Multi_output", "Referenced"}
@@ -166,8 +166,8 @@ def test_test_workbook_gives_each_tag_one_owner(tmp_path):
     # timer with two owners and two presets, so the expected answers could not all hold
     from core.catalog import default_catalog
     from core.rung import parse_rung
-    from eval.rung_compare import Side, _refs
-    from eval.test_workbook import build
+    from core.rung_compare import Side, _refs
+    from eval.expected_workbook import build
     out = tmp_path / "t.xlsx"
     counts = build(out, seed=3, rows=12)
     assert counts["Multi_output"] == 12  # the name pools are big enough to fill every sheet
@@ -218,7 +218,7 @@ def test_sheets_share_one_tag_table(monkeypatch):
                  "B": [["Requirement"], ["Latch Lamp_Out when Fill_Valve turns on."]]})
     from gui.spec import _run
     from gui.state import settings
-    from inputs.spec_excel import read_requirements
+    from generate.spec_excel import read_requirements
     out = _run(jobs.Job("t", 2), read_requirements(data), settings({}), "req.xlsx")
     z = zipfile.ZipFile(io.BytesIO(base64.b64decode(out["zip_b64"])))
     a, b = read_l5x(z.read("A.L5X")), read_l5x(z.read("B.L5X"))
@@ -242,20 +242,20 @@ def test_sheets_known_tags_are_passed_on(monkeypatch):
     data = book({"A": [["Rung text"], ["XIC(Go)OTE(Fill_Valve);"]],
                  "B": [["Rung text"], ["XIC(Fill_Valve)OTE(Lamp);"]]})
     from gui.state import settings
-    from inputs.spec_excel import read_requirements
+    from generate.spec_excel import read_requirements
     spec_mod._run(jobs.Job("t", 2), read_requirements(data), settings({}), "req.xlsx")
     assert "Fill_Valve" in seen[1]
 
 
 @pytest.mark.parametrize("seed", [1, 4, 5, 7])  # seeds whose last suite sheet used to come up short
 def test_test_workbook_fills_every_sheet(tmp_path, seed):
-    from eval.test_workbook import build
+    from eval.expected_workbook import build
     counts = build(tmp_path / "t.xlsx", seed=seed, rows=12)
     assert all(v == 12 for v in counts.values()), counts
 
 
 def test_test_workbook_refuses_a_missing_or_empty_corpus(tmp_path):
-    from eval.test_workbook import build
+    from eval.expected_workbook import build
     with pytest.raises(SystemExit, match="no such folder"):
         build(tmp_path / "t.xlsx", corpus=tmp_path / "nope")
     with pytest.raises(SystemExit, match="no .L5X files"):
@@ -269,7 +269,7 @@ def test_test_workbook_refuses_a_missing_or_empty_corpus(tmp_path):
 ])
 def test_real_world_skips_rungs_no_sentence_would_ask_for(text, why):
     from core.rung import parse_rung
-    from eval.test_workbook import nonsense
+    from eval.expected_workbook import nonsense
     assert why in (nonsense(parse_rung(text)) or "")
 
 
@@ -279,7 +279,7 @@ def test_real_world_skips_rungs_no_sentence_would_ask_for(text, why):
 ])
 def test_real_world_keeps_ordinary_rungs(text):
     from core.rung import parse_rung
-    from eval.test_workbook import nonsense
+    from eval.expected_workbook import nonsense
     assert nonsense(parse_rung(text)) is None
 
 
@@ -289,7 +289,7 @@ def test_real_world_skips_a_rung_that_needs_its_own_project(tmp_path):
     # source project, which used to stop the whole workbook (public corpus, Conveyor_MainProgram.L5X)
     import random
 
-    from eval.test_workbook import real_world_sheet
+    from eval.expected_workbook import real_world_sheet
     rung = ('<Rung Number="9" Type="N"><Text><![CDATA[XIC(PE_Alarm_Delay.DN)XIC(PE_Blue)XIO(PE_Red)'
             'RES(PE_Alarm_Delay);]]></Text></Rung>')
     text = (Path(__file__).parent / "fixtures" / "sample_project.L5X").read_text("utf-8-sig")
@@ -329,7 +329,7 @@ def test_report_shows_how_many_attempts_each_row_took(monkeypatch):
 
 
 def test_req_ids_are_their_own_column_and_parse():
-    from inputs.spec_excel import parse_reqs
+    from generate.spec_excel import parse_reqs
     assert parse_reqs("R1, R3") == (("R1", "R3"), False)
     assert parse_reqs("URS 4.2.1; R1\nR1") == (("URS 4.2.1", "R1"), False)
     assert parse_reqs("INFRA") == ((), True) and parse_reqs("") == ((), False)
@@ -370,7 +370,7 @@ def test_no_req_column_no_requirements_section(client):
 def test_level_2_fills_every_sheet_with_bigger_rungs(tmp_path, seed):
     import openpyxl
 
-    from eval.test_workbook import build
+    from eval.expected_workbook import build
     counts = {lvl: build(tmp_path / f"l{lvl}.xlsx", seed=seed, rows=12, level=lvl) for lvl in (1, 2)}
     assert all(v == 12 for v in counts[2].values()), counts[2]
 
@@ -408,7 +408,7 @@ def test_level_2_names_have_no_near_twin(twin, named):
 
 def test_level_2_oracle_sends_nothing_back(tmp_path):
     from eval.oracle_run import run as oracle
-    from eval.test_workbook import build
+    from eval.expected_workbook import build
     f = tmp_path / "l2.xlsx"
     build(f, seed=17, level=2)
     r = oracle(f.read_bytes())

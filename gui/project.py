@@ -7,7 +7,7 @@ from core.catalog import major_version
 from core.logicspec import format_spec
 from core.validator import validate_project
 from explain.decompiler import try_decompile
-from explain.describe import describe_statement
+from core.describe import describe_statement
 from gui.state import SESSION
 import lint
 

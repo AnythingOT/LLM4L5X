@@ -1,7 +1,7 @@
 """Data must not leave this PC by accident: the model address, the page banner, big files."""
 import pytest
 
-from inputs.llm import LLMError, check_url, is_local_url, make_client
+from generate.llm import LLMError, check_url, is_local_url, make_client
 
 
 @pytest.mark.parametrize("url", ["http://127.0.0.1:11434", "http://localhost:8080", "http://[::1]:1234",

@@ -50,7 +50,7 @@ Ollama works too: set *Thinking* to off in Settings. Details: [docs/GUIDE.md](do
 - Verified: generated routines and rungs import into Studio 5000; UDTs from Excel and routines from a requirements Excel work.
 - Not yet verified: a timer keeps its preset after import; tag values survive a whole-program UDT reorder (test on a copy).
 - Tested on 241 real exports. A requirements Excel with an *Expected rung* column scores the model row by row;
-  `python -m eval.test_workbook` makes one. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
+  `python -m eval.expected_workbook` makes one. See [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
 Planned: documentation written from an attached program; translating comments, descriptions and tag names to English.
 
@@ -63,10 +63,12 @@ controller. Keep safety routines out of scope.
 
 - [docs/HANDOVER.md](docs/HANDOVER.md) and [docs/ROADMAP.md](docs/ROADMAP.md): start here when picking the work up: how the code fits, working rules, results so far, and what is next.
 - [docs/GUIDE.md](docs/GUIDE.md): every feature in detail, rules, LogicSpec, command line.
-- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): repo layout, tests, the instruction test suite.
+- [STRUCTURE.txt](STRUCTURE.txt): every folder and file with one line each; each folder's README.md says what it owns and what it may use.
+- [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md): tests, the instruction test suite.
 - [docs/DESIGN.md](docs/DESIGN.md): how it works inside.
 
 This repo replaces [LLM4UDT](https://github.com/AnythingOT/LLM4UDT) and [L5X_UDTOptimizer](https://github.com/AnythingOT/L5X_UDTOptimizer), and
 includes the [L5X_Lint](https://github.com/AnythingOT/L5X_Lint) rules.
 
-MIT license.
+MIT license. Icons and packages by others: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Studio 5000 and Logix Designer are trademarks of Rockwell Automation; this project is not affiliated with or endorsed by Rockwell Automation.

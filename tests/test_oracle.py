@@ -1,6 +1,6 @@
 """The always-correct stand-in: no check may send a right answer back."""
 from eval.oracle_run import run
-from eval.test_workbook import build
+from eval.expected_workbook import build
 
 
 def test_no_correct_answer_is_sent_back(tmp_path):

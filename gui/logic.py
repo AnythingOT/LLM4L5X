@@ -11,11 +11,11 @@ from core.logicspec import SpecError, format_spec, parse_spec
 from core.rung import RungSyntaxError, format_rung, parse_rung
 from core.validator import errors, validate
 from explain.decompiler import try_decompile
-from explain.describe import describe_statement
+from core.describe import describe_statement
 from explain.ladder import to_svg
 from gui import state
 from gui.state import SESSION
-from inputs.llm import Generator, LLMError
+from generate.llm import Generator, LLMError
 from l5x.writer import write_routine, write_rungs
 
 

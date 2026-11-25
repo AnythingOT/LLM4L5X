@@ -15,6 +15,7 @@
         </span>
         {% block header_middle %}{% endblock %}
         <nav class="header-right">
+            {# icons drawn from or after Feather (MIT): see THIRD_PARTY_NOTICES.md #}
             {% block header_right %}{% endblock %}
             <a class="icon-btn {% if page == 'energize' %}active{% endif %}" href="/energize" title="Energize: run the whole program, flip its inputs, watch the ladder"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2L4 14h7l-1 8 9-12h-7z"/></svg><span class="label">Energize</span></a>
             <a class="icon-btn {% if page == 'tests' %}active{% endif %}" href="/tests" title="Tests: test cases run against the program, pass or fail per requirement"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6"/><path d="M10 3v6l-5 9a2 2 0 0 0 1.7 3h10.6a2 2 0 0 0 1.7-3l-5-9V3"/><path d="M7.5 15h9"/></svg><span class="label">Tests</span></a>

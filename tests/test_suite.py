@@ -3,7 +3,7 @@ import random
 import openpyxl
 
 from eval.mutation import mutate
-from eval.rung_compare import Side, compare
+from core.rung_compare import Side, compare
 from eval.suite import INSTRUCTIONS, STRUCTURES, generate
 from eval.suite_run import model_run, self_test, summary, write_excel
 from core.compiler import Compiler

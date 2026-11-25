@@ -18,20 +18,20 @@ The design has **two steps**, kept apart on purpose:
 
 | package | owns |
 |---|---|
-| `inputs/llm/` | model clients (local only unless allowed), prompt, tag-name helpers, **output checks** that send an answer back, the retry loop |
-| `inputs/spec_excel.py` | requirements workbook: one sheet = one routine, Req ID column, Expected rung column |
-| `inputs/iolist.py` | I/O list reader, device detection, proposed plant file, **MAP_IN / MAP_OUT** with Sim_Mode |
-| `core/` | LogicSpec, compiler, validator, rung parser, **scan simulator** (time-based, records rung power) |
+| `generate/llm/` | model clients (local only unless allowed), prompt, tag-name helpers, **output checks** that send an answer back, the retry loop |
+| `generate/spec_excel.py` | requirements workbook: one sheet = one routine, Req ID column, Expected rung column |
+| `generate/iolist.py` | I/O list reader, device detection, proposed plant file, **MAP_IN / MAP_OUT** with Sim_Mode |
+| `core/` | LogicSpec, compiler, plain-English read-back, validator, rung parser, **scan simulator** (time-based, records rung power), rung_compare (behaviour oracle), UDT layout |
 | `l5x/` | L5X reader (size cap, no entities) and writer |
 | `lint/` | 50 rules (CRT/ERR/WAR/INF) plus the company **profile** (STD001-STD004) |
-| `plant/` | **device models** (UI name; was "plant"): motor/pump and 2-position valve, fault injection through `PLANT:` tags |
-| `scenario/` | **test cases** (UI name; the file format still says `SCENARIO`): OpenVnV step language (SET/EXPECT/WAIT/RESET/COMMENT/CALL), runner, traceability |
+| `devices/` | **device models** (the Devices page; the YAML still says `PLANT:`): motor/pump and 2-position valve, fault injection through `PLANT:` tags |
+| `testcases/` | **test cases** (the Tests page; the file format still says `SCENARIO`): OpenVnV step language (SET/EXPECT/WAIT/RESET/COMMENT/CALL), runner, traceability |
 | `library/` | blocks (Motor, Valve2Pos, AlarmLatch): rungs + tags + plant + scenarios from one file |
 | `gui/` | Flask app on 127.0.0.1: chat, requirements jobs, **Lint** (was Rules), Settings, **Energize** (run the program live), **Tests** (test cases), **Devices** (device models) |
-| `eval/` | test workbook generator, **oracle_run** (always-correct stand-in), suites, mutation |
-| `explain/` | ladder SVG, decompiler (rung → LogicSpec), plain-English read-back |
+| `eval/` | expected-rung workbook, **oracle_run** (always-correct stand-in), suites, mutation, `structure.py` (makes STRUCTURE.txt) |
+| `explain/` | ladder SVG, decompiler (rung → LogicSpec) |
 
-Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, PLANT, SCENARIOS, LIBRARY, PROFILE.
+Each folder has a README.md; [STRUCTURE.txt](../STRUCTURE.txt) lists every file. Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, DEVICES, TESTCASES, LIBRARY, PROFILE.
 
 ## Working rules with the owner
 
@@ -63,7 +63,7 @@ Docs per area: GUIDE (users), DEVELOPMENT, DESIGN, IOLIST, PLANT, SCENARIOS, LIB
 
 ## How results are measured
 
-- **Test workbooks** (`python -m eval.test_workbook OUT.xlsx --seed N --corpus FOLDER`): sheets of
+- **Test workbooks** (`python -m eval.expected_workbook OUT.xlsx --seed N --corpus FOLDER`): sheets of
   generated requests with expected rungs; the report scores behaviour in the simulator, not text.
   Tune on one seed, keep another as **holdout**, run it once; a holdout used for diagnosis is spent.
 - **Oracle run** (`python -m eval.oracle_run WORKBOOK`): every answer correct by construction;

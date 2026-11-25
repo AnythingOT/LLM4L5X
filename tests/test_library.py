@@ -3,8 +3,8 @@ import yaml
 
 import lint
 from library import LibraryError, load_block, load_library
-from plant import load_plant
-from scenario import SimBackend, parse_scenarios, report, run_scenarios
+from devices import load_plant
+from testcases import SimBackend, parse_scenarios, report, run_scenarios
 
 LIB = load_library()
 EXAMPLES = {"Motor": {"name": "P101"}, "Valve2Pos": {"name": "XV101"},

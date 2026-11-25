@@ -9,8 +9,8 @@ import zipfile
 
 from gui import state
 from gui.state import SESSION
-from inputs.llm import LLMError
-from inputs.udt_llm import generate
+from generate.llm import LLMError
+from generate.udt_llm import generate
 from udt.model import UdtError, check, dependency_order, parse_spec
 from udt.optimize import file_name, full_program, single_file, zip_files
 from udt.writer import ordered, sizes, write_udt

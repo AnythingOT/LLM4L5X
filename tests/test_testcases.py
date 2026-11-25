@@ -1,8 +1,8 @@
 import pytest
 
 from core.rung import parse_rung
-from plant import load_plant
-from scenario import ScenarioError, SimBackend, parse_scenarios, report, run_scenario, run_scenarios, trace
+from devices import load_plant
+from testcases import ScenarioError, SimBackend, parse_scenarios, report, run_scenario, run_scenarios, trace
 
 # the tank example: R1 fill between switches, R2 stop button, R3 fail to start, R4 high-high
 TANK = """\

@@ -1,6 +1,6 @@
 from core.compiler import compile_spec
 from core.rung import parse_rung
-from eval.rung_compare import Side, compare
+from core.rung_compare import Side, compare
 
 
 def side(*texts, presets=None):

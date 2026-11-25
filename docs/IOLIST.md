@@ -1,6 +1,6 @@
 # I/O list
 
-`inputs/iolist.py` reads an Excel I/O list. Headers are matched loosely and may sit below title rows:
+`generate/iolist.py` reads an Excel I/O list. Headers are matched loosely and may sit below title rows:
 
 | column | also accepted |
 |---|---|
@@ -18,7 +18,7 @@ Addresses are used as written, never invented: the right form depends on the mod
 
 **Devices**: signals grouped by device are recognised conservatively. A pump has one command output,
 with optional running and overload inputs. A valve has an open output (plus optional close) and limit
-switches (ZSO / ZSC). `plant_yaml()` proposes a plant file (see PLANT.md) for those. Anything else is
+switches (ZSO / ZSC). `plant_yaml()` proposes a plant file (see DEVICES.md) for those. Anything else is
 listed as not recognised rather than guessed.
 
 ## Mapping routines

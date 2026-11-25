@@ -1,4 +1,4 @@
-"""The test report as a PDF, made from a run record (scenario/evidence.py) and nothing else.
+"""The test report as a PDF, made from a run record (testcases/evidence.py) and nothing else.
 
 The PDF is marked "no changes" for PDF readers (they honour it; an editing tool need not). What makes the
 report trustworthy is that every page prints the record's SHA-256: the report can be checked against the
@@ -19,7 +19,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from scenario.evidence import fingerprint
+from testcases.evidence import fingerprint
 
 INK = colors.HexColor("#16233a")
 MUTED = colors.HexColor("#6b7a90")

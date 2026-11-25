@@ -1,8 +1,8 @@
 import pytest
 
 from eval.suite import generate
-from inputs.gbnf import build_gbnf
-from inputs.llm import request_identifiers
+from generate.gbnf import build_gbnf
+from generate.llm import request_identifiers
 from helpers import Grammar
 
 TAGS = {"A": "BOOL", "B": "BOOL", "C": "BOOL", "OUT": "BOOL", "N1": "DINT", "N2": "REAL",

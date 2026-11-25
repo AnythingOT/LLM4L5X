@@ -2,7 +2,7 @@
 
 Successor to the earlier ILinSeries generator, with four fixes:
   * single, series, PARALLEL, nested and multi-output rungs (not series only)
-  * scored by behaviour (eval/rung_compare.py), not string EXACT
+  * scored by behaviour (core/rung_compare.py), not string EXACT
   * realistic tag names and whole requirements, not "check if var12 = var7"
   * Studio 5000 export format: TON(T,?,?) with preset in tag data, ONS with
     its own storage bit, v35 or v36 mnemonics

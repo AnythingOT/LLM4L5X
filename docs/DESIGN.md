@@ -96,7 +96,7 @@ Build in this order. Each layer has a test that does not need a model.
 
 Layout (agreed 2026-11-17): run from the repo root, no installable package.
 `core/` (catalog, rung, logicspec, compiler, validator, simulator), `l5x/` (reader, writer, xref),
-`explain/` (decompiler, describe), `inputs/` (front ends that produce LogicSpec: gbnf now;
+`explain/` (decompiler, describe), `generate/` (front ends that produce LogicSpec: gbnf now;
 excel_ce, llm later), `gui/` + `app.py` (Flask GUI), `cli.py`, `tests/`, `examples/`, `docs/`.
 Hand-written recursive-descent parsers; property tests use plain `random`.
 
@@ -172,9 +172,9 @@ JSR, instructions with no LogicSpec form) are marked non-convertible and skipped
 
 ## 7. LLM layer
 
-**Status (2026-11-18): built, not yet run against a real model.** `inputs/llm.py` talks to
+**Status (2026-11-18): built, not yet run against a real model.** `generate/llm.py` talks to
 Ollama's `/api/chat` (temperature 0, optional `think: false`) with a short system prompt, the
-most similar examples from `inputs/examples.yaml`, and, when a project is attached, its
+most similar examples from `generate/examples.yaml`, and, when a project is attached, its
 most relevant tags by name and description. The reply is stripped of thinking, code fences and
 prose; then it is parsed, compiled and validated. Errors go back to the model (2 retries). New
 tags close to existing ones are flagged. No grammar-constrained decoding yet (Ollama cannot
@@ -380,7 +380,7 @@ AST, keeping its codes (CRT/ERR/WAR/INF; the prefix fixes the severity). Differe
   one-shot) send the model back for another attempt, the others are shown.
 - Not ported: the Excel/PDF report exports, the lifecycle import page, configurable naming
   prefixes (SFTY_/STD_ are fixed in checks_tags.py).
-- WAR010/WAR011/WAR020 use `udt/layout.py`, the same layout code as the UDT optimizer.
+- WAR010/WAR011/WAR020 use `core/udt_layout.py`, the same layout code as the UDT optimizer.
 
 `tests/test_lint.py` runs every rule on `tests/fixtures/lint_project.L5X`, which breaks each rule
 at a known place next to a compliant twin.
@@ -389,7 +389,7 @@ at a known place next to a compliant twin.
 
 Four flows; only the first uses the model.
 
-1. **English → UDT** (`inputs/udt_llm.py`). The model writes the UDT text form
+1. **English → UDT** (`generate/udt_llm.py`). The model writes the UDT text form
    (`UDT Name "desc";` + `Member TYPE[n] "desc";`), constrained by a GBNF grammar that lists the
    allowed types plus the attached project's UDTs. `udt.model.check` judges it; a failure goes back
    to the model with the problem (2 retries). The model never chooses the member order.
@@ -397,7 +397,7 @@ Four flows; only the first uses the model.
    continues the UDT above. Same checks.
 3. **One UDT export → optimized export** and 4. **program → reordered UDTs** (`udt/optimize.py`).
 
-Layout (`udt/layout.py`): BOOL members pack into hidden SINT hosts named `ZZZZZZZZZZ` + the first
+Layout (`core/udt_layout.py`): BOOL members pack into hidden SINT hosts named `ZZZZZZZZZZ` + the first
 10 characters of the UDT name + the host's member index; BOOL[n] is stored as DINTs (n a multiple
 of 32); each member aligns to its type; the total pads to the largest alignment (minimum 4). The
 best order sorts by (alignment, group, type, natural name). Sizes are computed, not read from

@@ -8,9 +8,9 @@ from openpyxl import Workbook
 from core.compiler import TagDef
 from core.rung import Rung, parse_rung
 from l5x.writer import write_routine
-from scenario import parse_scenarios, run_scenarios
-from scenario.backend import SimBackend
-from scenario.evidence import (RunStore, code_fingerprint, fingerprint, requirements_from_workbook,
+from testcases import parse_scenarios, run_scenarios
+from testcases.backend import SimBackend
+from testcases.evidence import (RunStore, code_fingerprint, fingerprint, requirements_from_workbook,
                                rungs_by_requirement, run_record)
 
 ROWS = [  # Req ID, requirement, rung
@@ -140,7 +140,7 @@ def test_a_run_is_written_once_and_never_replaced(tmp_path):
 
 
 def test_the_pdf_report_is_made_from_the_record_and_marked_no_changes():
-    from scenario.report_pdf import build_pdf
+    from testcases.report_pdf import build_pdf
     pdf = build_pdf(record())
     assert pdf.startswith(b"%PDF") and b"/Encrypt" in pdf  # permissions: print and copy yes, modify no
     assert len(pdf) > 3000

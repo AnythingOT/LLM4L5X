@@ -1,7 +1,7 @@
 import pytest
 
-from plant import Motor, PlantError, Valve, load_plant
-from plant.plant import Plant
+from devices import Motor, PlantError, Valve, load_plant
+from devices.plant import Plant
 
 PUMP = "devices:\n  - {name: P101, type: pump, cmd: Cmd, running: Run, overload: OL, start_ms: 1000, stop_ms: 400}\n"
 

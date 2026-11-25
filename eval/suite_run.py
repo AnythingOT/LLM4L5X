@@ -25,7 +25,7 @@ from core.compiler import CompileError, Compiler
 from core.logicspec import SpecError, parse_spec
 from core.rung import format_rung, parse_rung
 from core.validator import errors, validate
-from eval.rung_compare import Side, compare
+from core.rung_compare import Side, compare
 from eval.suite import Case
 
 
@@ -92,7 +92,7 @@ def self_test(cases: list[Case], version: int, progress=None) -> list[Outcome]:
 
 
 def model_run(cases: list[Case], client, version: int, progress=None) -> list[Outcome]:
-    from inputs.llm import Generator
+    from generate.llm import Generator
     gen = Generator(client)
     out = []
     for n, c in enumerate(cases, 1):

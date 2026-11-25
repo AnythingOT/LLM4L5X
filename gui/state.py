@@ -10,7 +10,7 @@ from urllib.parse import urlsplit
 from dataclasses import dataclass, field
 
 import lint
-from inputs.llm import BACKENDS, is_local_url, make_client
+from generate.llm import BACKENDS, is_local_url, make_client
 from l5x.reader import Project
 from l5x.xref import cross_reference
 

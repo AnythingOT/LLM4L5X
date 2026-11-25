@@ -17,7 +17,7 @@ from core.logicspec import (
     ResetAcc, ResetBit, Rise, SetBit, SpecError, StartTimer, Statement, Var, format_statement,
     parse_spec,
 )
-from explain.describe import describe_statement
+from core.describe import describe_statement
 
 CMP_INSTR = {"=": "EQU", "<>": "NEQ", ">": "GRT", "<": "LES", ">=": "GEQ", "<=": "LEQ"}
 MATH_INSTR = {"+": "ADD", "-": "SUB", "*": "MUL", "/": "DIV"}

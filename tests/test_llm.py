@@ -4,7 +4,7 @@ import json
 import pytest
 
 from core.compiler import compile_spec
-from inputs.llm import (Generator, LLMError, OllamaClient, extract_spec, load_examples, pick_examples,
+from generate.llm import (Generator, LLMError, OllamaClient, extract_spec, load_examples, pick_examples,
                         pick_tags)
 
 
@@ -157,7 +157,7 @@ class Resp:
 
 def test_llamacpp_client_sends_grammar_and_lists_models(monkeypatch):
     import urllib.request
-    from inputs.llm import make_client
+    from generate.llm import make_client
     seen = []
 
     def fake(req, timeout=None):
@@ -179,7 +179,7 @@ def test_llamacpp_client_sends_grammar_and_lists_models(monkeypatch):
 
 def test_no_think_asks_the_template_to_skip_thinking(monkeypatch):
     import urllib.request
-    from inputs.llm import make_client
+    from generate.llm import make_client
     seen = []
 
     def fake(req, timeout=None):
@@ -196,7 +196,7 @@ def test_no_think_asks_the_template_to_skip_thinking(monkeypatch):
 
 def test_openai_compatible_client_has_no_grammar(monkeypatch):
     import urllib.request
-    from inputs.llm import make_client
+    from generate.llm import make_client
     bodies = []
     monkeypatch.setattr(urllib.request, "urlopen",
                         lambda req, timeout=None: bodies.append(json.loads(req.data)) or
@@ -208,7 +208,7 @@ def test_openai_compatible_client_has_no_grammar(monkeypatch):
 
 
 def test_grammar_rejected_falls_back(monkeypatch):
-    from inputs.llm import OpenAICompatClient
+    from generate.llm import OpenAICompatClient
 
     class Picky(OpenAICompatClient):
         def chat(self, messages, grammar=None):
@@ -227,14 +227,14 @@ def test_ollama_lists_models(monkeypatch):
 
 
 def test_extract_spec_joins_statements_split_over_lines():
-    from inputs.llm import extract_spec
+    from generate.llm import extract_spec
     reply = ("Here you go:\nIF (A <= B) OR C THEN\n  P := S * T;\nIf you need more, ask.\n"
              "Lamp := Door;")
     assert extract_spec(reply) == "IF (A <= B) OR C THEN P := S * T;\nLamp := Door;"
 
 
 def test_ollama_gets_the_context_window(monkeypatch):
-    import inputs.llm as llm
+    import generate.llm as llm
     seen = {}
     monkeypatch.setattr(llm.clients, "_post_json", lambda url, body, timeout: seen.update(body) or {"message": {"content": "A := B;"}})
     llm.make_client("ollama", context=32768).chat([{"role": "user", "content": "x"}])
@@ -242,7 +242,7 @@ def test_ollama_gets_the_context_window(monkeypatch):
 
 
 def test_guard_accepts_plain_names_written_in_the_request():
-    from inputs.llm import Generator
+    from generate.llm import Generator
 
     class Fake:
         supports_grammar = False
@@ -257,7 +257,7 @@ def test_guard_accepts_plain_names_written_in_the_request():
 
 
 def test_grammar_lets_the_model_write_plain_names_from_the_request():
-    from inputs.llm import Generator, plain_names
+    from generate.llm import Generator, plain_names
     assert plain_names("D is on while A is on and B is off.") == {"A", "B", "D"}
     assert plain_names("Turn on A_Lamp when a part arrives. Unlatch Beacon.") == {"Beacon"}
 
@@ -412,14 +412,14 @@ def test_a_write_that_changes_nothing_is_sent_back():
 @pytest.mark.parametrize("stmt", ["X := X;", "X := X - 0;", "X := X * 1;", "X := X / 1;", "X := 1 * X;"])
 def test_every_identity_write_is_a_no_op(stmt):
     from core.logicspec import parse_spec
-    from inputs.llm.checks import output_problems
+    from generate.llm.checks import output_problems
     assert any("changes nothing" in p for p in output_problems(parse_spec(stmt), "Use X.", {"X"}))
 
 
 @pytest.mark.parametrize("stmt", ["X := X + 1;", "X := X * 2;", "X := Y + 0;", "IF Y THEN X := 0;", "X := Y;"])
 def test_a_write_that_changes_something_passes(stmt):
     from core.logicspec import parse_spec
-    from inputs.llm.checks import output_problems
+    from generate.llm.checks import output_problems
     assert not any("changes nothing" in p for p in output_problems(parse_spec(stmt), "Use X and Y.", {"X", "Y"}))
 
 

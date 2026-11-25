@@ -1,4 +1,4 @@
-"""Scenario tests: requirement-level checks run against logic + plant, in OpenVnV's step language.
+"""Test cases: requirement-level checks run against the logic and its device models, in OpenVnV's step language.
 
     SCENARIO TC-07 "P-101 fails to start" REQ R3
     SETUP:

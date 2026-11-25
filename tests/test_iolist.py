@@ -3,8 +3,8 @@ import io
 import pytest
 from openpyxl import Workbook
 
-from inputs.iolist import IOListError, plant_yaml, read_iolist
-from plant import load_plant
+from generate.iolist import IOListError, plant_yaml, read_iolist
+from devices import load_plant
 
 
 def xlsx(rows, title="IO"):
@@ -101,7 +101,7 @@ def test_not_an_io_list():
 
 def test_mapping_routines_follow_the_sim_mode_pattern():
     from core.rung import format_rung
-    from inputs.iolist import mapping
+    from generate.iolist import mapping
     m = mapping(read_iolist(xlsx(GOOD + [["FCV1_Out", "Valve out", "Local:4:O.Ch0Data", "AO", 0, 100, "%"],
                                          ["Spare_9", "Spare", "", "DI"]])))
     ins = [format_rung(r) for r in m.map_in]
@@ -119,7 +119,7 @@ def test_mapping_routines_follow_the_sim_mode_pattern():
 
 def test_outputs_are_forced_off_in_sim_mode():
     from core.simulator import Simulator
-    from inputs.iolist import mapping
+    from generate.iolist import mapping
     m = mapping(read_iolist(xlsx(GOOD)))
     sim = Simulator(m.map_out, {"P101_Cmd": 1})
     sim.scan()
@@ -130,7 +130,7 @@ def test_outputs_are_forced_off_in_sim_mode():
 
 
 def test_mapping_refuses_a_list_with_errors_and_writes_importable_l5x():
-    from inputs.iolist import mapping, mapping_l5x
+    from generate.iolist import mapping, mapping_l5x
     from l5x.reader import read_l5x
     with pytest.raises(IOListError, match="fix the I/O list first"):
         mapping(read_iolist(xlsx(GOOD + [["P101_Cmd", "dup", "Local:2:O.Data.9", "DO"]])))
