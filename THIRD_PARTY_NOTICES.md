@@ -1,7 +1,8 @@
 # Third-party notices
 
-LLM4L5X is MIT-licensed (see `LICENSE`). It uses the following work by others. Every licence below is
-permissive and allows use, change and redistribution, including commercially, with the notice kept.
+LLM4L5X is licensed under the GNU GPL v3.0 only (see `LICENSE`). It uses the following work by others.
+Every licence below is permissive, compatible with the GPL-3.0, and allows use, change and redistribution
+with the notice kept.
 
 ## Icons
 

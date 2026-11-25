@@ -1,0 +1,7 @@
+cff-version: 1.2.0
+message: "If you use LLM4L5X, please cite it as below."
+title: "LLM4L5X"
+authors:
+  - name: "AJ (AnythingOT)"
+repository-code: "https://github.com/AnythingOT/LLM4L5X"
+license: GPL-3.0-only
