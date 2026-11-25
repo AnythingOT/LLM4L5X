@@ -1,23 +1,45 @@
 {% extends "base.html" %}
 {% block title %}Chat{% endblock %}
-{% block header_middle %}
-<span id="projectBadge" class="project-badge" hidden>
-    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg><span id="projectName"></span>
-    <button id="detachButton" title="Detach project">&times;</button>
-</span>
-{% endblock %}
-{% block header_right %}
-<a id="modelBadge" class="model-badge" href="/settings" title="Model connection - click to change">
-    <span id="modelDot" class="dot"></span><span id="modelBadgeText">model</span>
-</a>
-<button id="clearButton" class="icon-btn" title="Clear the chat (or type cls). The attached file stays." aria-label="Clear the chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg><span class="label">Clear</span></button>
-{% endblock %}
+{% block bodyclass %}ide-page{% endblock %}
 
 {% block body %}
-<main id="container">
-    <div id="chatWindow"></div>
-
-    <div id="inputWrapper">
+<div class="ide" id="ide">
+    <aside class="explorer" id="explorer" aria-label="Explorer">
+        <div class="pane-head">
+            <span class="pane-title">Explorer</span>
+            <span id="projectBadge" class="pane-file" hidden><span id="projectName"></span>
+                <button id="detachButton" class="pane-btn" title="Detach the file" aria-label="Detach the file">&times;</button></span>
+            <button id="explorerAttach" class="pane-btn" title="Attach an L5X" aria-label="Attach an L5X"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+        </div>
+        <div id="tree" class="tree" role="tree"></div>
+    </aside>
+    <div class="gutter gutter-v" data-resize="explorer" role="separator" aria-orientation="vertical" aria-label="Resize the explorer"></div>
+    <section class="center" aria-label="Editor">
+        <div class="editor">
+            <div class="tabs" id="tabs" role="tablist"></div>
+            <div class="tab-body" id="tabBody"></div>
+        </div>
+        <div class="gutter gutter-h" data-resize="panel" role="separator" aria-orientation="horizontal" aria-label="Resize the panel"></div>
+        <div class="panel" id="panel">
+            <div class="panel-head" role="tablist">
+                <button class="ptab active" data-panel="problems" role="tab">Problems <span id="problemCount" class="count"></span></button>
+                <button class="ptab" data-panel="output" role="tab">Output</button>
+                <button class="ptab" data-panel="tests" role="tab">Test results</button>
+                <button id="panelToggle" class="pane-btn panel-toggle" title="Hide or show the panel" aria-label="Hide or show the panel"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></button>
+            </div>
+            <div class="panel-body" id="panel-problems"><div class="panel-empty">No problems in the last result.</div></div>
+            <div class="panel-body" id="panel-output" hidden></div>
+            <div class="panel-body" id="panel-tests" hidden><div class="panel-empty">No test run yet: run the test cases on the <a href="/tests">Tests</a> view.</div></div>
+        </div>
+    </section>
+    <div class="gutter gutter-v" data-resize="chat" role="separator" aria-orientation="vertical" aria-label="Resize the chat"></div>
+    <aside class="chat-pane" id="container" aria-label="Chat">
+        <div class="pane-head">
+            <span class="pane-title">Chat</span>
+            <button id="clearButton" class="pane-btn" title="Clear the chat (or type cls). The attached file and the open tabs stay." aria-label="Clear the chat"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16"/><path d="M9 7V4h6v3"/><path d="M6 7l1 13h10l1-13"/></svg></button>
+        </div>
+        <div id="chatWindow"></div>
+        <div id="inputWrapper">
         <div class="chips" id="chips" hidden>
             <span class="chips-label">Examples:</span>
             <button class="chip logic-only" data-text="Start the pump with the start button and keep it running until the stop button is pressed or the pump faults.">pump start/stop</button>
@@ -38,19 +60,22 @@
             <button class="chip rungs-only" data-send="validate">validate</button>
             <button class="chip" data-send="optimize">optimize UDTs</button>
         </div>
-        <div class="input-with-buttons">
-            <button id="attachButton" class="tool-btn" title="Attach an .L5X export, or an Excel sheet of UDTs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg><span class="label">Attach</span></button>
-            <div id="modeToggle" class="mode-toggle" role="group" aria-label="What to create">
-                <button data-mode="logic" title="Describe logic, or paste rungs">Logic</button>
-                <button data-mode="udt" title="Describe a UDT (data type)">UDT</button>
+            <div class="input-with-buttons">
+                <textarea id="inputBox" rows="2" aria-label="Message"></textarea>
+                <div class="input-tools">
+                    <button id="attachButton" class="tool-btn" title="Attach an .L5X export, or an Excel sheet"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 11.5l-8.6 8.6a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9"/></svg></button>
+                    <div id="modeToggle" class="mode-toggle" role="group" aria-label="What to create">
+                        <button data-mode="logic" title="Describe logic, or paste rungs">Logic</button>
+                        <button data-mode="udt" title="Describe a UDT (data type)">UDT</button>
+                    </div>
+                    <button id="examplesButton" class="tool-btn" title="Examples and commands" aria-expanded="false" aria-label="Examples and commands"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg></button>
+                    <button id="enterButton" class="tool-btn" title="Send (Enter)" disabled>Send</button>
+                </div>
             </div>
-            <textarea id="inputBox" rows="1" aria-label="Message"></textarea>
-            <button id="examplesButton" class="tool-btn" title="Examples and commands" aria-expanded="false" aria-label="Examples and commands"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h10M4 18h7"/></svg></button>
-            <button id="enterButton" class="tool-btn" title="Send (Enter)" disabled>Send</button>
+            <input type="file" id="fileInput" accept=".l5x,.L5X,.xlsx,.xlsm" hidden />
         </div>
-        <input type="file" id="fileInput" accept=".l5x,.L5X,.xlsx,.xlsm" hidden />
-    </div>
-</main>
-
+    </aside>
+</div>
 {% endblock %}
-{% block scripts %}<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}
+{% block scripts %}<script src="{{ url_for('static', filename='ide.js') }}"></script>
+<script src="{{ url_for('static', filename='app.js') }}"></script>{% endblock %}

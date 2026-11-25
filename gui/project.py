@@ -93,3 +93,84 @@ def xref(tag: str) -> dict:
     return {"kind": "xref", "tag": tag, "refs": [
         {"where": f"{r.program} / {r.routine} / Rung {r.rung}", "instruction": r.instruction,
          "operand": r.operand, "role": r.role} for r in SESSION.xref().get(tag, [])]}
+
+
+# ------------------------------------------------------------------ the explorer
+
+def tree() -> dict:
+    """The attached file as the explorer shows it: controller, tasks with their programs, programs with
+    their routines, tags, UDTs, AOIs and the I/O tree. Names only: an item is read when it is opened."""
+    p = SESSION.project
+    if p is None:
+        return {"attached": False}
+    by_program: dict[str, list[dict]] = {}
+    for rt in p.routines:
+        if rt.program.startswith("AOI:"):
+            continue
+        by_program.setdefault(rt.program, []).append({"name": rt.name, "type": rt.type, "rungs": len(rt.rungs),
+                                                      "protected": rt.protected})
+    programs = [{"name": pr.name, "main": pr.main_routine, "safety": pr.program_class == "Safety",
+                 "routines": by_program.pop(pr.name, [])} for pr in p.programs]
+    programs += [{"name": name, "main": None, "safety": False, "routines": rts} for name, rts in by_program.items()]
+    scoped: dict[str, int] = {}
+    for key in p.tags:
+        scope = key.split("/", 1)[0] if "/" in key else ""
+        scoped[scope] = scoped.get(scope, 0) + 1
+    return {
+        "attached": True, "filename": SESSION.filename, "controller": p.controller, "processor": p.processor,
+        "revision": p.software_revision, "target": p.target_type,
+        "tasks": [{"name": t.name, "type": t.type, "period": t.period, "programs": t.programs} for t in p.tasks],
+        "programs": programs,
+        "tags": {"controller": scoped.get("", 0), "programs": {k: v for k, v in scoped.items() if k}},
+        "udts": sorted(n for n, d in p.datatypes.items() if d.is_user),
+        "aois": sorted(set(p.aois) | set(p.protected_aois)),
+        "modules": [{"name": m.name, "catalog": m.catalog, "parent": m.parent, "slot": m.slot} for m in p.modules],
+    }
+
+
+def routine(program: str, name: str) -> dict:
+    """One routine as the editor shows it: each rung's comment, its English read, its text."""
+    rows = [r for r in decompile()["rows"] if r["key"][0] == program and r["key"][1] == name]
+    if not rows and not any(rt.program == program and rt.name == name for rt in SESSION.project.routines):
+        raise KeyError(f"{program} / {name} is not in the attached file")
+    return {"kind": "routine", "program": program, "name": name, "rows": rows}
+
+
+def item(kind: str, name: str) -> dict:
+    """A UDT, an AOI, a module or a tag list, for an editor tab."""
+    p = SESSION.project
+    if kind == "udt":
+        d = p.datatypes.get(name)
+        if d is None:
+            raise KeyError(f"UDT {name} is not in the attached file")
+        return {"kind": "udt", "name": name, "description": d.description,
+                "members": [{"name": m.name, "type": m.datatype, "dimension": m.dimension,
+                             "description": m.description} for m in d.members if not m.hidden]}
+    if kind == "aoi":
+        a = p.aois.get(name)
+        if a is None:
+            if name in p.protected_aois:
+                return {"kind": "aoi", "name": name, "protected": True, "params": [], "rows": []}
+            raise KeyError(f"AOI {name} is not in the attached file")
+        rows = [r for r in decompile()["rows"] if r["key"][0] == f"AOI:{name}"]
+        return {"kind": "aoi", "name": name, "description": a.description, "protected": False,
+                "params": [{"name": x.name, "type": x.datatype, "usage": x.usage, "required": x.required,
+                            "description": x.description} for x in a.params],
+                "locals": [{"name": t.name, "type": t.datatype} for t in a.local_tags], "rows": rows}
+    if kind == "module":
+        m = next((m for m in p.modules if m.name == name), None)
+        if m is None:
+            raise KeyError(f"module {name} is not in the attached file")
+        return {"kind": "module", "name": name, "catalog": m.catalog_full or m.catalog, "parent": m.parent,
+                "slot": m.slot, "ekey": m.ekey, "port": m.upstream_type,
+                "io": [{"tag": f"{m.name}:{t.suffix}", "kind": t.kind, "comments": len(t.comments)} for t in m.io_tags]}
+    if kind == "tags":
+        scope = name  # "" for controller scope, else the program
+        rows = []
+        for key, t in p.tags.items():
+            in_scope = ("/" not in key) if not scope else key.startswith(f"{scope}/")
+            if in_scope:
+                rows.append({"name": t.name, "type": t.datatype, "dims": t.dimensions, "alias": t.alias_for,
+                             "description": t.description, "class": t.tag_class})
+        return {"kind": "tags", "scope": scope or "Controller", "tags": sorted(rows, key=lambda r: r["name"].upper())}
+    raise KeyError(f"unknown item kind {kind}")

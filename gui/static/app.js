@@ -6,7 +6,7 @@ const inputBox = $('inputBox');
 const enterButton = $('enterButton');
 const inputWrapper = $('inputWrapper');
 let settings = loadSettings();
-window.addEventListener('focus', () => { settings = loadSettings(); updateBadge(); });  // changed in another tab
+window.addEventListener('focus', () => { settings = loadSettings(); });  // changed in another tab
 
 // ---------------------------------------------------------------- work that must survive going to another page
 // A requirements run keeps going on the server: its id is kept for this tab, so coming back to this page picks
@@ -26,21 +26,6 @@ async function tracked(work) {
 window.addEventListener('beforeunload', (e) => {
     if (inflight) { e.preventDefault(); e.returnValue = ''; }  // the browser asks "Leave site?"
 });
-
-// ---------------------------------------------------------------- model badge
-async function updateBadge() {
-    const dot = $('modelDot');
-    const label = BACKEND_INFO[settings.backend] ? BACKEND_INFO[settings.backend].label : settings.backend;
-    $('modelBadgeText').textContent = settings.backend === 'llamacpp' ? label : `${settings.model || 'default model'} on ${label}`;
-    dot.className = 'dot';
-    try {
-        const d = await fetchModels(settings);
-        dot.className = 'dot ' + (d.ok ? 'ok' : 'bad');
-        if (d.ok && settings.backend === 'llamacpp' && d.models.length) $('modelBadgeText').textContent = `${d.models[0]} on ${label}`;
-        $('modelBadge').title = d.ok ? `Connected: ${d.url}${d.grammar ? ' (grammar-constrained)' : ''}. Click to change.`
-            : `${d.error}. Click to change.`;
-    } catch { dot.className = 'dot bad'; }
-}
 
 // ---------------------------------------------------------------- help page and examples rows
 function openHelp() { window.location.href = '/help'; }  // leaving with a request on its way asks first
@@ -87,9 +72,25 @@ function setMode(m) {
 document.querySelectorAll('#modeToggle button').forEach((b) => (b.onclick = () => { setMode(b.dataset.mode); inputBox.focus(); }));
 
 // ---------------------------------------------------------------- message helpers
-function scrollDown() { window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' }); }
-function addUser(text) { chatWindow.appendChild(el('div', { cls: 'chat-message user', text })); scrollDown(); }
+function scrollDown() { chatWindow.scrollTo({ top: chatWindow.scrollHeight, behavior: 'smooth' }); }
+function addUser(text) { chatWindow.appendChild(el('div', { cls: 'chat-message user', text })); scrollDown(); log(`> ${text}`); }
+// A result (rungs, tables, checks) opens in the editor as a tab of its own; the chat keeps one line that
+// says what it is and opens it again. Short answers (errors, notes, "working...") stay in the chat.
+let route = null;
 function addBot(...children) {
+    if (route) {
+        const r = route;
+        route = null;
+        const doc = openTab(r.key || null, r.title, r.kind, (d) => children.forEach((c) => c && d.appendChild(c)));
+        if (r.quiet) return doc;
+        const line = el('button', { cls: 'chat-link' }, el('span', { cls: 'sum', text: r.summary }),
+            el('span', { cls: 'open', text: `Open ${r.title}` }));
+        line.onclick = () => activateTab(doc.dataset.tab);
+        chatWindow.appendChild(el('div', { cls: 'chat-message bot' }, line));
+        scrollDown();
+        log(`${r.title}: ${r.summary}`);
+        return doc;
+    }
     const m = el('div', { cls: 'chat-message bot' }, ...children);
     chatWindow.appendChild(m);
     scrollDown();
@@ -145,6 +146,7 @@ function copyButton(getText, label) {
     return b;
 }
 function download(filename, text, type = 'application/xml') {
+    log(`Downloaded ${filename}`);
     const blob = text instanceof Blob ? text : new Blob([text], { type });
     const a = el('a');
     a.href = URL.createObjectURL(blob);
@@ -332,7 +334,7 @@ const render = {
         if (d.udts.length && !d.udt_plan) row.appendChild(button(`Optimize UDTs (${d.udts.length})`, () => send('optimize')));
         parts.push(row);
         const msg = addBot(...parts);
-        if (d.udt_plan) render.udt_plan(d.udt_plan);
+        if (d.udt_plan) { route = ROUTES.udt_plan(d.udt_plan); render.udt_plan(d.udt_plan); }
         return msg;
     },
 
@@ -604,7 +606,35 @@ const render = {
     },
 };
 
-function show(d) { (render[d.kind] || render.error)(d.kind in render ? d : { message: 'Unexpected reply from the server.' }); }
+// what each kind of result is called in its tab and its one line in the chat
+const n_ = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+const ROUTES = {
+    generated: (d) => ({ title: 'Generated', kind: 'Rungs', summary: rungSummary(d) }),
+    compiled: (d) => ({ title: 'Compiled', kind: 'Rungs', summary: rungSummary(d) }),
+    rungs: (d) => ({ title: 'Pasted rungs', kind: 'Rungs', summary: rungSummary(d) }),
+    project: (d) => ({ title: d.filename, kind: 'Summary', summary: `Attached ${d.filename}: ${n_(d.routines.length, 'routine')}, ${n_(d.udts.length, 'UDT')}` }),
+    decompiled: (d) => ({ title: `Explained ${d.filename || ''}`.trim(), kind: 'Read', summary: `${d.ok} of ${n_(d.total, 'rung')} explained` }),
+    validated: (d) => ({ title: 'Validation', kind: 'Checks', summary: validationSummary(d) }),
+    udt_created: (d) => ({ title: d.udts.length === 1 ? d.udts[0].name : n_(d.udts.length, 'UDT'), kind: 'UDT', summary: `${n_(d.udts.length, 'UDT')} from ${d.source}` }),
+    udt_plan: (d) => ({ title: 'Optimize UDTs', kind: 'UDT', summary: `${n_(d.plans.length, 'UDT')} analysed` }),
+    spec_started: (d) => ({ title: d.filename, kind: 'Build', summary: `Building ${d.filename}: ${n_(d.sheets.length, 'routine')}` }),
+    xref: (d) => ({ title: `xref ${d.tag}`, kind: 'Refs', summary: `${n_(d.refs.length, 'reference')} to ${d.tag}` }),
+};
+function rungSummary(d) {
+    const errs = (d.issues || []).filter((i) => i.level === 'error').length;
+    return `${n_(d.rungs.length, 'rung')}, ${errs ? `${n_(errs, 'import error')}` : 'ready to import'}`;
+}
+function validationSummary(d) {
+    const errs = (d.import || []).filter((r) => r.level === 'error').length;
+    const c = d.lint.counts;
+    return `${n_(errs, 'import error')}; rules: ${c.critical + c.error} errors, ${n_(c.warning, 'warning')}`;
+}
+function show(d) {
+    if (!(d.kind in render)) d = { kind: 'error', message: 'Unexpected reply from the server.' };
+    route = ROUTES[d.kind] && !(d.kind === 'xref' && !d.refs.length) ? ROUTES[d.kind](d) : null;
+    problemsFrom(d);
+    try { render[d.kind](d); } finally { route = null; }
+}
 
 // ---------------------------------------------------------------- sending
 async function send(text) {
@@ -665,8 +695,14 @@ function showProject() {
     document.querySelectorAll('#fileChips .rungs-only').forEach((c) => (c.hidden = attached.target === 'DataType'));
 }
 function setProject(name, programs, preferred, target) {
+    const changed = (name || null) !== attached.name;
     attached = { name: name || null, target: target || null };
     showProject();
+    if (changed) {
+        if (!name) closeItemTabs();
+        loadTree();
+        refreshStatus();
+    }
     if (programs && programs.length) {
         settings = loadSettings();
         if (!programs.includes(settings.program)) { settings.program = preferred || programs[0]; saveSettings(settings); }
@@ -711,10 +747,11 @@ setChips(store.get('llm4l5x.chips', false));
     try {
         const s = await (await fetch('/api/status')).json();
         setProject(s.project, s.programs, s.default_program, s.target);
+        await loadTree();
+        await restoreTabs();
     } catch { /* server not ready */ }
     inputBox.value = (tab.get(DRAFT_KEY) || {})[mode] || '';
     onInput();
-    updateBadge();
     await intro();
     resumeJob();
 })();
@@ -781,43 +818,45 @@ function specSummary(res, row) {
     }
 }
 
-// ---------------------------------------------------------------- clear the screen (cls)
-// Clears what is on the screen and starts again from the first screen. The attached file stays (detach it
-// with its x), and a requirements run still building keeps going on the server, but is no longer shown.
+// ---------------------------------------------------------------- clear the chat (cls)
+// Clears the chat. The attached file and the open tabs stay; a requirements run still building keeps going
+// on the server, but is no longer followed here.
 function clearChat() {
     tab.del(JOB_KEY);
     chatWindow.replaceChildren();
-    window.scrollTo({ top: 0 });
-    intro();
+    log('Chat cleared');
 }
 $('clearButton').onclick = clearChat;
 
-// ---------------------------------------------------------------- first screen
+// ---------------------------------------------------------------- first screen: the Welcome tab
 const EXAMPLE = {
     said: 'Start the pump with the start button and keep it running until the stop button is pressed or the pump faults.',
     text: '[XIC(Start_PB) ,XIC(Pump_Run) ]XIO(Stop_PB)XIO(Pump_Fault)OTE(Pump_Run);',
 };
 async function intro() {
-    const box = el('section', { cls: 'intro' });
-    box.appendChild(el('h1', { text: 'Ladder logic from plain English, checked before it reaches Studio 5000' }));
-    box.appendChild(el('p', { text: 'Describe what a rung should do, or paste rungs to read them. A model on this PC writes the logic; '
-        + 'fixed code draws it, checks it against your project and writes the L5X.' }));
-    const ex = el('div', { cls: 'example' });
-    ex.appendChild(el('div', { cls: 'said', text: EXAMPLE.said }));
     const [svg] = await ladders([{ text: EXAMPLE.text, number: 0 }]);
-    if (svg) ex.appendChild(drawing(svg));
-    box.appendChild(ex);
-    const row = el('div', { cls: 'btn-row' });
-    const tryIt = button('Try this example', () => { setMode('logic'); inputBox.value = EXAMPLE.said; onInput(); inputBox.focus(); });
-    tryIt.classList.add('primary');
-    row.appendChild(tryIt);
-    row.appendChild(button('Attach an L5X', () => $('fileInput').click()));
-    row.appendChild(button('Create a UDT', () => { setMode('udt'); inputBox.focus(); }));
-    row.appendChild(button('What else it does', openHelp));
-    box.appendChild(row);
-    chatWindow.prepend(box);
+    openTab('welcome', 'Welcome', '', (doc) => {
+        const box = el('section', { cls: 'intro' });
+        box.appendChild(el('h1', { text: 'Ladder logic from plain English, checked before it reaches Studio 5000' }));
+        box.appendChild(el('p', { text: 'Describe what a rung should do in the chat, or paste rungs to read them. A model on this PC '
+            + 'writes the logic; fixed code draws it, checks it against your project and writes the L5X. Attach an L5X to see '
+            + 'its routines, tags, UDTs, AOIs and I/O in the explorer.' }));
+        const ex = el('div', { cls: 'example' });
+        ex.appendChild(el('div', { cls: 'said', text: EXAMPLE.said }));
+        if (svg) ex.appendChild(drawing(svg));
+        box.appendChild(ex);
+        const row = el('div', { cls: 'btn-row' });
+        const tryIt = button('Try this example', () => { setMode('logic'); inputBox.value = EXAMPLE.said; onInput(); inputBox.focus(); });
+        tryIt.classList.add('primary');
+        row.appendChild(tryIt);
+        row.appendChild(button('Attach an L5X', () => $('fileInput').click()));
+        row.appendChild(button('Create a UDT', () => { setMode('udt'); inputBox.focus(); }));
+        row.appendChild(button('What else it does', openHelp));
+        box.appendChild(row);
+        doc.appendChild(box);
+    }, { keep: !restoredTabs });
 }
 
 // the input grows with its text, up to its max-height
-function grow() { inputBox.style.height = 'auto'; inputBox.style.height = `${inputBox.scrollHeight}px`; }
+function grow() { inputBox.style.height = 'auto'; inputBox.style.height = `${Math.max(inputBox.scrollHeight, 52)}px`; }
 inputBox.addEventListener('input', grow);
