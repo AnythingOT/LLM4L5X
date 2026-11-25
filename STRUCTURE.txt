@@ -64,8 +64,9 @@ eval/                      Measuring quality, for developers: the model's scores
 examples/
   pump_station.spec
   tank_plant.yaml
-explain/                   From existing logic to words and pictures: rungs back to LogicSpec, and ladder drawings.
+explain/                   From existing logic to words and pictures: rungs back to LogicSpec, ladder drawings, rung comments.
   __init__.py
+  comments.py              Write the plain-English read of each rung into the L5X as its rung comment.
   decompiler.py            Turn existing rungs back into LogicSpec.
   equivalence.py           Do two LogicSpec programs do the same thing?
   ladder.py                Draw a rung as a ladder diagram (SVG), the way Logix Designer lays it out: left and right power rails, contacts and coils as symbols, every other instruction as a box with its operands, branches as parallel legs, outputs pushed to the right rail.
@@ -109,6 +110,7 @@ gui/                       The local web app: pages and the JSON API behind them
     base.html
     devices.html
     energize.html
+    help.html
     index.html
     lint.html
     settings.html
@@ -186,6 +188,7 @@ tests/                     pytest: one file per area.
   test_oracle_report.py    The oracle report: an unanswerable row is listed once, by Excel row with its Rung number.
   test_profile.py
   test_rung.py
+  test_rung_comments.py    Download the attached L5X with the English read as rung comments: only missing comments are added.
   test_rung_compare.py
   test_security.py         Data must not leave this PC by accident: the model address, the page banner, big files.
   test_simulator.py
