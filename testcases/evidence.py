@@ -27,7 +27,7 @@ from datetime import datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-_CODE_DIRS = ("core", "l5x", "lint", "scenario", "plant", "gui", "explain", "inputs", "udt", "library", "eval")
+_CODE_DIRS = ("core", "l5x", "lint", "testcases", "devices", "gui", "explain", "generate", "udt", "library", "eval")
 _COMMENT_REQS = re.compile(r"^\s*\[([^\]]+)\]\s*(.*)$", re.S)
 FORMAT = 1
 

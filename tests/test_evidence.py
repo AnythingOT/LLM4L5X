@@ -1,4 +1,5 @@
 """Test evidence: requirements from the instruction sheet, traceability, run records, the PDF report."""
+import functools
 import io
 from datetime import datetime, timezone
 
@@ -52,6 +53,7 @@ def workbook() -> bytes:
     return buf.getvalue()
 
 
+@functools.cache  # one export: the file carries its ExportDate, so two exports a second apart differ
 def program() -> bytes:
     """The generated routine: each rung's comment carries its Req IDs, as a requirements run writes it."""
     rungs = []
@@ -180,3 +182,14 @@ def test_tests_page_keeps_evidence_and_serves_the_report(web):
     rec = web.get(f"/api/tests/runs/{run['run_id']}/record.json").get_json()
     assert rec["id"] == run["run_id"] and fingerprint(rec).startswith(run["run_id"].split("-")[2])
     assert web.get("/api/tests/runs/nope/report.pdf").status_code == 404
+
+
+def test_the_code_fingerprint_covers_every_product_folder():
+    # the folders were renamed (plant -> devices, scenario -> testcases, inputs -> generate): the hash must follow
+    from pathlib import Path
+
+    from testcases import evidence
+    root = Path(evidence.__file__).resolve().parent.parent
+    for d in ("core", "l5x", "lint", "testcases", "devices", "gui", "explain", "generate", "udt", "library"):
+        assert d in evidence._CODE_DIRS and (root / d).is_dir(), d
+    assert all((root / d).is_dir() for d in evidence._CODE_DIRS)
