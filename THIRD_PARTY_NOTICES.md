@@ -45,6 +45,13 @@ licences come with them when installed.
 | charset-normalizer (used by reportlab) | MIT |
 | pytest (tests only), ruff (code checks, CI only) | MIT |
 
+Optional, not in `requirements.txt`: you install it yourself only to run test cases on Logix
+Emulate or a controller (`testcases/emulate.py`).
+
+| Package | Licence |
+|---|---|
+| pylogix (https://github.com/dmroeder/pylogix) | Apache-2.0 |
+
 ## Test data
 
 - `tests/fixtures/studio_single_udt.L5X` comes from AnythingOT/L5X_UDTOptimizer (MIT, same author).
@@ -54,6 +61,6 @@ licences come with them when installed.
 
 ## Trademarks
 
-Rockwell Automation, Studio 5000, Logix Designer, RSLogix 5000, ControlLogix, CompactLogix and GuardLogix
-are trademarks of Rockwell Automation, Inc. They are used here only to say which files this tool reads and
+Rockwell Automation, Studio 5000, Logix Designer, Logix Emulate, RSLogix 5000, ControlLogix, CompactLogix and
+GuardLogix are trademarks of Rockwell Automation, Inc. They are used here only to say which files this tool reads and
 writes. LLM4L5X is not affiliated with or endorsed by Rockwell Automation.
